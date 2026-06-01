@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Compound Growth</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #09090f;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #fff;
+  -webkit-text-size-adjust: 100%;
+}
+
+.page {
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 18px 14px;
+}
+
+/* ── Controls panel ── */
+.controls {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+.ctrl-group { display: flex; flex-direction: column; gap: 5px; }
+.ctrl-group.full { grid-column: 1 / -1; }
+.ctrl-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ctrl-val {
+  font-size: 16px;
+  font-weight: 600;
+  color: #a89ff5;
+  letter-spacing: -0.01em;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.12);
+  outline: none;
+  margin-top: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #6b62d4;
+  border: 2px solid #a89ff5;
+  cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #6b62d4;
+  border: 2px solid #a89ff5;
+  cursor: pointer;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.header-left {}
+.h-label { font-size: 11px; color: rgba(255,255,255,0.3); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 2px; }
+.h-val { font-size: clamp(24px, 6vw, 38px); font-weight: 700; color: #fff; letter-spacing: -0.03em; line-height: 1; }
+.h-sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 3px; }
+.header-right { text-align: right; }
+.cur-label { font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+.cur-val { font-size: clamp(20px, 5vw, 32px); font-weight: 700; color: #a89ff5; letter-spacing: -0.02em; line-height: 1; }
+.cur-mult { font-size: 11px; color: rgba(168,159,245,0.55); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab {
+  padding: 7px 18px;
+  border-radius: 40px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: rgba(255,255,255,0.35);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab.on { background: #4c44b0; border-color: #6b62d4; color: #fff; }
+
+/* ── Chart ── */
+.chart-wrap {
+  flex: 1;
+  min-height: 200px;
+  max-height: 300px;
+  position: relative;
+  margin-bottom: 12px;
+}
+canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* ── Milestones ── */
+.miles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.ms {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 7px 4px;
+  text-align: center;
+  transition: all 0.35s;
+}
+.ms.lit { background: rgba(108,98,212,0.15); border-color: rgba(108,98,212,0.4); }
+.ms.cur { background: rgba(108,98,212,0.3); border-color: #6b62d4; }
+.ms-yr { font-size: 9px; color: rgba(255,255,255,0.3); margin-bottom: 3px; letter-spacing: 0.04em; }
+.ms-v { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.2); transition: color 0.35s; font-variant-numeric: tabular-nums; }
+.ms.lit .ms-v, .ms.cur .ms-v { color: #fff; }
+.ms-g { font-size: 9px; color: rgba(108,98,212,0.8); margin-top: 2px; min-height: 11px; font-variant-numeric: tabular-nums; }
+
+/* ── Annotation ── */
+.ann {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.ann-pill {
+  background: rgba(108,98,212,0.22);
+  border: 1px solid rgba(108,98,212,0.4);
+  color: #b8b2f5;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ann-txt { font-size: 12px; color: rgba(255,255,255,0.3); }
+
+/* ── Bottom ── */
+.bottom { display: flex; align-items: center; gap: 12px; }
+.ptrack { flex: 1; height: 2px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.pfill { height: 100%; background: #6b62d4; border-radius: 2px; transition: width 0.45s ease; width: 0%; }
+.rbtn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.4);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.rbtn:active { background: rgba(255,255,255,0.08); color: #fff; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="ctrl-group">
+      <div class="ctrl-label">Annual return</div>
+      <div class="ctrl-val" id="lbl-rate">20%</div>
+      <input type="range" id="sl-rate" min="5" max="40" step="1" value="20">
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Starting amount</div>
+      <div class="ctrl-val" id="lbl-start">$10,000</div>
+      <input type="range" id="sl-start" min="1000" max="100000" step="1000" value="10000">
+    </div>
+    <div class="ctrl-group full">
+      <div class="ctrl-label">Monthly contribution</div>
+      <div class="ctrl-val" id="lbl-contrib">$0 / month</div>
+      <input type="range" id="sl-contrib" min="0" max="5000" step="100" value="0">
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="h-label">annual return</div>
+      <div class="h-val" id="h-rate">20%</div>
+      <div class="h-sub" id="h-sub">starting with $10,000</div>
+    </div>
+    <div class="header-right">
+      <div class="cur-label">now worth</div>
+      <div class="cur-val" id="cur-val">—</div>
+      <div class="cur-mult" id="cur-mult"></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab on" id="tb-bar" onclick="setMode('bar')">Bar</button>
+    <button class="tab" id="tb-line" onclick="setMode('line')">Line</button>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-wrap"><canvas id="cv"></canvas></div>
+
+  <!-- Milestones -->
+  <div class="miles" id="miles"></div>
+
+  <!-- Annotation -->
+  <div class="ann">
+    <span class="ann-pill" id="ann-pill"></span>
+    <span class="ann-txt" id="ann-txt"></span>
+  </div>
+
+  <!-- Bottom -->
+  <div class="bottom">
+    <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+    <button class="rbtn" onclick="restart()">↺ replay</button>
+  </div>
+
+</div>
+<script>
+// ── State ──────────────────────────────────────────────────
+let RATE = 20, START = 10000, CONTRIB = 0;
+let mode = 'bar', step = -1, timer = null, raf = null;
+const YEARS = [0, 10, 20, 30, 40];
+const YR_LABELS = ['Today','Yr 10','Yr 20','Yr 30','Yr 40'];
+
+// ── Compute value at year y with monthly contributions ──────
+function calcVal(y) {
+  const r = RATE / 100;
+  const mr = r / 12;
+  const months = y * 12;
+  // lump sum compounded
+  const lump = START * Math.pow(1 + r, y);
+  // annuity future value of monthly contributions
+  const contrib = CONTRIB > 0 && mr > 0
+    ? CONTRIB * (Math.pow(1 + mr, months) - 1) / mr
+    : CONTRIB * months;
+  return Math.round(lump + contrib);
+}
+
+function getVals() { return YEARS.map(y => calcVal(y)); }
+function fmt(n) {
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(2) + 'M';
+  if (n >= 1000)    return '$' + (Math.round(n/100)*100/1000).toFixed(0) + 'K';
+  return '$' + n.toLocaleString();
+}
+function fmtShort(n) {
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return '$' + Math.round(n/1000) + 'K';
+  return '$' + n;
+}
+
+// ── Canvas ─────────────────────────────────────────────────
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let barH = [0,0,0,0,0], barT = [0,0,0,0,0];
+let lineP = 0, lineT = 0;
+
+function resizeCanvas() {
+  const rect = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  cv.width  = rect.width  * dpr;
+  cv.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function lerp(a, b, t) { return a + (b-a) * t; }
+
+function animBars() {
+  let done = true;
+  for (let i=0;i<5;i++) {
+    const d = barT[i] - barH[i];
+    if (Math.abs(d) > 0.0005) { barH[i] += d * 0.13; done = false; }
+    else barH[i] = barT[i];
+  }
+  draw();
+  if (!done) raf = requestAnimationFrame(animBars);
+}
+function animLine() {
+  const d = lineT - lineP;
+  if (Math.abs(d) > 0.001) { lineP += d * 0.1; draw(); raf = requestAnimationFrame(animLine); }
+  else { lineP = lineT; draw(); }
+}
+function cancelAnim() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+
+function draw() {
+  const W = cv.width  / (window.devicePixelRatio||1);
+  const H = cv.height / (window.devicePixelRatio||1);
+  ctx.clearRect(0,0,W,H);
+
+  const PL=54, PR=10, PT=14, PB=30;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const vals = getVals();
+  const maxV = vals[4];
+
+  // Grid
+  const nLines = 5;
+  ctx.font = '500 9.5px -apple-system, sans-serif';
+  for (let i=0;i<=nLines;i++) {
+    const v = (i/nLines)*maxV;
+    const gy = PT + cH - (v/maxV)*cH;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PL,gy); ctx.lineTo(PL+cW,gy); ctx.stroke();
+    if (i>0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.textAlign = 'right';
+      ctx.fillText(fmtShort(v), PL-5, gy+3.5);
+    }
+  }
+
+  if (mode==='bar') drawBars(PL,PT,cW,cH,maxV,vals);
+  else drawLine(PL,PT,cW,cH,maxV);
+
+  // X labels
+  ctx.textAlign='center';
+  ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.font='400 10px -apple-system, sans-serif';
+  YEARS.forEach((yr,i)=>{
+    ctx.fillText(YR_LABELS[i], PL+(i/4)*cW, H-7);
+  });
+}
+
+function drawBars(PL,PT,cW,cH,maxV,vals) {
+  const n=5, gapFrac=0.38;
+  const totalG = cW*gapFrac, bW = (cW-totalG)/n, gap = totalG/(n+1);
+  vals.forEach((v,i)=>{
+    if (barH[i]<0.001) return;
+    const bh = barH[i]*cH;
+    const x  = PL+gap+i*(bW+gap);
+    const y  = PT+cH-bh;
+    ctx.beginPath();
+    const r = Math.min(5, bW/3);
+    ctx.moveTo(x+r,y); ctx.lineTo(x+bW-r,y);
+    ctx.quadraticCurveTo(x+bW,y,x+bW,y+r);
+    ctx.lineTo(x+bW,y+bh); ctx.lineTo(x,y+bh); ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+    ctx.fillStyle = i===step ? '#8b82ee' : 'rgba(83,74,183,0.55)';
+    ctx.fill();
+    if (bh>18 && barH[i]>=barT[i]*0.97) {
+      ctx.textAlign='center';
+      ctx.font='600 9.5px -apple-system, sans-serif';
+      ctx.fillStyle = i===step ? '#fff' : 'rgba(255,255,255,0.5)';
+      ctx.fillText(fmtShort(v), x+bW/2, y-5);
+    }
+  });
+}
+
+function drawLine(PL,PT,cW,cH,maxV) {
+  const visYr = lineP * 40;
+  if (visYr<0.1) return;
+  const pts=[];
+  for (let y=0;y<=Math.min(40,Math.floor(visYr));y++) {
+    pts.push({ x: PL+(y/40)*cW, y: PT+cH-(calcVal(y)/maxV)*cH });
+  }
+  const frac = visYr-Math.floor(visYr);
+  if (frac>0 && Math.floor(visYr)<40) {
+    const y0=Math.floor(visYr), v0=calcVal(y0), v1=calcVal(y0+1);
+    const vf=v0+(v1-v0)*frac;
+    pts.push({ x: PL+(visYr/40)*cW, y: PT+cH-(vf/maxV)*cH });
+  }
+  if (pts.length<2) return;
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, PT+cH);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.lineTo(pts[pts.length-1].x, PT+cH);
+  ctx.closePath();
+  ctx.fillStyle='rgba(107,98,212,0.15)';
+  ctx.fill();
+
+  // Stroke
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle='#8b82ee'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.stroke();
+
+  // Dots at milestones
+  YEARS.forEach((yr,i)=>{
+    if (yr>visYr) return;
+    const vals=getVals();
+    const px=PL+(yr/40)*cW, py=PT+cH-(vals[i]/maxV)*cH;
+    const isCur=i===step;
+    ctx.beginPath(); ctx.arc(px,py,isCur?7:4.5,0,Math.PI*2);
+    ctx.fillStyle=isCur?'#fff':'#6b62d4'; ctx.fill();
+    ctx.strokeStyle=isCur?'#8b82ee':'rgba(255,255,255,0.25)'; ctx.lineWidth=2; ctx.stroke();
+    if (i<=step) {
+      ctx.textAlign=i<3?'left':'right';
+      ctx.font='600 9.5px -apple-system, sans-serif';
+      ctx.fillStyle=isCur?'#fff':'rgba(255,255,255,0.45)';
+      ctx.fillText(fmtShort(vals[i]), i<3?px+9:px-9, py-8);
+    }
+  });
+}
+
+// ── Milestones DOM ──────────────────────────────────────────
+function buildMiles() {
+  const el=document.getElementById('miles'); el.innerHTML='';
+  YEARS.forEach((_,i)=>{
+    el.innerHTML+=`<div class="ms" id="ms${i}"><div class="ms-yr">${YR_LABELS[i]}</div><div class="ms-v" id="msv${i}">—</div><div class="ms-g" id="msg${i}"></div></div>`;
+  });
+}
+
+function updateMiles(s) {
+  const vals=getVals();
+  YEARS.forEach((_,i)=>{
+    const el=document.getElementById('ms'+i);
+    const vEl=document.getElementById('msv'+i);
+    const gEl=document.getElementById('msg'+i);
+    if (i<s)      { el.className='ms lit'; vEl.textContent=fmtShort(vals[i]); gEl.textContent=i>0?'+'+fmtShort(vals[i]-vals[i-1]):''; }
+    else if (i===s){ el.className='ms cur'; vEl.textContent=fmtShort(vals[i]); gEl.textContent=i>0?'+'+fmtShort(vals[i]-vals[i-1]):''; }
+    else           { el.className='ms'; vEl.textContent='—'; gEl.textContent=''; }
+  });
+}
+
+// ── Annotations ────────────────────────────────────────────
+function getNote(i) {
+  const vals=getVals();
+  if (i===0) return { pill: fmt(vals[0])+' invested', txt: 'your starting point' };
+  const gain=vals[i]-vals[i-1];
+  const mult=(gain/(vals[i-1]||1)).toFixed(1);
+  const notes=['','slow start — patience required','growth accelerating','more than all previous decades combined','this decade changes everything'];
+  return { pill: '+'+fmt(gain)+' in 10 years', txt: notes[i] };
+}
+
+function revealStep(i) {
+  step=i;
+  const vals=getVals();
+  document.getElementById('cur-val').textContent=fmt(vals[i]);
+  document.getElementById('cur-mult').textContent='×'+(vals[i]/START).toFixed(1)+' your money';
+  const note=getNote(i);
+  document.getElementById('ann-pill').textContent=note.pill;
+  document.getElementById('ann-txt').textContent=note.txt;
+  document.getElementById('pfill').style.width=(i/4*100)+'%';
+  updateMiles(i);
+
+  cancelAnim();
+  if (mode==='bar') { barT[i]=vals[i]/vals[4]; animBars(); }
+  else { lineT=YEARS[i]/40; animLine(); }
+}
+
+// ── Sequence ────────────────────────────────────────────────
+function runSeq() {
+  step=-1;
+  clearInterval(timer);
+  cancelAnim();
+  barH=[0,0,0,0,0]; barT=[0,0,0,0,0];
+  lineP=0; lineT=0;
+  document.getElementById('cur-val').textContent='—';
+  document.getElementById('cur-mult').textContent='';
+  document.getElementById('ann-pill').textContent='';
+  document.getElementById('ann-txt').textContent='';
+  document.getElementById('pfill').style.width='0%';
+  updateMiles(-1);
+  draw();
+  let s=0;
+  setTimeout(()=>{
+    revealStep(0);
+    timer=setInterval(()=>{ s++; if(s>4){clearInterval(timer);return;} revealStep(s); },1000);
+  },350);
+}
+
+function restart() { runSeq(); }
+function setMode(m) {
+  mode=m;
+  document.getElementById('tb-bar').className='tab'+(m==='bar'?' on':'');
+  document.getElementById('tb-line').className='tab'+(m==='line'?' on':'');
+  restart();
+}
+
+// ── Slider wiring ───────────────────────────────────────────
+function updateHeader() {
+  document.getElementById('h-rate').textContent=RATE+'%';
+  const subParts=['starting with '+fmt(START)];
+  if (CONTRIB>0) subParts.push('+'+fmt(CONTRIB)+'/mo');
+  document.getElementById('h-sub').textContent=subParts.join('  ·  ');
+}
+
+document.getElementById('sl-rate').addEventListener('input', function(){
+  RATE=+this.value;
+  document.getElementById('lbl-rate').textContent=RATE+'%';
+  updateHeader(); restart();
+});
+document.getElementById('sl-start').addEventListener('input', function(){
+  START=+this.value;
+  document.getElementById('lbl-start').textContent=fmt(START);
+  updateHeader(); restart();
+});
+document.getElementById('sl-contrib').addEventListener('input', function(){
+  CONTRIB=+this.value;
+  document.getElementById('lbl-contrib').textContent=CONTRIB===0?'$0 / month':fmt(CONTRIB)+' / month';
+  updateHeader(); restart();
+});
+
+// ── Init ────────────────────────────────────────────────────
+buildMiles();
+resizeCanvas();
+setTimeout(runSeq, 300);
+</script>
+</body>
+</html>
