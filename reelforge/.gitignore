@@ -1,0 +1,12 @@
+.reelforge/
+__pycache__/
+*.pyc
+assets/fonts/*.ttf
+assets/fonts/*.otf
+assets/broll/*
+!assets/broll/README.md
+*-reel.mp4
+*-subbed.mp4
+*.egg-info/
+build/
+dist/
