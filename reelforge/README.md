@@ -233,6 +233,19 @@ For more control add `assets/broll/library.yml` — see the README in that folde
 `captions_only` ship with it; copy one and edit to make your own. Anything in a profile can
 also be set per run with `--set key.path=value`.
 
+## Where things live
+
+| | |
+|---|---|
+| `studio/` | **Created on your machine** by `reelforge studio init`. Your background, voice, frameworks and scripts. Never committed, never uploaded. |
+| `.reelforge/` | Also local. Cache, market database, learning history, render work files. |
+| `studio_template/`, `frameworks/` | In this repo — the starting text `studio init` copies into your `studio/`. Edit these if you want different defaults for every new studio. |
+| `templates/` | Video look presets (`viral`, `clean`, ...), in this repo. |
+
+Nothing in `studio/` or `.reelforge/` leaves your computer. If you are browsing this
+repo looking for `studio/background.md`, it is not here by design — run
+`reelforge studio init` and it appears in your working folder.
+
 ## Layout
 
 ```

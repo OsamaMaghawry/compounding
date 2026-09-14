@@ -17,6 +17,13 @@ That creates three files. **Edit them** — the writer reads them verbatim:
 | `studio/voice.md` | Language and dialect, tone, sentence shape, words you use and avoid |
 | `studio/audience.md` | Who is watching, what they already believe, what they fear |
 
+**These files are created on your computer, not in this repository.** Your background
+and voice are your content — they are never committed or uploaded. If you want to see
+what they look like before running anything, the starting text is in
+[`studio_template/`](../studio_template/) and the frameworks are in
+[`frameworks/`](../frameworks/); `studio init` copies both into your `studio/` folder
+for you to edit.
+
 They ship as empty prompts, not invented biography. A plausible-sounding fake
 credential is worse than a blank, because a blank gets noticed and a fake gets
 published.

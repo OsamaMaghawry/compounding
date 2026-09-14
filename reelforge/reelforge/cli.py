@@ -362,7 +362,8 @@ def cmd_studio(args) -> int:
         else:
             _print("studio already set up (use --force to overwrite)")
         print()
-        _print("Now edit these three files - the writer reads them verbatim:")
+        _print("These live on your computer, not in the repo - they are your content.")
+        _print("Edit them before writing scripts; the writer reads them verbatim:")
         _print(f"  {studio.root / 'background.md'}   who you are")
         _print(f"  {studio.root / 'voice.md'}        how you sound")
         _print(f"  {studio.root / 'audience.md'}     who is watching")

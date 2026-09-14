@@ -16,63 +16,25 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 BUILTIN_FRAMEWORKS = PACKAGE_ROOT / "frameworks"
 
-BACKGROUND = """# Background
+STUDIO_TEMPLATE = PACKAGE_ROOT / "studio_template"
+STUDIO_FILES = ("background.md", "voice.md", "audience.md")
 
-Everything in this file is read by the writer, verbatim. Replace it with the truth.
 
-## Who I am
-(Your name, and what you actually do.)
+def template(name: str) -> str:
+    """The starting text for one studio file.
 
-## What this channel covers
-(Markets? Compounding? Personal finance for a specific audience?)
+    These live as real markdown in `studio_template/` rather than as strings in
+    here, so they can be read and edited like any other file in the repo - which
+    is where anyone looking for them will look first.
+    """
+    path = STUDIO_TEMPLATE / name
+    return path.read_text("utf-8") if path.exists() else ""
 
-## Why someone should listen to me
-(Experience, track record, qualifications - whatever is genuinely true.)
 
-## What I never claim
-(For example: I do not give individual investment advice. I do not predict prices.)
-"""
-
-VOICE = """# Voice
-
-## Language
-Egyptian Arabic (عامية مصرية). Keep English technical terms in English.
-
-## Tone
-Direct and calm. No hype, no shouting, no "secret nobody tells you".
-
-## Sentence shape
-Short. One idea per sentence. Captions cut long sentences in half and they stop landing.
-
-## I always
-- Say the time period whenever I quote a return.
-- Admit what a number does not prove.
-
-## I never
-- Promise a return.
-- Use fear as the hook.
-
-## Words I use
-(Add the phrases you actually say.)
-
-## Words I avoid
-(Add the ones that do not sound like you.)
-"""
-
-AUDIENCE = """# Audience
-
-## Who is watching
-(Age, country, how much they already know.)
-
-## What they already believe
-(The assumptions your content has to work against.)
-
-## What they are afraid of
-(Losing savings? Being late? Being scammed?)
-
-## What a good video does for them
-(Changes one belief? Gives one action?)
-"""
+# Kept as module constants for convenience; the files are the source of truth.
+BACKGROUND = template("background.md")
+VOICE = template("voice.md")
+AUDIENCE = template("audience.md")
 
 
 @dataclass
@@ -141,10 +103,12 @@ class Studio:
         self.frameworks_dir.mkdir(parents=True, exist_ok=True)
         self.scripts_dir.mkdir(parents=True, exist_ok=True)
 
-        for name, body in (("background.md", BACKGROUND), ("voice.md", VOICE),
-                           ("audience.md", AUDIENCE)):
+        for name in STUDIO_FILES:
             path = self.root / name
             if path.exists() and not force:
+                continue
+            body = template(name)
+            if not body:
                 continue
             path.write_text(body, encoding="utf-8")
             written.append(path)
