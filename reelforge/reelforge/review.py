@@ -79,6 +79,7 @@ button:disabled{opacity:.5;cursor:default}
     <div class="card"><h2>Captions</h2><div id="captions"></div></div>
     <div class="card"><h2>Zoom moves</h2><div id="zooms"></div></div>
     <div class="card"><h2>B-roll layers</h2><div id="overlays"></div></div>
+    <div class="card"><h2>Transitions</h2><div id="transitions"></div></div>
   </div>
 </div>
 <script>
@@ -91,7 +92,7 @@ async function load(){
   edl=d.edl; runId=d.run_id;
   $('src').textContent=d.source;
   $('player').src='/preview.mp4?v='+Date.now();
-  renderStats(d.summary); renderCaptions(); renderZooms(); renderOverlays();
+  renderStats(d.summary); renderCaptions(); renderZooms(); renderOverlays(); renderTransitions();
 }
 function renderStats(s){
   $('stats').innerHTML=[
@@ -132,6 +133,17 @@ function renderOverlays(){
   ).join('') : '<div class="meta">No b-roll matched. Add clips to your library folder.</div>';
   $('overlays').querySelectorAll('input').forEach(el=>{
     el.onchange=()=>{edl.overlays[el.dataset.i].enabled=el.checked;};
+  });
+}
+function renderTransitions(){
+  $('transitions').innerHTML = edl.transitions.length? edl.transitions.map((t,i)=>
+    `<div class="row"><input type="checkbox" data-i="${i}" ${t.enabled?'checked':''}>
+     <span class="t">${fmt(t.out_time)}</span>
+     <span class="grow meta">${t.kind}</span>
+     <span class="badge">${Math.round(t.duration*1000)}ms</span></div>`
+  ).join('') : '<div class="meta">No transitions.</div>';
+  $('transitions').querySelectorAll('input').forEach(el=>{
+    el.onchange=()=>{edl.transitions[el.dataset.i].enabled=el.checked;};
   });
 }
 async function post(url){
@@ -189,6 +201,9 @@ class ReviewServer:
         for index, overlay in enumerate(payload.get("overlays", [])):
             if index < len(self.edl.overlays):
                 self.edl.overlays[index].enabled = bool(overlay.get("enabled", True))
+        for index, transition in enumerate(payload.get("transitions", [])):
+            if index < len(self.edl.transitions):
+                self.edl.transitions[index].enabled = bool(transition.get("enabled", True))
         for index, caption in enumerate(payload.get("captions", [])):
             if index < len(self.edl.captions):
                 text = (caption.get("text") or "").strip()

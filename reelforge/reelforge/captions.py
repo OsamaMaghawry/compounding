@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .arabic import clean_for_display, is_arabic
+from .arabic import clean_for_display, emphasis_set, is_arabic, is_emphatic
 from .speech import Word
 
 # Vertical space the Instagram/TikTok UI covers at the bottom of a 1920-tall frame.
@@ -147,6 +147,61 @@ def _wrap_rows(words: list[str], max_chars: int) -> list[list[int]]:
     return rows
 
 
+def _style_spec(profile, font_size: int) -> dict:
+    """Per-style ASS parameters and the inline tags that mark the spoken word."""
+    style = (profile.get("captions.style") or "karaoke").lower()
+    primary = _inline_color(profile.get("captions.primary"))
+    highlight = _inline_color(profile.get("captions.highlight"))
+    pop = float(profile.get("captions.pop_scale"))
+
+    spec = {
+        "style": style,
+        "font_size": font_size,
+        "border_style": 1,
+        "outline": float(profile.get("captions.outline")),
+        "shadow": float(profile.get("captions.shadow")),
+        "outline_color": _ass_color(profile.get("captions.outline_color")),
+        "per_word": True,     # emit one event per word so the active one can change
+        "one_word": False,    # show only the active word, nothing else
+        "active_open": f"{{\\c{highlight}}}",
+        "active_close": f"{{\\c{primary}}}",
+        "line_prefix": "",
+    }
+
+    if style == "plain":
+        spec["per_word"] = False
+        spec["active_open"] = spec["active_close"] = ""
+    elif style == "pop":
+        # Scaling a single word inline does not reflow the rest of the line, so the
+        # word grows straight into its neighbour. Pulse the whole line instead: the
+        # colour change still tracks the spoken word, and nothing can collide.
+        scale = int(round(pop * 100))
+        spec["line_prefix"] = (f"{{\\fscx{scale}\\fscy{scale}"
+                               f"\\t(0,150,\\fscx100\\fscy100)}}")
+        spec["active_open"] = f"{{\\c{highlight}}}"
+        spec["active_close"] = f"{{\\c{primary}}}"
+    elif style == "box":
+        # BorderStyle 3 turns the outline into a filled box. The style's box is
+        # transparent, so only the word that opts in with \3a is visibly boxed.
+        box_fill = _inline_color(profile.get("captions.box_color"))
+        box_text = _inline_color(profile.get("captions.box_text"))
+        spec["border_style"] = 3
+        spec["outline"] = float(profile.get("captions.box_padding"))
+        spec["shadow"] = 0.0
+        spec["outline_color"] = "&HFF000000"          # fully transparent
+        spec["active_open"] = f"{{\\3a&H00&\\3c{box_fill}\\c{box_text}}}"
+        spec["active_close"] = f"{{\\3a&HFF&\\c{primary}}}"
+    elif style == "word":
+        spec["one_word"] = True
+        spec["font_size"] = int(round(font_size * float(profile.get("captions.word_size_boost"))))
+        spec["outline"] = float(profile.get("captions.outline")) + 2
+        # A single word needs no colour change to read as active; a scale-in
+        # gives it the beat instead.
+        spec["active_open"] = "{\\fscx88\\fscy88\\t(0,120,\\fscx100\\fscy100)}"
+        spec["active_close"] = ""
+    return spec
+
+
 def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
               height: int | None = None) -> str:
     """Render caption lines to an ASS subtitle script."""
@@ -154,19 +209,28 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
     height = height or int(profile.get("output.height"))
 
     font = profile.get("captions.font")
-    font_size = int(profile.get("captions.font_size"))
     bold = -1 if profile.get("captions.bold") else 0
     primary = _ass_color(profile.get("captions.primary"))
-    outline_color = _ass_color(profile.get("captions.outline_color"))
-    outline = float(profile.get("captions.outline"))
-    shadow = float(profile.get("captions.shadow"))
     margin_x = int(profile.get("captions.margin_x"))
     y_pct = float(profile.get("captions.y_pct"))
     max_chars = int(profile.get("captions.max_chars"))
-    karaoke = bool(profile.get("captions.karaoke"))
-    highlight = _inline_color(profile.get("captions.highlight"))
     primary_inline = _inline_color(profile.get("captions.primary"))
-    pop = float(profile.get("captions.highlight_scale"))
+
+    spec = _style_spec(profile, int(profile.get("captions.font_size")))
+
+    use_emphasis = bool(profile.get("captions.emphasis"))
+    extra_emphasis = emphasis_set(profile.get("captions.emphasis_words"))
+    emphasis_inline = _inline_color(profile.get("captions.emphasis_color"))
+    # Scaling one word does not reflow the line, so any scale above 1 risks the word
+    # overlapping its neighbour. Colour alone marks importance safely; the scale knob
+    # is there for anyone who wants it and accepts the tighter spacing.
+    emphasis_scale = int(round(float(profile.get("captions.emphasis_scale")) * 100))
+    if emphasis_scale == 100:
+        emphasis_open = f"{{\\c{emphasis_inline}}}"
+        emphasis_close = f"{{\\c{primary_inline}}}"
+    else:
+        emphasis_open = f"{{\\c{emphasis_inline}\\fscx{emphasis_scale}\\fscy{emphasis_scale}}}"
+        emphasis_close = f"{{\\c{primary_inline}\\fscx100\\fscy100}}"
 
     margin_v = int(round(height * (1.0 - y_pct)))
     if profile.get("captions.safe_area"):
@@ -186,9 +250,9 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, "
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Reel,{font},{font_size},{primary},{primary},{outline_color},&H80000000,"
-        f"{bold},0,0,0,100,100,0,0,1,{outline:g},{shadow:g},2,"
-        f"{margin_x},{margin_x},{margin_v},1",
+        f"Style: Reel,{font},{spec['font_size']},{primary},{primary},{spec['outline_color']},"
+        f"&H80000000,{bold},0,0,0,100,100,0,0,{spec['border_style']},"
+        f"{spec['outline']:g},{spec['shadow']:g},2,{margin_x},{margin_x},{margin_v},1",
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -197,37 +261,41 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
     events: list[str] = []
     for line in lines:
         texts = [_escape(w.text) for w in line.words]
+        emphatic = [use_emphasis and is_emphatic(w.text, extra_emphasis) for w in line.words]
         rows = _wrap_rows([w.text for w in line.words], max_chars)
 
         def render(active: int | None) -> str:
+            """The full line, with the active word marked and important words kept marked."""
+            if spec["one_word"]:
+                index = active if active is not None else 0
+                return (f"{spec['line_prefix']}{spec['active_open']}"
+                        f"{texts[index]}{spec['active_close']}")
             parts: list[str] = []
             for row in rows:
                 chunk: list[str] = []
                 for index in row:
                     word = texts[index]
                     if active is not None and index == active:
-                        prefix = f"{{\\c{highlight}"
-                        if pop and abs(pop - 1.0) > 0.01:
-                            prefix += f"\\fscx{int(pop * 100)}\\fscy{int(pop * 100)}"
-                        prefix += "}"
-                        suffix = f"{{\\c{primary_inline}"
-                        if pop and abs(pop - 1.0) > 0.01:
-                            suffix += "\\fscx100\\fscy100"
-                        suffix += "}"
-                        chunk.append(f"{prefix}{word}{suffix}")
+                        chunk.append(f"{spec['active_open']}{word}{spec['active_close']}")
+                    elif emphatic[index]:
+                        chunk.append(f"{emphasis_open}{word}{emphasis_close}")
                     else:
                         chunk.append(word)
                 parts.append(" ".join(chunk))
-            return "\\N".join(parts)
+            return spec["line_prefix"] + "\\N".join(parts)
 
-        if not karaoke or len(line.words) == 1:
+        if not spec["per_word"] or len(line.words) == 1:
+            active = 0 if (spec["one_word"] or len(line.words) == 1) else None
+            if not spec["per_word"]:
+                active = None
             events.append(
-                f"Dialogue: 0,{_timestamp(line.start)},{_timestamp(line.end)},Reel,,0,0,0,,{render(None)}"
+                f"Dialogue: 0,{_timestamp(line.start)},{_timestamp(line.end)},Reel,,0,0,0,,"
+                f"{render(active)}"
             )
             continue
 
-        # One event per word so the active word can be highlighted. Events tile the
-        # line exactly - any gap would make the caption blink.
+        # One event per word. Events tile the line exactly - any gap would make
+        # the caption blink between words.
         for index, word in enumerate(line.words):
             start = line.start if index == 0 else max(line.start, word.start)
             if index + 1 < len(line.words):

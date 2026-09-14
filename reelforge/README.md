@@ -48,17 +48,82 @@ pip install -r requirements-asr.txt
 ## Use it
 
 ```bash
-reelforge auto raw.mp4                  # edit and export
-reelforge auto raw.mp4 --review         # ...and open the review page first
-reelforge auto raw.mp4 -p punchy        # faster pacing
+reelforge templates                     # see the ready-made looks
+reelforge templates --preview           # ...as a picture, so you can pick by eye
+reelforge auto raw.mp4 -t viral         # use one
+reelforge auto raw.mp4 -t viral --review  # ...and check it before exporting
 reelforge auto raw.mp4 --preview        # half resolution, for a quick look
 reelforge captions raw.mp4 --srt        # Arabic subtitles only
+reelforge fonts                         # Arabic fonts you can install
 reelforge learn                         # what it has picked up from you so far
 ```
+
+## Start here
+
+```bash
+reelforge templates --preview
+```
+
+That writes an image showing every template's captions so you can pick one by eye, then:
+
+```bash
+reelforge auto myclip.mp4 -t viral --review
+```
+
+| Template | |
+|---|---|
+| `viral` | Yellow box captions, tight cuts, constant movement. The default Reels look. |
+| `bold` | Wide Alexandria with a pulse on every spoken word. Punchy, no boxes. |
+| `clean` | Calm gold karaoke on white, no transitions. Good for teaching. |
+| `word` | One huge word at a time. Highest attention - hooks and ads. |
+| `elegant` | Full lines, soft blur transitions. Storytelling and long-form cutdowns. |
+| `news` | Dark box, sober, minimal movement. Market and data content. |
+
+Templates are just YAML in `templates/`. Copy one, change it, and it shows up in the list.
 
 Useful flags: `--no-zoom`, `--no-broll`, `--no-cuts`, `--no-captions` to turn off a stage,
 `--set zoom.max_factor=1.3` to override any setting, `--model small` for a faster/less
 accurate transcript.
+
+## Engagement effects
+
+**Captions never get typed by you.** Your voice is transcribed automatically with per-word
+timing; you only ever correct a word it mishears, and it remembers the correction.
+
+*Caption styles* - `--caption-style` or `captions.style`:
+
+| | |
+|---|---|
+| `karaoke` | The spoken word changes colour. Default. |
+| `box` | The spoken word sits in a filled box. The CapCut look. |
+| `pop` | The line pulses as each word lands. |
+| `word` | One large word on screen at a time. |
+| `plain` | Full lines, no per-word marking. |
+
+*Important words stay marked* even when they are not being spoken - numbers, percentages
+and a built-in list of Arabic emphasis words (`مجانا`, `أهم`, `احذر`, `سر`, ...). Add your own
+with `captions.emphasis_words`.
+
+*Transitions* on cuts - `--transitions` or `transitions.kind`:
+
+| | |
+|---|---|
+| `auto` | Blur where the shot changed, flash where a long pause was cut, punch otherwise. Default. |
+| `punch` | Quick zoom spike on the cut. |
+| `flash` | Brief brightness lift. |
+| `blur` | Short defocus. |
+| `none` | Straight cuts. |
+
+*Zoom* punches in on the phrases you emphasise and pulls out between them, chained so the
+framing never snaps back.
+
+*Fonts* - 14 popular Arabic families, all SIL Open Font License:
+
+```bash
+reelforge fonts                      # list, with what each is good for
+reelforge fonts --install Changa     # or --install all
+reelforge auto clip.mp4 --font Almarai
+```
 
 ## What `auto` actually does
 
@@ -69,7 +134,8 @@ accurate transcript.
 | Cut | Silences longer than a threshold are removed with a little padding either side. Everything downstream is re-timed onto the shortened timeline. |
 | Zoom | Each phrase is scored for emphasis (loudness relative to the clip, word rate, position, whether it follows a cut). The strongest get a punch-in or pull-out. Moves are chained so the framing never snaps back. |
 | B-roll | Phrases are matched against your own clip library by keyword and composited as a layer. |
-| Caption | Words are grouped into short lines broken at natural pauses, then written as ASS and burned in with libass, which handles Arabic shaping and bidi properly. |
+| Caption | Words are grouped into short lines broken at natural pauses, styled per your template, then written as ASS and burned in with libass, which handles Arabic shaping and bidi properly. |
+| Transition | A short punch, flash or blur is placed on cuts, sparsely enough that the edit does not feel like a template. |
 | Render | One ffmpeg pass: retime, reframe to 9:16, zoom curve, layers, captions, loudness normalisation to -14 LUFS. |
 
 Every decision lands in an **EDL** — plain JSON in `.reelforge/runs/` with a stable id and an
@@ -146,7 +212,11 @@ reelforge/
 - Transcription accuracy is Whisper's. It is strong on MSA, good on Egyptian and Gulf
   dialect, weaker on heavy dialect and noisy audio. The vocabulary loop is what closes
   the gap on your specific recurring terms.
-- Music beat-sync, transitions and SFX are not implemented.
+- No music beat-sync or SFX yet.
+- Caption effects cannot reflow a line, so scaling a single word would grow it into its
+  neighbour. `pop` pulses the whole line instead, and word emphasis is colour-only by
+  default. `captions.emphasis_scale` raises it if you want the size change and accept
+  the tighter spacing.
 - Transcription has been verified against faster-whisper's API, but the model weights
   themselves were never downloaded during development. If your first run fails inside the
   ASR step, `reelforge doctor` and the error text will say why.
@@ -157,7 +227,7 @@ reelforge/
 python -m unittest discover -s tests -v
 ```
 
-51 tests, no sample files or model downloads needed. The media tests build their own clip
+69 tests, no sample files or model downloads needed. The media tests build their own clip
 with ffmpeg. The faster-whisper adapter is covered by integration tests that drive it with
 the library's own `Segment`/`Word` types and assert every keyword argument we send is one
 the installed version accepts — so a breaking change upstream fails the suite rather than

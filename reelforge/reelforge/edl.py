@@ -68,6 +68,22 @@ class Zoom:
 
 
 @dataclass
+class Transition:
+    """A short effect sitting on a cut, in output time."""
+    id: str
+    out_time: float
+    kind: str = "punch"          # punch | flash | blur
+    duration: float = 0.18
+    strength: float = 0.7
+    enabled: bool = True
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "out_time": round(self.out_time, 3), "kind": self.kind,
+                "duration": round(self.duration, 3), "strength": round(self.strength, 3),
+                "enabled": self.enabled}
+
+
+@dataclass
 class Overlay:
     id: str
     asset: str
@@ -146,6 +162,7 @@ class EDL:
     cuts: list[Cut] = field(default_factory=list)
     zooms: list[Zoom] = field(default_factory=list)
     overlays: list[Overlay] = field(default_factory=list)
+    transitions: list[Transition] = field(default_factory=list)
     captions: list[CaptionLine] = field(default_factory=list)
     audio: dict = field(default_factory=dict)
     meta: dict = field(default_factory=dict)
@@ -165,6 +182,9 @@ class EDL:
     def active_overlays(self) -> list[Overlay]:
         return [o for o in self.overlays if o.enabled and o.duration > 0.05]
 
+    def active_transitions(self) -> list[Transition]:
+        return [t for t in self.transitions if t.enabled and t.duration > 0.01]
+
     def summary(self) -> dict:
         src_duration = float(self.meta.get("source_duration") or 0.0)
         return {
@@ -174,6 +194,7 @@ class EDL:
             "cuts": len(self.cuts),
             "zooms": len(self.active_zooms()),
             "overlays": len(self.active_overlays()),
+            "transitions": len(self.active_transitions()),
             "caption_lines": len(self.captions),
             "words": sum(len(line.words) for line in self.captions),
         }
@@ -186,6 +207,7 @@ class EDL:
             "cuts": [c.to_dict() for c in self.cuts],
             "zooms": [z.to_dict() for z in self.zooms],
             "overlays": [o.to_dict() for o in self.overlays],
+            "transitions": [t.to_dict() for t in self.transitions],
             "captions": [line.to_dict() for line in self.captions],
             "audio": self.audio,
             "meta": self.meta,
@@ -204,6 +226,7 @@ class EDL:
             cuts=[Cut(**c) for c in data.get("cuts", [])],
             zooms=[Zoom(**z) for z in data.get("zooms", [])],
             overlays=[Overlay(**o) for o in data.get("overlays", [])],
+            transitions=[Transition(**t) for t in data.get("transitions", [])],
             captions=[CaptionLine.from_dict(c) for c in data.get("captions", [])],
             audio=data.get("audio", {}),
             meta=data.get("meta", {}),

@@ -69,9 +69,21 @@ will silently draw boxes. `reelforge setup` fetches Cairo, Tajawal and Almarai.
 reelforge auto clip.mp4 --font Tajawal
 ```
 
+```bash
+reelforge fonts                      # the full list and what each suits
+reelforge fonts --install all
+```
+
 Cairo is the safe default: clean, heavy enough for captions, good coverage. Almarai
-ExtraBold reads well at large caption sizes. Set `captions.font` in your profile to make it
-permanent.
+ExtraBold reads well at large caption sizes. Alexandria is the best pick for
+one-word-at-a-time captions.
+
+One caveat found by testing rather than assumed: **Changa's `%` glyph crowds the word next
+to it**, so avoid it if you say percentages a lot. Cairo, Almarai and Alexandria all render
+percentages cleanly. If you prefer proper Arabic typography, `captions.arabic_percent: true`
+renders `%` as `٪`.
+
+Set `captions.font` in your template to make a choice permanent.
 
 ## Style
 

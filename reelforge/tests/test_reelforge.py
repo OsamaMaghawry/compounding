@@ -587,3 +587,177 @@ class FasterWhisperAdapterTests(unittest.TestCase):
         self.assertEqual([w.text for w in transcript.words], ["انا", "أسامة"])
         # ...and the same vocabulary biased the decoder up front.
         self.assertIn("أسامة", recorder["transcribe"]["initial_prompt"])
+
+
+class CaptionStyleTests(unittest.TestCase):
+    def words(self, texts, step=0.4):
+        out, t = [], 0.0
+        for text in texts:
+            out.append(Word(text, t, t + step * 0.9, 0.9))
+            t += step
+        return out
+
+    def build(self, style, *overrides):
+        profile = StyleProfile().apply_overrides([f"captions.style={style}", *overrides])
+        lines = group_words(self.words(["وفرت", "تسعين", "من", "وقتك"]), profile)
+        return profile, lines, build_ass(lines, profile)
+
+    def events(self, ass):
+        return [line for line in ass.splitlines() if line.startswith("Dialogue")]
+
+    def body(self, event: str) -> str:
+        """The Text field of an ASS Dialogue line (the first 9 fields are metadata)."""
+        return event.split(",", 9)[9]
+
+    def test_every_style_produces_a_usable_script(self):
+        for style in ("karaoke", "box", "pop", "word", "plain"):
+            _, lines, ass = self.build(style)
+            with self.subTest(style=style):
+                self.assertIn("[Events]", ass)
+                self.assertTrue(self.events(ass), f"{style} produced no events")
+
+    def test_box_style_uses_an_opaque_box_only_on_the_active_word(self):
+        _, _, ass = self.build("box")
+        style_line = [l for l in ass.splitlines() if l.startswith("Style:")][0]
+        self.assertEqual(style_line.split(",")[15], "3")        # BorderStyle 3 = filled box
+        self.assertEqual(style_line.split(",")[5], "&HFF000000")  # transparent by default
+        self.assertIn("\\3a&H00&", self.events(ass)[0])         # active word opts in
+
+    def test_pop_style_scales_the_line_not_a_single_word(self):
+        # Scaling one word would grow it into its neighbour, since libass does not reflow.
+        _, _, ass = self.build("pop")
+        text = self.body(self.events(ass)[0])
+        self.assertTrue(text.startswith("{\\fscx"), f"line-level pulse missing: {text[:40]}")
+        self.assertEqual(text.count("\\fscx"), 2)   # only the opening tag and its transform
+
+    def test_word_style_shows_one_word_per_event(self):
+        _, lines, ass = self.build("word")
+        events = self.events(ass)
+        self.assertEqual(len(events), sum(len(line.words) for line in lines))
+        for event, word in zip(events, [w for line in lines for w in line.words]):
+            body = self.body(event)
+            self.assertIn(word.text, body)
+            for other in ("وفرت", "تسعين", "من", "وقتك"):
+                if other != word.text:
+                    self.assertNotIn(other, body)
+
+    def test_plain_style_emits_one_event_per_line(self):
+        _, lines, ass = self.build("plain")
+        self.assertEqual(len(self.events(ass)), len(lines))
+
+    def test_emphasis_marks_numbers_without_resizing_them_by_default(self):
+        profile = StyleProfile()
+        self.assertEqual(profile.get("captions.emphasis_scale"), 1.0)
+        words = [Word("وفرت", 0, 0.4), Word("90%", 0.4, 0.8), Word("وقتك", 0.8, 1.2)]
+        ass = build_ass(group_words(words, profile), profile)
+        body = self.body(self.events(ass)[0])
+        self.assertIn("90%", body)
+        self.assertNotIn("\\fscx", body)   # colour only - no width change, no overlap
+
+    def test_emphasis_can_be_disabled(self):
+        profile = StyleProfile().apply_overrides(["captions.emphasis=false"])
+        words = [Word("وفرت", 0, 0.4), Word("90%", 0.4, 0.8)]
+        emphasis_colour = _inline = profile.get("captions.emphasis_color").lstrip("#")
+        ass = build_ass(group_words(words, profile), profile)
+        self.assertNotIn(emphasis_colour[4:6] + emphasis_colour[2:4] + emphasis_colour[0:2],
+                         ass.upper())
+
+    def test_custom_emphasis_words_are_honoured(self):
+        self.assertFalse(arabic.is_emphatic("قناتي"))
+        self.assertTrue(arabic.is_emphatic("قناتي", arabic.emphasis_set(["قناتي"])))
+
+
+class TransitionTests(unittest.TestCase):
+    def timeline(self):
+        return Timeline(build_timeline([(0, 3), (5, 8), (10, 13)]))
+
+    def analysis(self, scenes=()):
+        from reelforge.analysis import Analysis
+        return Analysis(duration=14.0, width=1280, height=720, fps=30.0,
+                        has_audio=True, scenes=list(scenes))
+
+    def test_one_transition_per_cut_boundary(self):
+        from reelforge.brain import plan_transitions
+        transitions = plan_transitions(self.timeline(), self.analysis(), StyleProfile())
+        self.assertEqual([round(t.out_time, 2) for t in transitions], [3.0, 6.0])
+
+    def test_disabled_or_none_yields_nothing(self):
+        from reelforge.brain import plan_transitions
+        for override in ("transitions.enabled=false", "transitions.kind=none"):
+            profile = StyleProfile().apply_overrides([override])
+            self.assertEqual(plan_transitions(self.timeline(), self.analysis(), profile), [])
+
+    def test_auto_picks_blur_where_the_shot_actually_changes(self):
+        from reelforge.brain import plan_transitions
+        # Output 3.0 maps back to source 3.0; put a scene change right there.
+        transitions = plan_transitions(self.timeline(), self.analysis(scenes=[3.0]),
+                                       StyleProfile())
+        self.assertEqual(transitions[0].kind, "blur")
+
+    def test_min_gap_prevents_stacking(self):
+        from reelforge.brain import plan_transitions
+        profile = StyleProfile().apply_overrides(["transitions.min_gap=10"])
+        self.assertEqual(len(plan_transitions(self.timeline(), self.analysis(), profile)), 1)
+
+    def test_punch_composes_with_the_zoom_curve_and_returns_to_one(self):
+        from reelforge.edl import Transition
+        from reelforge.render import max_punch_factor, punch_expression
+        punches = [Transition("t1", 2.0, "punch", 0.2, 1.0)]
+        expression = punch_expression(punches)
+        self.assertIn("between(in_time,2.000,2.200)", expression)
+        self.assertGreater(max_punch_factor(punches), 1.0)
+        # Outside the window the multiplier is exactly 1, so framing is untouched.
+        self.assertTrue(expression.rstrip(")").endswith("1"))
+
+    def test_flash_and_blur_expressions(self):
+        from reelforge.edl import Transition
+        from reelforge.render import blur_enable_expression, flash_expression
+        items = [Transition("t1", 1.0, "flash", 0.2, 1.0), Transition("t2", 4.0, "blur", 0.2, 1.0)]
+        self.assertIn("between(t,1.000,1.200)", flash_expression(items))
+        self.assertEqual(blur_enable_expression(items), "between(t,4.000,4.200)")
+        self.assertEqual(flash_expression([items[1]]), "")   # no flashes -> no filter
+
+    def test_disabled_transitions_are_not_rendered(self):
+        from reelforge.edl import Transition
+        from reelforge.render import flash_expression
+        self.assertEqual(flash_expression([Transition("t1", 1.0, "flash", enabled=False)]), "")
+
+
+class FontAndTemplateTests(unittest.TestCase):
+    def test_catalog_entries_are_well_formed(self):
+        from reelforge.fonts import CATALOG, resolve
+        self.assertGreaterEqual(len(CATALOG), 10)
+        for entry in CATALOG:
+            self.assertTrue(entry.url.startswith("https://"))
+            self.assertTrue(entry.filename.endswith((".ttf", ".otf")))
+            self.assertTrue(entry.note)
+        self.assertIsNotNone(resolve("cairo"))
+        self.assertIsNone(resolve("not-a-font"))
+
+    def test_every_template_loads_and_is_valid(self):
+        root = Path(__file__).resolve().parent.parent
+        templates = sorted((root / "templates").glob("*.yml"))
+        self.assertGreaterEqual(len(templates), 5)
+        valid_styles = {"karaoke", "box", "pop", "word", "plain"}
+        valid_transitions = {"auto", "punch", "flash", "blur", "none"}
+        for path in templates:
+            profile = StyleProfile.load(path)
+            with self.subTest(template=path.stem):
+                self.assertEqual(profile.get("name"), path.stem)
+                self.assertTrue(profile.get("description"))
+                self.assertIn(profile.get("captions.style"), valid_styles)
+                self.assertIn(profile.get("transitions.kind"), valid_transitions)
+                # The font must be one we can actually install.
+                from reelforge.fonts import resolve
+                self.assertIsNotNone(resolve(profile.get("captions.font")),
+                                     f"{path.stem} uses an uninstallable font")
+
+    def test_templates_render_valid_ass(self):
+        root = Path(__file__).resolve().parent.parent
+        words = [Word("وفرت", 0, 0.4), Word("90%", 0.4, 0.8), Word("وقتك", 0.8, 1.2)]
+        for path in sorted((root / "templates").glob("*.yml")):
+            profile = StyleProfile.load(path)
+            with self.subTest(template=path.stem):
+                ass = build_ass(group_words(words, profile), profile)
+                self.assertIn("[V4+ Styles]", ass)
+                self.assertTrue([l for l in ass.splitlines() if l.startswith("Dialogue")])

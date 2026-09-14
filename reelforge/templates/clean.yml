@@ -1,0 +1,22 @@
+name: clean
+description: Calm and readable. Gold karaoke on white, no transitions. Good for teaching.
+captions:
+  style: karaoke
+  font: Tajawal
+  font_size: 84
+  max_words: 5
+  max_chars: 40
+  highlight: "#FFC24B"
+  emphasis_color: "#3DDC97"
+cuts:
+  min_silence: 0.5
+  pad_before: 0.14
+  pad_after: 0.18
+zoom:
+  rate_per_min: 8.0
+  max_factor: 1.12
+  min_gap: 2.2
+transitions:
+  enabled: false
+broll:
+  max_per_min: 3.0

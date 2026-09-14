@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .captions import build_ass
-from .edl import EDL, Overlay, Zoom
+from .edl import EDL, Overlay, Transition, Zoom
 from .ffmpeg import FFmpegError, ffmpeg_bin, probe, run
 from .profile import StyleProfile
 
@@ -57,6 +57,55 @@ def zoom_expression(zooms: list[Zoom], *, ease: str = "smooth", var: str = "in_t
                       f"if(lt({var},{move.out_end:.3f}),{ramp(move)},{expression}))")
         expression = expression.replace("HOLD", f"{move.start_factor:.4f}", 1)
     return expression
+
+
+def punch_expression(transitions: list[Transition], *, var: str = "in_time") -> str:
+    """A multiplier that spikes on each punch transition and decays back to 1.
+
+    Multiplying this into the zoom curve keeps the two independent: a punch lands
+    on top of whatever framing the zoom happens to be holding.
+    """
+    punches = [t for t in transitions if t.enabled and t.kind == "punch" and t.duration > 0]
+    if not punches:
+        return ""
+    expression = "1"
+    for punch in sorted(punches, key=lambda t: t.out_time):
+        amp = 0.16 * max(0.0, min(1.0, punch.strength))
+        start, end = punch.out_time, punch.out_time + punch.duration
+        decay = f"(1-(({var}-{start:.3f})/{punch.duration:.3f}))"
+        expression = (f"if(between({var},{start:.3f},{end:.3f}),"
+                      f"(1+{amp:.4f}*{decay}),{expression})")
+    return expression
+
+
+def max_punch_factor(transitions: list[Transition]) -> float:
+    punches = [t for t in transitions if t.enabled and t.kind == "punch"]
+    if not punches:
+        return 1.0
+    return 1.0 + 0.16 * max(max(0.0, min(1.0, t.strength)) for t in punches)
+
+
+def flash_expression(transitions: list[Transition]) -> str:
+    """Brightness lift that decays over each flash transition."""
+    flashes = [t for t in transitions if t.enabled and t.kind == "flash" and t.duration > 0]
+    if not flashes:
+        return ""
+    expression = "0"
+    for flash in sorted(flashes, key=lambda t: t.out_time):
+        amp = 0.75 * max(0.0, min(1.0, flash.strength))
+        start, end = flash.out_time, flash.out_time + flash.duration
+        decay = f"(1-((t-{start:.3f})/{flash.duration:.3f}))"
+        expression = (f"if(between(t,{start:.3f},{end:.3f}),"
+                      f"({amp:.4f}*{decay}),{expression})")
+    return expression
+
+
+def blur_enable_expression(transitions: list[Transition]) -> str:
+    """A single enable expression covering every blur window."""
+    blurs = [t for t in transitions if t.enabled and t.kind == "blur" and t.duration > 0]
+    if not blurs:
+        return ""
+    return "+".join(f"between(t,{b.out_time:.3f},{b.out_time + b.duration:.3f})" for b in blurs)
 
 
 # ------------------------------------------------------------------ graph
@@ -166,8 +215,10 @@ class Renderer:
 
         headroom = float(self.profile.get("output.zoom_headroom"))
         zooms = edl.active_zooms()
+        transitions = edl.active_transitions()
         max_factor = max([z.end_factor for z in zooms] + [z.start_factor for z in zooms] + [1.0])
-        headroom = max(1.0, min(headroom, max_factor)) if zooms else 1.0
+        max_factor *= max_punch_factor(transitions)
+        headroom = max(1.0, min(headroom, max_factor)) if (zooms or transitions) else 1.0
         canvas_w, canvas_h = _even(width * headroom), _even(height * headroom)
 
         args: list[str] = ["-i", str(source)]
@@ -216,9 +267,12 @@ class Renderer:
         # 2. Reframe to the vertical canvas (oversized when we plan to zoom).
         graph.append(self._reframe("cvf", "canvas", canvas_w, canvas_h))
 
-        # 3. Zoom curve.
-        if zooms:
+        # 3. Zoom curve, with any punch transitions multiplied on top of it.
+        punch = punch_expression(transitions)
+        if zooms or punch:
             expression = zoom_expression(zooms, ease=self.profile.get("zoom.ease"))
+            if punch:
+                expression = f"({expression})*({punch})"
             graph.append(
                 f"[canvas]zoompan=z='{expression}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
                 f"d=1:s={width}x{height}:fps={fps}[zv];"
@@ -226,8 +280,21 @@ class Renderer:
         else:
             graph.append(f"[canvas]scale={width}:{height}[zv];")
 
+        # 3b. Flash and blur transitions.
+        base_tr = "zv"
+        flash = flash_expression(transitions)
+        if flash:
+            graph.append(f"[{base_tr}]eq=brightness='{flash}':eval=frame[trf];")
+            base_tr = "trf"
+        blur_windows = blur_enable_expression(transitions)
+        if blur_windows:
+            sigma = 6.0 + 14.0 * max((t.strength for t in transitions if t.kind == "blur"),
+                                     default=0.7)
+            graph.append(f"[{base_tr}]gblur=sigma={sigma:.1f}:enable='{blur_windows}'[trb];")
+            base_tr = "trb"
+
         # 4. B-roll layers.
-        base = "zv"
+        base = base_tr
         input_index = 1
         for number, overlay in enumerate(overlays):
             if not Path(overlay.asset).exists():

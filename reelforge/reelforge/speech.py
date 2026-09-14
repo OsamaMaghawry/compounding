@@ -351,13 +351,16 @@ def transcribe(audio: Path, profile, *, analysis: Analysis | None = None,
 
     strip_marks = bool(profile.get("captions.strip_diacritics"))
     normalize_punct = bool(profile.get("captions.normalize_punctuation"))
+    arabic_percent = bool(profile.get("captions.arabic_percent", False))
     for segment in transcript.segments:
         for word in segment.words:
             text = clean_for_display(word.text, strip_marks=strip_marks,
-                                     normalize_punctuation=normalize_punct)
+                                     normalize_punctuation=normalize_punct,
+                                     arabic_percent=arabic_percent)
             word.text = corrector.correct_word(text) if corrector else text
         segment.text = clean_for_display(segment.text, strip_marks=strip_marks,
-                                         normalize_punctuation=normalize_punct)
+                                         normalize_punctuation=normalize_punct,
+                                         arabic_percent=arabic_percent)
         if corrector:
             segment.text = corrector.correct_text(segment.text)
         if analysis is not None and segment.words:

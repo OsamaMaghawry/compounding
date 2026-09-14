@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from .analysis import Analysis, Interval
 from .broll import BrollLibrary
 from .captions import CaptionLine, group_words
-from .edl import EDL, Cut, Overlay, Timeline, Zoom, build_timeline
+from .edl import EDL, Cut, Overlay, Timeline, Transition, Zoom, build_timeline
 from .speech import Transcript, Word
 
 
@@ -251,6 +251,68 @@ def plan_overlays(lines: list[CaptionLine], library: BrollLibrary, profile,
     return overlays
 
 
+# ---------------------------------------------------------------- transitions
+
+def plan_transitions(timeline: Timeline, analysis: Analysis, profile) -> list[Transition]:
+    """Put a short effect on the cuts, so a jump cut reads as intentional.
+
+    Kept sparse on purpose: a transition on every cut is what makes an edit feel
+    like a template. `auto` picks by context - a blur where the shot actually
+    changed, a flash where a long pause was removed, a punch otherwise.
+    """
+    if not profile.get("transitions.enabled"):
+        return []
+
+    boundaries = timeline.cut_boundaries()
+    if not boundaries:
+        return []
+
+    # `kind: none` (or null) means no transitions. Note that profile overrides coerce
+    # the string "none" to None, so both spellings have to land here.
+    raw_kind = profile.get("transitions.kind")
+    if raw_kind is None or str(raw_kind).lower() == "none":
+        return []
+    kind = str(raw_kind).lower()
+
+    duration = float(profile.get("transitions.duration"))
+    strength = float(profile.get("transitions.strength"))
+    min_gap = float(profile.get("transitions.min_gap"))
+    scene_only = bool(profile.get("transitions.scene_change_only"))
+    budget = max(1, int(round(float(profile.get("transitions.max_per_min"))
+                              * timeline.duration / 60.0)))
+
+    transitions: list[Transition] = []
+    last_at = -999.0
+    for index, boundary in enumerate(boundaries):
+        if len(transitions) >= budget or boundary - last_at < min_gap:
+            continue
+
+        src = timeline.to_src(boundary)
+        scene_change = False
+        removed = 0.0
+        if src is not None:
+            nearest = analysis.nearest_scene(src)
+            scene_change = nearest is not None and abs(nearest - src) < 0.35
+        if index + 1 <= len(timeline.cuts) - 1:
+            # How much source time was dropped at this join.
+            removed = timeline.cuts[index + 1].src_start - timeline.cuts[index].src_end
+
+        if scene_only and not scene_change:
+            continue
+
+        if kind == "auto":
+            chosen = "blur" if scene_change else ("flash" if removed > 1.2 else "punch")
+        else:
+            chosen = kind
+
+        transitions.append(Transition(
+            id=f"t{len(transitions) + 1}", out_time=round(boundary, 3), kind=chosen,
+            duration=duration, strength=strength,
+        ))
+        last_at = boundary
+    return transitions
+
+
 # ---------------------------------------------------------------------- build
 
 def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
@@ -275,6 +337,7 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
                        profile, scorer=scorer)
     overlays = plan_overlays(lines, library or BrollLibrary(), profile,
                              out_duration=out_duration, weights=weights)
+    transitions = plan_transitions(timeline, analysis, profile)
 
     return EDL(
         source=source,
@@ -286,6 +349,7 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
         cuts=cuts,
         zooms=zooms,
         overlays=overlays,
+        transitions=transitions,
         captions=lines,
         audio={
             "loudnorm": bool(profile.get("audio.loudnorm")),

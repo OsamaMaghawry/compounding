@@ -85,8 +85,25 @@ DEFAULTS: dict[str, Any] = {
         "font": "Cairo",
         "font_size": 92,
         "bold": True,
+        # How the spoken word is marked while you talk:
+        #   karaoke - active word changes colour (default)
+        #   box     - active word sits in a filled box (the CapCut look)
+        #   pop     - active word scales up as it is spoken
+        #   word    - one large word on screen at a time
+        #   plain   - no per-word marking at all
+        "style": "karaoke",
         "primary": "#FFFFFF",
         "highlight": "#FFD700",    # active-word colour
+        "box_color": "#FFD700",    # active-word box fill, for style: box
+        "box_text": "#101010",     # text colour inside that box
+        "box_padding": 7,
+        "pop_scale": 1.12,         # active-word scale, for style: pop
+        "word_size_boost": 1.55,   # font multiplier, for style: word
+        # Important words stay marked even when they are not being spoken.
+        "emphasis": True,
+        "emphasis_color": "#3DDC97",
+        "emphasis_scale": 1.0,      # >1 makes the word bigger, but it will not reflow
+        "emphasis_words": [],      # your own terms, added to the built-in list
         "outline_color": "#101010",
         "outline": 7,
         "shadow": 3,
@@ -101,7 +118,19 @@ DEFAULTS: dict[str, Any] = {
         "highlight_scale": 1.0,    # >1 pops the active word (CapCut-style)
         "strip_diacritics": False,
         "normalize_punctuation": True,
+        "arabic_percent": False,   # render % as the Arabic ٪ sign
         "safe_area": True,         # keep out of the UI overlay zones
+    },
+
+    # Cut-point effects. Short by design - a transition you notice is too long.
+    "transitions": {
+        "enabled": True,
+        "kind": "auto",            # auto | punch | flash | blur | none
+        "duration": 0.18,
+        "strength": 0.7,           # 0..1, scales the effect
+        "min_gap": 0.9,            # never stack two transitions closer than this
+        "max_per_min": 24.0,
+        "scene_change_only": False,  # only transition where the shot actually changes
     },
 
     "audio": {

@@ -13,7 +13,6 @@ import json
 import shutil
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 from . import __version__
@@ -22,14 +21,13 @@ from .ffmpeg import FFmpegError, FFmpegMissing, build_config, probe
 from .learn import FeedbackStore
 from .pipeline import PACKAGE_ROOT, AutoEditor
 from .profile import StyleProfile
+from .fonts import CATALOG, install as install_fonts, installed as installed_fonts
 from .speech import available_backend
 
+TEMPLATE_DIR = PACKAGE_ROOT / "templates"
 PROFILE_DIR = PACKAGE_ROOT / "profiles"
-FONTS = {
-    "Cairo.ttf": "https://raw.githubusercontent.com/google/fonts/main/ofl/cairo/Cairo%5Bslnt%2Cwght%5D.ttf",
-    "Tajawal-Bold.ttf": "https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf",
-    "Almarai-ExtraBold.ttf": "https://raw.githubusercontent.com/google/fonts/main/ofl/almarai/Almarai-ExtraBold.ttf",
-}
+FONTS_DIR = PACKAGE_ROOT / "assets" / "fonts"
+SEARCH_DIRS = [TEMPLATE_DIR, PROFILE_DIR]
 
 
 def _print(message: str) -> None:
@@ -37,7 +35,8 @@ def _print(message: str) -> None:
 
 
 def _profile_from_args(args) -> StyleProfile:
-    profile = StyleProfile.resolve(getattr(args, "profile", None), [PROFILE_DIR])
+    chosen = getattr(args, "template", None) or getattr(args, "profile", None)
+    profile = StyleProfile.resolve(chosen, SEARCH_DIRS)
     overrides: list[str] = list(getattr(args, "set", None) or [])
 
     flag_map = {
@@ -45,6 +44,7 @@ def _profile_from_args(args) -> StyleProfile:
         "no_zoom": "zoom.enabled=false",
         "no_broll": "broll.enabled=false",
         "no_cuts": "cuts.enabled=false",
+        "no_transitions": "transitions.enabled=false",
         "no_learning": "learning.enabled=false",
     }
     for flag, override in flag_map.items():
@@ -53,7 +53,8 @@ def _profile_from_args(args) -> StyleProfile:
 
     for attr, key in (("asr_backend", "asr.backend"), ("model", "asr.model"),
                       ("lang", "asr.language"), ("broll_dir", "broll.library"),
-                      ("font", "captions.font")):
+                      ("font", "captions.font"), ("caption_style", "captions.style"),
+                      ("transitions", "transitions.kind")):
         value = getattr(args, attr, None)
         if value:
             overrides.append(f"{key}={value}")
@@ -213,21 +214,124 @@ def cmd_learn(args) -> int:
 
 
 def cmd_setup(args) -> int:
-    fonts_dir = PACKAGE_ROOT / "assets" / "fonts"
-    fonts_dir.mkdir(parents=True, exist_ok=True)
-    for name, url in FONTS.items():
-        target = fonts_dir / name
-        if target.exists() and not args.force:
-            _print(f"have {name}")
-            continue
-        try:
-            _print(f"downloading {name}")
-            with urllib.request.urlopen(url, timeout=60) as response:
-                target.write_bytes(response.read())
-        except Exception as exc:
-            _print(f"could not fetch {name}: {exc}")
-    _print(f"fonts in {fonts_dir}")
+    for _changed, message in install_fonts(None, FONTS_DIR, force=args.force):
+        _print(message)
+    _print(f"fonts in {FONTS_DIR}")
+    _print("more Arabic fonts: reelforge fonts")
     return cmd_doctor(args)
+
+
+def cmd_fonts(args) -> int:
+    if args.install:
+        for _changed, message in install_fonts(args.install, FONTS_DIR, force=args.force):
+            _print(message)
+        return 0
+
+    have = installed_fonts(FONTS_DIR)
+    print("  Arabic caption fonts (all SIL Open Font License)\n")
+    for entry in CATALOG:
+        mark = "*" if entry.family in have else " "
+        print(f"  {mark} {entry.family:<20} {entry.note}")
+    print("\n  * = installed. Add one with:  reelforge fonts --install Changa")
+    print("  Then use it with:             reelforge auto clip.mp4 --font Changa")
+    return 0
+
+
+def _template_entries() -> list[tuple[str, StyleProfile]]:
+    entries = []
+    for path in sorted(TEMPLATE_DIR.glob("*.yml")) + sorted(PROFILE_DIR.glob("*.yml")):
+        try:
+            entries.append((path.stem, StyleProfile.load(path)))
+        except Exception:
+            continue
+    return entries
+
+
+def cmd_templates(args) -> int:
+    entries = _template_entries()
+    if args.preview:
+        return _render_template_preview(entries, args)
+
+    print("  Ready-made looks. Start with one, then tweak.\n")
+    for stem, profile in entries:
+        style = profile.get("captions.style")
+        font = profile.get("captions.font")
+        transition = profile.get("transitions.kind") if profile.get("transitions.enabled") else "none"
+        print(f"  {stem:<15} {profile.get('description', '')}")
+        print(f"  {'':<15} captions: {style} / {font}   transitions: {transition}\n")
+    print("  Use one:      reelforge auto clip.mp4 -t viral")
+    print("  See them:     reelforge templates --preview")
+    return 0
+
+
+def _render_template_preview(entries, args) -> int:
+    """Render one caption sample per template so you can pick by eye."""
+    from .captions import CaptionLine, build_ass  # noqa: PLC0415
+    from .ffmpeg import run_ffmpeg  # noqa: PLC0415
+    from .speech import Word  # noqa: PLC0415
+
+    out = Path(args.out) if args.out else Path.cwd() / "reelforge-templates.png"
+    work = Path(args.project) if args.project else Path.cwd() / ".reelforge"
+    work = work / "preview"
+    work.mkdir(parents=True, exist_ok=True)
+
+    sample = ["وفرت", "90%", "من", "وقت", "المونتاج"]
+    words, cursor = [], 0.0
+    for text in sample:
+        words.append(Word(text=text, start=cursor, end=cursor + 0.42, prob=1.0))
+        cursor += 0.46
+
+    needed = {profile.get("captions.font") for _, profile in entries}
+    missing = needed - installed_fonts(FONTS_DIR)
+    if missing:
+        _print(f"fetching fonts for the preview: {', '.join(sorted(missing))}")
+        for _changed, message in install_fonts(sorted(missing), FONTS_DIR):
+            _print(message)
+
+    strips = []
+    for index, (stem, profile) in enumerate(entries):
+        preview_profile = profile.apply_overrides([
+            "captions.y_pct=0.5", "captions.safe_area=false", "captions.enabled=true",
+        ])
+        # Freeze on the second word so the active-word treatment is visible.
+        line = CaptionLine(words=[Word(w.text, w.start, w.end, 1.0) for w in words],
+                           start=words[0].start, end=words[-1].end)
+        ass_path = work / f"{stem}.ass"
+        ass_path.write_text(build_ass([line], preview_profile, width=1080, height=1920),
+                            encoding="utf-8")
+        strip = work / f"{stem}.png"
+        label = stem.replace("_", " ")
+        run_ffmpeg([
+            "-f", "lavfi", "-i", "color=c=0x14141c:s=1080x1920:d=1:r=5",
+            "-vf", (f"ass={_escape_for_filter(ass_path)}:fontsdir={_escape_for_filter(FONTS_DIR)},"
+                    f"crop=1080:340:0:790,"
+                    f"drawtext=text='{label}':x=28:y=18:fontsize=34:fontcolor=0x8a8aa0:"
+                    f"fontfile={_escape_for_filter(_any_font())},"
+                    f"drawbox=x=0:y=338:w=1080:h=2:color=0x2a2a3a:t=fill"),
+            "-ss", f"{words[1].start + 0.2:.2f}", "-frames:v", "1", str(strip),
+        ])
+        strips.append(strip)
+
+    inputs = []
+    for strip in strips:
+        inputs += ["-i", str(strip)]
+    labels = "".join(f"[{i}:v]" for i in range(len(strips)))
+    run_ffmpeg(inputs + ["-filter_complex", f"{labels}vstack=inputs={len(strips)}", str(out)])
+    _print(f"preview of {len(strips)} templates -> {out}")
+    return 0
+
+
+def _escape_for_filter(path) -> str:
+    text = str(path)
+    for char in ("\\", ":", "'", "[", "]", ","):
+        text = text.replace(char, "\\" + char)
+    return text
+
+
+def _any_font() -> Path:
+    for candidate in sorted(FONTS_DIR.glob("*.ttf")):
+        return candidate
+    return Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
 
 def cmd_doctor(args) -> int:
@@ -297,8 +401,16 @@ def build_parser() -> argparse.ArgumentParser:
         if with_video:
             target.add_argument("video", help="input video file")
         target.add_argument("-o", "--out", help="output path")
-        target.add_argument("-p", "--profile", help="profile name or path "
-                            "(default, punchy, calm, captions_only)")
+        target.add_argument("-t", "--template", help="ready-made look: viral, bold, clean, "
+                            "word, elegant, news (see `reelforge templates`)")
+        target.add_argument("-p", "--profile", help="alias for --template; also accepts a "
+                            "path to your own .yml")
+        target.add_argument("--caption-style",
+                            choices=["karaoke", "box", "pop", "word", "plain"],
+                            help="how the spoken word is marked")
+        target.add_argument("--transitions",
+                            choices=["auto", "punch", "flash", "blur", "none"],
+                            help="effect on each cut")
         target.add_argument("--set", action="append", metavar="KEY=VALUE",
                             help="override any profile value, repeatable")
         target.add_argument("--project", help="where to keep cache and learning data "
@@ -317,6 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument("--no-zoom", action="store_true")
         target.add_argument("--no-broll", action="store_true")
         target.add_argument("--no-cuts", action="store_true")
+        target.add_argument("--no-transitions", action="store_true")
         target.add_argument("--no-learning", action="store_true")
 
     auto = sub.add_parser("auto", help="analyse and edit a clip end to end")
@@ -360,6 +473,19 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument("--force", action="store_true")
     setup.add_argument("--project")
     setup.set_defaults(func=cmd_setup)
+
+    templates = sub.add_parser("templates", help="list the ready-made looks")
+    templates.add_argument("--preview", action="store_true",
+                           help="render a picture of every template's captions")
+    templates.add_argument("-o", "--out", help="where to write the preview image")
+    templates.add_argument("--project")
+    templates.set_defaults(func=cmd_templates)
+
+    fonts = sub.add_parser("fonts", help="list or install Arabic caption fonts")
+    fonts.add_argument("--install", action="append", metavar="FAMILY",
+                       help="install a family by name, repeatable, or 'all'")
+    fonts.add_argument("--force", action="store_true")
+    fonts.set_defaults(func=cmd_fonts)
 
     doctor = sub.add_parser("doctor", help="check ffmpeg, fonts and models")
     doctor.add_argument("--project")

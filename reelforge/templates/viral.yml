@@ -1,0 +1,27 @@
+name: viral
+description: Max energy. Yellow box captions, tight cuts, constant movement. The default Reels look.
+captions:
+  style: box
+  font: Cairo
+  font_size: 98
+  max_words: 3
+  box_color: "#FFD700"
+  box_text: "#101010"
+  emphasis_color: "#FF4A6E"
+cuts:
+  min_silence: 0.28
+  pad_before: 0.06
+  pad_after: 0.08
+  max_gap_keep: 0.16
+zoom:
+  rate_per_min: 20.0
+  max_factor: 1.26
+  min_gap: 0.85
+  score_threshold: 0.36
+transitions:
+  kind: auto
+  strength: 0.8
+  max_per_min: 24.0
+broll:
+  max_per_min: 9.0
+  max_duration: 2.0

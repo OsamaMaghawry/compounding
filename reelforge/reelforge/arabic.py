@@ -69,7 +69,8 @@ def normalize_for_match(text: str) -> str:
 
 
 def clean_for_display(text: str, *, strip_marks: bool = False,
-                      normalize_punctuation: bool = True) -> str:
+                      normalize_punctuation: bool = True,
+                      arabic_percent: bool = False) -> str:
     """Tidy a transcript word/line for burning into the frame."""
     text = unicodedata.normalize("NFKC", text or "").strip()
     text = text.translate(_PRESENTATION_FOLD)
@@ -79,6 +80,8 @@ def clean_for_display(text: str, *, strip_marks: bool = False,
     if normalize_punctuation and is_arabic(text):
         for latin, arabic in PUNCT_MAP.items():
             text = text.replace(latin, arabic)
+        if arabic_percent:
+            text = text.replace("%", "\u066a")
     # ASS treats a literal newline as a line break directive; never emit one by accident.
     text = text.replace("\n", " ").replace("\r", " ")
     return WHITESPACE.sub(" ", text).strip()
@@ -164,3 +167,53 @@ class VocabCorrector:
 def split_sentences(text: str) -> list[str]:
     parts = re.split(r"(?<=[.!؟?])\s+|\n+", text or "")
     return [p.strip() for p in parts if p.strip()]
+
+
+# Words that carry the weight of a sentence in short-form video: superlatives,
+# urgency, offers, outcomes. Kept deliberately small - marking everything marks
+# nothing. Extend it per channel with `captions.emphasis_words`.
+EMPHASIS_LEXICON = {
+    # superlative / ranking
+    "اهم", "الاهم", "افضل", "الافضل", "احسن", "اسوا", "اقوي", "الاقوي", "اكبر", "اصغر",
+    "اسرع", "الاسرع", "اول", "الاول", "اخر", "الاخر", "الوحيد", "الحقيقي",
+    # urgency / warning
+    "احذر", "خطير", "تحذير", "انتبه", "ممنوع", "لازم", "ضروري", "توقف", "مشكله", "غلط", "خطا",
+    # offer / value
+    "مجانا", "مجاني", "حصري", "عرض", "فرصه", "مضمون", "بسهوله", "بسرعه", "فوري",
+    # payoff
+    "سر", "السر", "اسرار", "الحل", "نتيجه", "النتيجه", "مفاجاه", "جديد", "الجديد",
+    "وفر", "توفير", "ربح", "ارباح", "خساره", "نصيحه", "خطوه", "طريقه", "الطريقه",
+    # quantity words that usually sit next to a number
+    "ضعف", "اضعاف", "نسبه", "مليون", "الف", "مليار", "ثانيه", "ثواني", "دقيقه", "دقائق",
+}
+
+# A number, a percentage, a currency amount, or a multiplier - always worth marking.
+NUMERIC_RE = re.compile(r"[\d٠-٩]")
+
+
+def is_emphatic(word: str, extra: set[str] | frozenset[str] | None = None) -> bool:
+    """Should this word stay visually marked even when it is not being spoken?"""
+    text = (word or "").strip()
+    if not text:
+        return False
+    if NUMERIC_RE.search(text):
+        return True
+    key = normalize_for_match(text)
+    if not key:
+        return False
+    if key in EMPHASIS_LEXICON:
+        return True
+    if extra and key in extra:
+        return True
+    # `الفلوس` should match a listed `فلوس`, but only for words long enough that
+    # stripping the article cannot collide with something unrelated.
+    if key.startswith("ال") and len(key) > 4:
+        stripped = key[2:]
+        if stripped in EMPHASIS_LEXICON or (extra and stripped in extra):
+            return True
+    return False
+
+
+def emphasis_set(words: list[str] | None) -> frozenset[str]:
+    """Normalise a user-supplied emphasis list once, for repeated lookups."""
+    return frozenset(normalize_for_match(w) for w in (words or []) if normalize_for_match(w))
