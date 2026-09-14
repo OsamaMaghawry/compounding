@@ -597,7 +597,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Local AI auto-editor for vertical short-form video.",
     )
     parser.add_argument("--version", action="version", version=f"reelforge {__version__}")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
     def add_common(target, *, with_video: bool = True):
         if with_video:
@@ -744,9 +744,41 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+WELCOME = """
+  ReelForge - editing happens on this computer. Nothing is uploaded.
+
+  There is no "upload" step: your video file stays where it is and you point
+  the command at it.
+
+  First time:
+    reelforge doctor                    check ffmpeg, fonts and the speech model
+    reelforge setup                     download Arabic caption fonts
+
+  Edit a video (put the file in this folder, or give the full path):
+    reelforge auto myvideo.mp4 --review
+
+    ...that opens a page in your browser showing the finished cut, every
+    zoom and every caption, so you can fix anything before exporting.
+
+  Pick a look first, if you like:
+    reelforge templates --preview        writes a picture of each style
+    reelforge auto myvideo.mp4 -t viral --review
+
+  Captions only, no editing:
+    reelforge captions myvideo.mp4 --srt
+
+  Everything else:
+    reelforge --help
+"""
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if not getattr(args, "command", None):
+        # A bare `reelforge` is someone asking what to do, not a usage error.
+        print(WELCOME)
+        return 0
     try:
         return args.func(args)
     except FFmpegMissing as exc:
