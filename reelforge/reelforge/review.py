@@ -61,6 +61,7 @@ button:disabled{opacity:.5;cursor:default}
   <div>
     <div class="card">
       <h1>ReelForge review</h1>
+      <div class="sub" id="ver"></div>
       <div class="sub" id="src"></div>
       <video id="player" controls playsinline></video>
     </div>
@@ -91,6 +92,7 @@ async function load(){
   const r=await fetch('/api/state'); const d=await r.json();
   edl=d.edl; runId=d.run_id;
   $('src').textContent=d.source;
+  $('ver').textContent='version '+(d.version||'?');
   $('player').src='/preview.mp4?v='+Date.now();
   renderStats(d.summary); renderCaptions(); renderZooms(); renderOverlays(); renderTransitions();
 }
@@ -306,8 +308,10 @@ def _make_handler(app: ReviewServer):
                 self.end_headers()
                 self.wfile.write(body)
             elif route == "/api/state":
+                from .cli import _checkout_revision  # noqa: PLC0415
                 self._send_json({
                     "run_id": app.run_id,
+                    "version": _checkout_revision(),
                     "source": app.edl.source,
                     "summary": app.edl.summary(),
                     "edl": app.edl.to_dict(),
