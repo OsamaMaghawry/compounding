@@ -55,11 +55,19 @@ def run(args: list[str], *, capture: bool = True, check: bool = True,
     return proc
 
 
-def run_ffmpeg(args: list[str], *, quiet: bool = True) -> subprocess.CompletedProcess:
-    """Run ffmpeg with sane defaults. Returns the completed process (stderr captured)."""
+def run_ffmpeg(args: list[str], *, quiet: bool = True,
+               progress: bool = False) -> subprocess.CompletedProcess:
+    """Run ffmpeg with sane defaults.
+
+    `progress` lets ffmpeg's own frame/time/speed line through to the terminal.
+    A long encode with no output is indistinguishable from a hang.
+    """
     base = [ffmpeg_bin(), "-hide_banner", "-nostdin", "-y"]
     if quiet:
         base += ["-loglevel", "error"]
+    if progress:
+        base += ["-stats"]
+        return run(base + args, capture=False)
     return run(base + args)
 
 

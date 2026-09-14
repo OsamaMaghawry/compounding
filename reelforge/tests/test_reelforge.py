@@ -7,6 +7,7 @@ suite runs anywhere ffmpeg is installed and needs no sample files or models.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -1754,3 +1755,56 @@ class CaptionTimingTests(unittest.TestCase):
         edl = build_edl("x.mp4", analysis, transcript, profile)
         for earlier, later in zip(edl.captions, edl.captions[1:]):
             self.assertLessEqual(earlier.end, later.start)
+
+
+@needs_ffmpeg
+class JoinCacheTests(unittest.TestCase):
+    """Joining re-encodes every frame; repeating it on unchanged clips is waste."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="reelforge-joincache-")
+        root = Path(cls.tmp)
+
+        def make(name, duration=1):
+            path = root / name
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                            "-f", "lavfi", "-i", f"testsrc2=s=240x426:r=25:d={duration}",
+                            "-f", "lavfi", "-i", f"sine=f=300:d={duration}",
+                            "-pix_fmt", "yuv420p", "-c:a", "aac", str(path)],
+                           check=True, capture_output=True)
+            return path
+
+        cls.a, cls.b = make("a.mp4"), make("b.mp4")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_an_unchanged_set_of_clips_is_not_rejoined(self):
+        from reelforge.join import join_clips
+        dest = Path(self.tmp) / "j.mp4"
+        join_clips([self.a, self.b], dest)
+        first = dest.stat().st_mtime_ns
+
+        messages = []
+        join_clips([self.a, self.b], dest, on_status=messages.append)
+        self.assertEqual(dest.stat().st_mtime_ns, first, "the file was re-encoded")
+        self.assertTrue(any("reusing" in m for m in messages), messages)
+
+    def test_a_changed_clip_forces_a_rejoin(self):
+        from reelforge.join import join_clips
+        dest = Path(self.tmp) / "j2.mp4"
+        join_clips([self.a, self.b], dest)
+        os.utime(self.b, (1_000_000, 1_000_000))       # the clip was re-recorded
+        messages = []
+        join_clips([self.a, self.b], dest, on_status=messages.append)
+        self.assertTrue(any("joining" in m for m in messages), messages)
+
+    def test_a_different_order_is_a_different_join(self):
+        from reelforge.join import join_clips
+        dest = Path(self.tmp) / "j3.mp4"
+        join_clips([self.a, self.b], dest)
+        messages = []
+        join_clips([self.b, self.a], dest, on_status=messages.append)
+        self.assertTrue(any("joining" in m for m in messages), messages)

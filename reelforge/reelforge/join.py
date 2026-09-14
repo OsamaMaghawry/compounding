@@ -10,9 +10,11 @@ being dropped or knocking the audio out of sync.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
-from .ffmpeg import FFmpegError, MediaInfo, ffmpeg_bin, probe, run
+from .ffmpeg import FFmpegError, MediaInfo, ffmpeg_bin, probe, run, run_ffmpeg
 
 
 def _even(value: float) -> int:
@@ -63,8 +65,24 @@ def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "very
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
+    # Joining re-encodes every frame, which on 4K phone clips is minutes of work.
+    # Doing it again on an unchanged set of clips is pure waste, so remember it.
+    signature = _signature(sources, width, height, fps, audio_rate)
+    stamp = dest.with_suffix(".join.json")
+    if dest.exists() and stamp.exists():
+        try:
+            if json.loads(stamp.read_text("utf-8")).get("signature") == signature:
+                if on_status:
+                    on_status(f"reusing the joined timeline from last time ({dest.name})")
+                return dest
+        except (json.JSONDecodeError, OSError):
+            pass
+
     if on_status:
-        on_status(f"joining {len(sources)} clips into one {width}x{height} timeline")
+        total = sum(info.duration for info in infos)
+        on_status(f"joining {len(sources)} clips into one {width}x{height} timeline "
+                  f"({total:.0f}s) - this re-encodes every frame and can take a few "
+                  f"minutes the first time")
 
     args: list[str] = []
     for path in sources:
@@ -99,16 +117,27 @@ def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "very
     pairs = "".join(f"[v{i}][a{i}]" for i in range(len(sources)))
     graph.append(f"{pairs}concat=n={len(sources)}:v=1:a=1[outv][outa]")
 
-    run([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
-         *args, "-filter_complex", "".join(graph),
-         "-map", "[outv]", "-map", "[outa]",
-         "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
-         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
-         "-movflags", "+faststart", str(dest)])
+    run_ffmpeg([*args, "-filter_complex", "".join(graph),
+                "-map", "[outv]", "-map", "[outa]",
+                "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart", str(dest)], progress=True)
 
     if not dest.exists() or dest.stat().st_size == 0:
         raise FFmpegError(f"joining produced no output at {dest}")
+    stamp.write_text(json.dumps({"signature": signature}), encoding="utf-8")
     return dest
+
+
+def _signature(sources: list[Path], width: int, height: int, fps: int,
+               audio_rate: int) -> str:
+    """Identifies this exact set of clips joined to this exact shape."""
+    parts = []
+    for path in sources:
+        stat = path.stat()
+        parts.append(f"{path.resolve()}|{stat.st_size}|{int(stat.st_mtime)}")
+    parts.append(f"{width}x{height}@{fps}:{audio_rate}")
+    return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
 def clip_boundaries(paths: list[str | Path]) -> list[float]:
