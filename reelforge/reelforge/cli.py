@@ -692,6 +692,54 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 0
 
 
+def cmd_check(args) -> int:
+    """Self-test the caption fixes and report, so one paste settles what is running."""
+    from .captions import CaptionLine, build_ass, group_words  # noqa: PLC0415
+    from .speech import Word, enforce_order  # noqa: PLC0415
+
+    print()
+    _print(f"reelforge {__version__}  ·  {_checkout_revision()}")
+    print()
+
+    profile = StyleProfile()
+    spoken = ["انت", "و", "صاحبك", "كل"]
+    words, cursor = [], 0.0
+    for text in spoken:
+        words.append(Word(text, cursor, cursor + 0.4, 1.0))
+        cursor += 0.5
+    line = CaptionLine(words=words, start=0.0, end=cursor)
+    ass = build_ass([line], profile)
+    events = [row for row in ass.splitlines() if row.startswith("Dialogue")]
+    body = events[0].split(",", 9)[9] if events else ""
+
+    _print("1. Arabic word order (the first word must sit on the RIGHT)")
+    _print(f"   you say : {' '.join(spoken)}")
+    _print(f"   written : {body}")
+    # Written left-to-right, so the first spoken word must come LAST in the string.
+    order_ok = body.strip().endswith("}") and body.strip().startswith(spoken[-1])
+    _print(f"   result  : {'PASS - reads right to left' if order_ok else 'FAIL - still reversed'}")
+    print()
+
+    _print("2. Gap between caption lines (so statements do not run together)")
+    pair = [Word("انت", 0.0, 0.6), Word("و", 0.55, 0.8),
+            Word("كل", 0.75, 1.1), Word("واحد", 1.05, 1.5)]
+    lines = group_words(enforce_order(pair),
+                        profile.apply_overrides(["captions.max_words=2"]))
+    gaps = [round(b.start - a.end, 3) for a, b in zip(lines, lines[1:])]
+    _print(f"   line gaps: {gaps if gaps else 'only one line'}")
+    gap_ok = bool(gaps) and all(g >= 0.079 for g in gaps)
+    _print(f"   result   : {'PASS - lines separate' if gap_ok else 'FAIL - lines touch or overlap'}")
+    print()
+
+    if order_ok and gap_ok:
+        _print("Both fixes are active in the code you are running.")
+        _print("If a video still looks wrong, it was rendered before this - delete")
+        _print("the work folder and run again:  Remove-Item -Recurse -Force .reelforge\\work")
+    else:
+        _print("This checkout does NOT have the fixes. Run: git pull")
+    return 0
+
+
 def cmd_probe(args) -> int:
     info = probe(args.video)
     print(json.dumps({
@@ -854,6 +902,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="check ffmpeg, fonts and models")
     doctor.add_argument("--project")
     doctor.set_defaults(func=cmd_doctor)
+
+    check = sub.add_parser("check", help="self-test the caption fixes and show the version")
+    check.set_defaults(func=cmd_check)
 
     probe_cmd = sub.add_parser("probe", help="show what ffmpeg sees in a file")
     probe_cmd.add_argument("video")
