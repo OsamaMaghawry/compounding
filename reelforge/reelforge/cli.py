@@ -67,6 +67,37 @@ def _profile_from_args(args) -> StyleProfile:
     return profile.apply_overrides(overrides)
 
 
+VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
+
+
+def _resolve_video(raw: str) -> Path:
+    """Check the input file exists, and if not, say what is actually here.
+
+    Getting the filename slightly wrong is the commonest first-run stumble, and
+    "file not found" alone leaves you guessing at spelling, extension and folder.
+    """
+    path = Path(raw).expanduser()
+    if path.exists():
+        return path
+
+    nearby = sorted(p for p in Path.cwd().iterdir()
+                    if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES)
+    message = [f"no file called '{raw}' in {Path.cwd()}"]
+    if nearby:
+        message.append("")
+        message.append("Videos in this folder:")
+        message += [f"  {p.name}" for p in nearby[:12]]
+        message.append("")
+        message.append(f'Use one of those, in quotes if the name has spaces:')
+        message.append(f'  reelforge auto "{nearby[0].name}" --model small --review')
+    else:
+        message.append("")
+        message.append("There are no video files in this folder yet.")
+        message.append("Open it with `explorer .` and drag a video in, or give a full path:")
+        message.append(r'  reelforge auto "C:\Users\you\Videos\clip.mp4" --model small --review')
+    raise FileNotFoundError("\n  ".join(message))
+
+
 def _editor(args, profile: StyleProfile) -> AutoEditor:
     project = Path(args.project) if getattr(args, "project", None) else Path.cwd() / ".reelforge"
     return AutoEditor(profile, project_dir=project,
@@ -78,7 +109,7 @@ def _editor(args, profile: StyleProfile) -> AutoEditor:
 def cmd_auto(args) -> int:
     profile = _profile_from_args(args)
     editor = _editor(args, profile)
-    source = Path(args.video).expanduser()
+    source = _resolve_video(args.video)
 
     started = time.time()
     extra_vocab = None
@@ -141,7 +172,7 @@ def cmd_captions(args) -> int:
     args.no_zoom = args.no_broll = args.no_cuts = True
     profile = _profile_from_args(args)
     editor = _editor(args, profile)
-    source = Path(args.video).expanduser()
+    source = _resolve_video(args.video)
 
     result = editor.plan(source, refresh=args.refresh)
     for warning in result.warnings:
