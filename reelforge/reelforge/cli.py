@@ -148,6 +148,9 @@ def _editor(args, profile: StyleProfile) -> AutoEditor:
 # ------------------------------------------------------------------ commands
 
 def cmd_auto(args) -> int:
+    # Every run names the code that produced it. Without this, a stale checkout
+    # and a fixed one are indistinguishable from the output.
+    _print(f"reelforge {__version__} · {_checkout_revision()}")
     profile = _profile_from_args(args)
     editor = _editor(args, profile)
     clips = _resolve_videos(args.video, order=args.order)
@@ -220,6 +223,7 @@ def cmd_auto(args) -> int:
 
 
 def cmd_captions(args) -> int:
+    _print(f"reelforge {__version__} · {_checkout_revision()}")
     args.no_zoom = args.no_broll = args.no_cuts = True
     profile = _profile_from_args(args)
     editor = _editor(args, profile)
