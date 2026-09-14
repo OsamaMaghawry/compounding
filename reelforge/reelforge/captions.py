@@ -84,12 +84,26 @@ def group_words(words: list[Word], profile) -> list[CaptionLine]:
         current.append(word)
     flush()
 
-    # A line that flashes by is unreadable; borrow time from the gap that follows.
+    line_gap = float(profile.get("captions.line_gap", 0.0))
+
+    # A line that flashes by is unreadable; borrow time from the gap that follows,
+    # but never all of it - the next line needs somewhere to begin.
     for index, line in enumerate(lines):
         if line.duration < min_duration:
-            limit = lines[index + 1].start if index + 1 < len(lines) else line.end + min_duration
+            if index + 1 < len(lines):
+                limit = lines[index + 1].start - line_gap
+            else:
+                limit = line.end + min_duration
             line.end = min(max(line.end, line.start + min_duration), limit)
-    return [line for line in lines if line.text]
+
+    # Two lines on screen at once reads as a duplicated word, and lines that touch
+    # never blink off, so one statement runs into the next.
+    for index in range(len(lines) - 1):
+        latest = lines[index + 1].start - line_gap
+        if lines[index].end > latest:
+            lines[index].end = max(lines[index].start + 0.12, latest)
+
+    return [line for line in lines if line.text and line.end > line.start]
 
 
 # ------------------------------------------------------------------ ASS output

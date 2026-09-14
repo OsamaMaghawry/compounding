@@ -312,6 +312,26 @@ def snap_words_to_energy(words: list[Word], analysis: Analysis, *,
     return snapped
 
 
+def enforce_order(words: list[Word], *, min_duration: float = 0.06) -> list[Word]:
+    """Sort words and remove any overlap between them.
+
+    Whisper emits each segment independently, so the last word of one segment can
+    end after the first word of the next begins; cutting silences then remaps both
+    onto the same surviving frame. Either way two words end up claiming the same
+    instant, which puts two caption lines on screen at once and makes the marked
+    word look like it repeats into the next line.
+    """
+    ordered: list[Word] = []
+    for word in sorted(words, key=lambda w: (w.start, w.end)):
+        start = word.start
+        if ordered and start < ordered[-1].end:
+            start = ordered[-1].end
+        end = max(word.end, start + min_duration)
+        ordered.append(Word(text=word.text, start=round(start, 3),
+                            end=round(end, 3), prob=word.prob))
+    return ordered
+
+
 def transcribe(audio: Path, profile, *, analysis: Analysis | None = None,
                corrector: VocabCorrector | None = None, cache_dir: Path | None = None,
                cache_key: str | None = None, refresh: bool = False,

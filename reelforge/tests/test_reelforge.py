@@ -1666,3 +1666,91 @@ class CaptionPixelOrderTests(unittest.TestCase):
         order = self.render_positions(profile, ["واحد", "اثنين", "ثلاثة", "اربعة"])
         # Left to right on screen must be the last word first.
         self.assertEqual(order, [3, 2, 1, 0])
+
+
+class CaptionTimingTests(unittest.TestCase):
+    """Two lines on screen at once reads as a repeated word; lines that touch
+    never blink off, so one statement runs into the next."""
+
+    def overlapping_words(self):
+        # Whisper emits segments independently, so words straddle the boundary.
+        return [Word("انت", 0.00, 0.60), Word("و", 0.55, 0.80),
+                Word("صاحبك", 0.75, 1.30), Word("كل", 1.20, 1.60),
+                Word("واحد", 1.55, 2.10), Word("فيكوا", 2.05, 2.60)]
+
+    def test_enforce_order_removes_overlap_but_keeps_the_words(self):
+        from reelforge.speech import enforce_order
+        fixed = enforce_order(self.overlapping_words())
+        self.assertEqual([w.text for w in fixed],
+                         [w.text for w in self.overlapping_words()])
+        for earlier, later in zip(fixed, fixed[1:]):
+            self.assertLessEqual(earlier.end, later.start)
+            self.assertGreater(earlier.end, earlier.start)
+
+    def test_enforce_order_sorts_out_of_order_input(self):
+        from reelforge.speech import enforce_order
+        jumbled = [Word("b", 1.0, 1.5), Word("a", 0.0, 0.5)]
+        self.assertEqual([w.text for w in enforce_order(jumbled)], ["a", "b"])
+
+    def test_lines_never_overlap_even_from_overlapping_words(self):
+        from reelforge.speech import enforce_order
+        profile = StyleProfile().apply_overrides(["captions.max_words=3"])
+        lines = group_words(enforce_order(self.overlapping_words()), profile)
+        self.assertGreaterEqual(len(lines), 2)
+        for earlier, later in zip(lines, lines[1:]):
+            self.assertLessEqual(earlier.end, later.start,
+                                 "two caption lines would be on screen at once")
+
+    def test_there_is_a_visible_break_between_lines(self):
+        from reelforge.speech import enforce_order
+        profile = StyleProfile().apply_overrides(["captions.max_words=3",
+                                                  "captions.line_gap=0.08"])
+        lines = group_words(enforce_order(self.overlapping_words()), profile)
+        for earlier, later in zip(lines, lines[1:]):
+            self.assertGreaterEqual(round(later.start - earlier.end, 3), 0.079)
+
+    def test_short_line_padding_does_not_eat_the_next_line(self):
+        profile = StyleProfile().apply_overrides(["captions.max_words=1",
+                                                  "captions.min_duration=2.0",
+                                                  "captions.line_gap=0.08"])
+        words = [Word("انت", 0.0, 0.2), Word("كل", 0.5, 0.7), Word("واحد", 1.0, 1.2)]
+        lines = group_words(words, profile)
+        for earlier, later in zip(lines, lines[1:]):
+            self.assertLessEqual(earlier.end, later.start)
+
+    def test_a_line_is_never_collapsed_to_nothing(self):
+        profile = StyleProfile().apply_overrides(["captions.max_words=1",
+                                                  "captions.line_gap=0.5"])
+        words = [Word("انت", 0.0, 0.2), Word("كل", 0.25, 0.45)]
+        for line in group_words(words, profile):
+            self.assertGreater(line.end, line.start)
+
+    def test_karaoke_events_still_tile_a_line_without_gaps(self):
+        # Inside a line the marker must move with no blink; the gap is only
+        # between lines.
+        profile = StyleProfile().apply_overrides(["captions.style=karaoke",
+                                                  "captions.max_words=4"])
+        words = [Word("انت", 0.0, 0.4), Word("و", 0.4, 0.6),
+                 Word("صاحبك", 0.6, 1.1), Word("كل", 1.1, 1.5)]
+        ass = build_ass(group_words(words, profile), profile)
+        events = [l for l in ass.splitlines() if l.startswith("Dialogue")]
+        stamps = [(e.split(",")[1], e.split(",")[2]) for e in events]
+        for (_, end), (start, _) in zip(stamps, stamps[1:]):
+            self.assertEqual(end, start)
+
+    def test_end_to_end_edl_has_no_overlapping_captions(self):
+        from reelforge.analysis import Analysis
+        from reelforge.speech import Segment, Transcript
+        profile = StyleProfile().apply_overrides(["cuts.enabled=false"])
+        analysis = Analysis(duration=5.0, width=1080, height=1920, fps=30.0,
+                            has_audio=True)
+        # Two segments whose words overlap at the join, as real output does.
+        transcript = Transcript(language="ar", backend="test", model="t", segments=[
+            Segment(text="انت و صاحبك", start=0.0, end=1.3, words=[
+                Word("انت", 0.0, 0.6), Word("و", 0.55, 0.8), Word("صاحبك", 0.75, 1.3)]),
+            Segment(text="كل واحد", start=1.2, end=2.1, words=[
+                Word("كل", 1.2, 1.6), Word("واحد", 1.55, 2.1)]),
+        ])
+        edl = build_edl("x.mp4", analysis, transcript, profile)
+        for earlier, later in zip(edl.captions, edl.captions[1:]):
+            self.assertLessEqual(earlier.end, later.start)
