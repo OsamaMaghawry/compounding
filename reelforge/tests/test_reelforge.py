@@ -1459,3 +1459,58 @@ class JoinCapTests(unittest.TestCase):
         profile = StyleProfile().apply_overrides(["output.height=1920",
                                                   "output.zoom_headroom=1.35"])
         self.assertEqual(_join_cap(profile), 2592)
+
+
+@needs_ffmpeg
+class FiltergraphPathTests(unittest.TestCase):
+    """Windows paths carry a drive colon and backslashes - the filtergraph's own
+    separator and escape characters. The renderer keeps paths out of the graph
+    entirely rather than trying to escape them."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="reelforge-paths-")
+        cls.clip = make_clip(Path(cls.tmp) / "clip.mp4", duration=4)
+        # A directory carrying every character that broke the filtergraph parser.
+        cls.hostile = Path(cls.tmp) / "C: drive\\path, weird [dir]"
+        cls.hostile.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def editor(self):
+        profile = StyleProfile().apply_overrides(["asr.backend=stub"])
+        return AutoEditor(profile, project_dir=self.hostile / ".reelforge",
+                          fonts_dir=Path(__file__).resolve().parent.parent / "assets" / "fonts")
+
+    def test_renders_from_a_path_full_of_filtergraph_metacharacters(self):
+        editor = self.editor()
+        result = editor.plan(self.clip)
+        out = editor.render(result.edl, self.hostile / "out reel.mp4", preview=True)
+        self.assertTrue(out.exists() and out.stat().st_size > 0)
+
+    def test_the_subtitle_filter_uses_bare_names_not_paths(self):
+        editor = self.editor()
+        result = editor.plan(self.clip)
+        editor.render(result.edl, self.hostile / "out2.mp4", preview=True)
+
+        graph = (editor.work_dir / "filtergraph_preview.txt").read_text("utf-8")
+        ass_segment = next(seg for seg in graph.split(";") if "ass=" in seg)
+        self.assertIn("ass=captions.ass", ass_segment)
+        self.assertNotIn(str(self.hostile), graph)
+        self.assertNotIn("\\", graph)          # no escaped path fragments anywhere
+
+    def test_fonts_are_copied_next_to_the_subtitles(self):
+        editor = self.editor()
+        result = editor.plan(self.clip)
+        editor.render(result.edl, self.hostile / "out3.mp4", preview=True)
+        fonts = editor.work_dir / "fonts"
+        self.assertTrue(fonts.exists())
+        self.assertTrue(any(f.suffix.lower() == ".ttf" for f in fonts.iterdir()))
+
+    def test_escape_helper_converts_windows_separators(self):
+        from reelforge.render import _escape_path
+        escaped = _escape_path(r"C:\Users\osama\captions.ass")
+        self.assertEqual(escaped, "C\\:/Users/osama/captions.ass")
+        self.assertNotIn("\\U", escaped)       # no stray backslash-letter sequences

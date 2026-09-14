@@ -27,11 +27,40 @@ def _even(value: float) -> int:
 
 
 def _escape_path(path: str | Path) -> str:
-    """Escape a path for use inside a filtergraph argument."""
-    text = str(path)
-    for char in ("\\", ":", "'", "[", "]", ","):
+    """Escape a path for use inside a filtergraph argument.
+
+    Only used for paths we cannot make relative. A Windows path carries both a
+    drive colon and backslashes, which are the filtergraph's own separator and
+    escape characters - so the renderer avoids embedding absolute paths at all
+    (see `Renderer.render`, which runs ffmpeg inside the work directory and
+    refers to the subtitle file and font folder by bare name). This remains for
+    the cases that cannot be made relative.
+    """
+    text = str(path).replace("\\", "/")          # Windows accepts forward slashes
+    for char in ("'", ":", "[", "]", ",", ";"):
         text = text.replace(char, "\\" + char)
     return text
+
+
+def sync_fonts(fonts_dir: Path | None, work_dir: Path) -> str | None:
+    """Put the fonts next to the subtitle file so libass needs no path.
+
+    Copying a few hundred KB per render is a cheap price for never having to
+    escape a font folder path inside a filtergraph.
+    """
+    if not fonts_dir or not Path(fonts_dir).exists():
+        return None
+    local = work_dir / "fonts"
+    local.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for source in Path(fonts_dir).iterdir():
+        if source.suffix.lower() not in (".ttf", ".otf", ".ttc"):
+            continue
+        target = local / source.name
+        if not target.exists() or target.stat().st_mtime < source.stat().st_mtime:
+            shutil.copy2(source, target)
+        copied += 1
+    return "fonts" if copied else None
 
 
 # --------------------------------------------------------------- zoom curve
@@ -202,7 +231,7 @@ class Renderer:
     # -- plan ------------------------------------------------------------
     def plan(self, edl: EDL, output: Path, *, preview: bool = False,
              burn_captions: bool = True) -> RenderPlan:
-        source = Path(edl.source)
+        source = Path(edl.source).expanduser().resolve()
         if not source.exists():
             raise FFmpegError(f"source file is gone: {source}")
         info = probe(source)
@@ -224,7 +253,7 @@ class Renderer:
         args: list[str] = ["-i", str(source)]
         overlays = edl.active_overlays()
         for overlay in overlays:
-            asset = Path(overlay.asset)
+            asset = Path(overlay.asset).expanduser().resolve()
             if not asset.exists():
                 continue
             if asset.suffix.lower() in IMAGE_EXT:
@@ -312,9 +341,13 @@ class Renderer:
                 build_ass(edl.captions, self.profile, width=width, height=height),
                 encoding="utf-8",
             )
-            ass_filter = f"ass={_escape_path(ass_path)}"
-            if self.fonts_dir and self.fonts_dir.exists():
-                ass_filter += f":fontsdir={_escape_path(self.fonts_dir)}"
+            # Referenced by bare name: ffmpeg is run with the work directory as its
+            # cwd, so no absolute path - and therefore no drive colon or backslash -
+            # ever reaches the filtergraph parser.
+            ass_filter = f"ass={ass_path.name}"
+            local_fonts = sync_fonts(self.fonts_dir, self.work_dir)
+            if local_fonts:
+                ass_filter += f":fontsdir={local_fonts}"
             graph.append(f"[{base}]{ass_filter}[sub];")
             base = "sub"
 
@@ -342,7 +375,8 @@ class Renderer:
     # -- run -------------------------------------------------------------
     def render(self, edl: EDL, output: str | Path, *, preview: bool = False,
                burn_captions: bool = True, on_status=None) -> Path:
-        output = Path(output)
+        # Absolute, because ffmpeg runs with the work directory as its cwd.
+        output = Path(output).expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
         plan = self.plan(edl, output, preview=preview, burn_captions=burn_captions)
 
@@ -354,7 +388,8 @@ class Renderer:
 
         # Inputs first, then the filtergraph, then mapping/encoding args.
         split = plan.args.index("-map")
-        run_filtergraph(plan.args[:split], plan.filtergraph, script, plan.args[split:])
+        run_filtergraph(plan.args[:split], plan.filtergraph, script, plan.args[split:],
+                        cwd=self.work_dir)
         if not output.exists() or output.stat().st_size == 0:
             raise FFmpegError(f"render produced no output at {output}")
         return output

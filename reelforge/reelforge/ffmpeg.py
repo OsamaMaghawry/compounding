@@ -38,7 +38,8 @@ def ffprobe_bin() -> str:
     return _binary("ffprobe")
 
 
-def run(args: list[str], *, capture: bool = True, check: bool = True) -> subprocess.CompletedProcess:
+def run(args: list[str], *, capture: bool = True, check: bool = True,
+        cwd: str | Path | None = None) -> subprocess.CompletedProcess:
     """Run a command, raising FFmpegError with the tail of stderr on failure."""
     proc = subprocess.run(
         args,
@@ -46,6 +47,7 @@ def run(args: list[str], *, capture: bool = True, check: bool = True) -> subproc
         stderr=subprocess.PIPE if capture else None,
         text=True,
         errors="replace",
+        cwd=str(cwd) if cwd else None,
     )
     if check and proc.returncode != 0:
         tail = "\n".join((proc.stderr or "").strip().splitlines()[-15:])
@@ -205,7 +207,8 @@ def _filter_args(mode: str, script: Path, graph: str) -> list[str]:
 
 
 def run_filtergraph(before: list[str], graph: str, script: Path,
-                    after: list[str]) -> subprocess.CompletedProcess:
+                    after: list[str], *,
+                    cwd: str | Path | None = None) -> subprocess.CompletedProcess:
     """Run ffmpeg with a filtergraph, using whichever mechanism this build accepts."""
     global _FILTER_MODE
     script.parent.mkdir(parents=True, exist_ok=True)
@@ -217,7 +220,7 @@ def run_filtergraph(before: list[str], graph: str, script: Path,
         args = ([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error"]
                 + before + _filter_args(mode, script, graph) + after)
         try:
-            result = run(args)
+            result = run(args, cwd=cwd)
         except FFmpegError as exc:
             message = str(exc)
             if "Unrecognized option" in message or "Option not found" in message:
