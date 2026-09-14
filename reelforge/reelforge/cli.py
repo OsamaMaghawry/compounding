@@ -70,6 +70,13 @@ def _profile_from_args(args) -> StyleProfile:
 VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 
 
+def _join_cap(profile: StyleProfile) -> int:
+    """Tallest canvas the renderer can actually sample from."""
+    height = int(profile.get("output.height"))
+    headroom = float(profile.get("output.zoom_headroom"))
+    return int(round(height * max(1.0, headroom)))
+
+
 def _resolve_videos(raw: list[str] | str, *, order: str = "given") -> list[Path]:
     """Expand what the user typed into a list of real video files.
 
@@ -150,7 +157,8 @@ def cmd_auto(args) -> int:
         from .join import join_clips  # noqa: PLC0415
         for index, clip in enumerate(clips, start=1):
             _print(f"  {index}. {clip.name}")
-        source = join_clips(clips, editor.work_dir / "joined.mp4", on_status=_print)
+        source = join_clips(clips, editor.work_dir / "joined.mp4",
+                            max_height=_join_cap(profile), on_status=_print)
     else:
         source = clips[0]
 
@@ -218,7 +226,8 @@ def cmd_captions(args) -> int:
     clips = _resolve_videos(args.video, order=getattr(args, "order", "given"))
     if len(clips) > 1:
         from .join import join_clips  # noqa: PLC0415
-        source = join_clips(clips, editor.work_dir / "joined.mp4", on_status=_print)
+        source = join_clips(clips, editor.work_dir / "joined.mp4",
+                            max_height=_join_cap(profile), on_status=_print)
     else:
         source = clips[0]
 

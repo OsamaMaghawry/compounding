@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .captions import build_ass
 from .edl import EDL, Overlay, Transition, Zoom
-from .ffmpeg import FFmpegError, ffmpeg_bin, probe, run
+from .ffmpeg import FFmpegError, probe, run_filtergraph
 from .profile import StyleProfile
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
@@ -348,18 +348,13 @@ class Renderer:
 
         # Filtergraphs get long; pass via file so we never hit an argv limit.
         script = self.work_dir / ("filtergraph_preview.txt" if preview else "filtergraph.txt")
-        script.write_text(plan.filtergraph, encoding="utf-8")
 
         if on_status:
             on_status(f"rendering {'preview' if preview else 'final'} -> {output.name}")
 
-        # Inputs first, then the filtergraph script, then mapping/encoding args.
+        # Inputs first, then the filtergraph, then mapping/encoding args.
         split = plan.args.index("-map")
-        args = ([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error"]
-                + plan.args[:split]
-                + ["-filter_complex_script", str(script)]
-                + plan.args[split:])
-        run(args)
+        run_filtergraph(plan.args[:split], plan.filtergraph, script, plan.args[split:])
         if not output.exists() or output.stat().st_size == 0:
             raise FFmpegError(f"render produced no output at {output}")
         return output

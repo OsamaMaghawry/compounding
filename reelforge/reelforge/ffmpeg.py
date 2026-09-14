@@ -171,6 +171,64 @@ def extract_wav(path: str | Path, dest: str | Path, *, rate: int = 16000) -> Pat
     return dest
 
 
+# How to hand ffmpeg a long filtergraph. `-filter_complex_script` was the way for
+# years, was deprecated in favour of the generic `-/option file` syntax in 7.0, and
+# was REMOVED in 8.0. Neither flag works everywhere, so pick by version and fall
+# back if the guess is wrong.
+_FILTER_MODE: str | None = None
+
+
+def version_tuple() -> tuple[int, ...] | None:
+    """(major, minor) of the installed ffmpeg, or None for a git build."""
+    import re  # noqa: PLC0415
+    first = (build_config().splitlines() or [""])[0]
+    match = re.search(r"ffmpeg version n?(\d+)\.(\d+)", first)
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def _filter_mode_order() -> list[str]:
+    version = version_tuple()
+    major = version[0] if version else None
+    if major is None or major >= 7:          # unknown builds are usually recent
+        return ["new", "old", "inline"]
+    return ["old", "new", "inline"]
+
+
+def _filter_args(mode: str, script: Path, graph: str) -> list[str]:
+    if mode == "new":
+        return ["-/filter_complex", str(script)]
+    if mode == "old":
+        return ["-filter_complex_script", str(script)]
+    return ["-filter_complex", graph]
+
+
+def run_filtergraph(before: list[str], graph: str, script: Path,
+                    after: list[str]) -> subprocess.CompletedProcess:
+    """Run ffmpeg with a filtergraph, using whichever mechanism this build accepts."""
+    global _FILTER_MODE
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(graph, encoding="utf-8")
+
+    modes = [_FILTER_MODE] if _FILTER_MODE else _filter_mode_order()
+    last: Exception | None = None
+    for mode in modes:
+        args = ([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error"]
+                + before + _filter_args(mode, script, graph) + after)
+        try:
+            result = run(args)
+        except FFmpegError as exc:
+            message = str(exc)
+            if "Unrecognized option" in message or "Option not found" in message:
+                last = exc
+                continue                      # wrong flag for this build - try the next
+            raise
+        _FILTER_MODE = mode
+        return result
+    raise last or FFmpegError("could not pass a filtergraph to ffmpeg")
+
+
 def has_encoder(name: str) -> bool:
     try:
         proc = run([ffmpeg_bin(), "-hide_banner", "-encoders"], check=False)

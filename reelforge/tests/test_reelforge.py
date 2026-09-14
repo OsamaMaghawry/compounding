@@ -1377,3 +1377,85 @@ class VideoResolutionTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError) as caught:
                 _resolve_videos([str(Path(tmp) / "*.mp4")])
             self.assertIn(tmp, str(caught.exception))
+
+
+class FiltergraphMechanismTests(unittest.TestCase):
+    """`-filter_complex_script` was removed in ffmpeg 8; `-/filter_complex` arrived in 7."""
+
+    def test_mode_order_follows_the_installed_version(self):
+        import reelforge.ffmpeg as ffmpeg_module
+        original = ffmpeg_module.version_tuple
+        try:
+            ffmpeg_module.version_tuple = lambda: (9, 0)
+            self.assertEqual(ffmpeg_module._filter_mode_order()[0], "new")
+            ffmpeg_module.version_tuple = lambda: (6, 1)
+            self.assertEqual(ffmpeg_module._filter_mode_order()[0], "old")
+            ffmpeg_module.version_tuple = lambda: None       # git build
+            self.assertEqual(ffmpeg_module._filter_mode_order()[0], "new")
+        finally:
+            ffmpeg_module.version_tuple = original
+
+    def test_inline_is_always_the_last_resort(self):
+        import reelforge.ffmpeg as ffmpeg_module
+        self.assertEqual(ffmpeg_module._filter_mode_order()[-1], "inline")
+
+    def test_each_mode_builds_the_right_arguments(self):
+        import reelforge.ffmpeg as ffmpeg_module
+        script = Path("g.txt")
+        self.assertEqual(ffmpeg_module._filter_args("new", script, "G"),
+                         ["-/filter_complex", "g.txt"])
+        self.assertEqual(ffmpeg_module._filter_args("old", script, "G"),
+                         ["-filter_complex_script", "g.txt"])
+        self.assertEqual(ffmpeg_module._filter_args("inline", script, "G"),
+                         ["-filter_complex", "G"])
+
+    @needs_ffmpeg
+    def test_a_rejected_flag_is_retried_with_the_other_one(self):
+        """The failure the user hit: the preferred flag does not exist on their build."""
+        import reelforge.ffmpeg as ffmpeg_module
+        original_order = ffmpeg_module._filter_mode_order
+        original_mode = ffmpeg_module._FILTER_MODE
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                # Force the wrong flag first, whichever this ffmpeg dislikes.
+                rejected = "new" if (ffmpeg_module.version_tuple() or (6,))[0] < 7 else "old"
+                keeper = "old" if rejected == "new" else "new"
+                ffmpeg_module._filter_mode_order = lambda: [rejected, keeper, "inline"]
+                ffmpeg_module._FILTER_MODE = None
+
+                out = Path(tmp) / "out.png"
+                ffmpeg_module.run_filtergraph(
+                    ["-f", "lavfi", "-i", "color=c=blue:s=64x64:d=0.2"],
+                    "[0:v]scale=32:32[outv]", Path(tmp) / "g.txt",
+                    ["-map", "[outv]", "-frames:v", "1", str(out)],
+                )
+                self.assertTrue(out.exists() and out.stat().st_size > 0)
+                # And it remembers, so later renders do not pay for the retry.
+                self.assertEqual(ffmpeg_module._FILTER_MODE, keeper)
+            finally:
+                ffmpeg_module._filter_mode_order = original_order
+                ffmpeg_module._FILTER_MODE = original_mode
+
+
+class JoinCapTests(unittest.TestCase):
+    def info(self, width, height):
+        from reelforge.ffmpeg import MediaInfo
+        return MediaInfo(path=Path("x.mp4"), duration=5.0, width=width, height=height,
+                         fps=30.0, has_audio=True, audio_rate=48000, rotation=0, size_bytes=1)
+
+    def test_4k_phone_clips_are_capped_to_what_the_render_uses(self):
+        from reelforge.join import target_shape
+        width, height, _f, _r = target_shape([self.info(2160, 3840)] * 3, max_height=2592)
+        self.assertEqual(height, 2592)
+        self.assertAlmostEqual(width / height, 2160 / 3840, places=2)   # aspect kept
+
+    def test_smaller_clips_are_never_upscaled(self):
+        from reelforge.join import target_shape
+        width, height, _f, _r = target_shape([self.info(1080, 1920)], max_height=2592)
+        self.assertEqual((width, height), (1080, 1920))
+
+    def test_cap_comes_from_output_size_and_headroom(self):
+        from reelforge.cli import _join_cap
+        profile = StyleProfile().apply_overrides(["output.height=1920",
+                                                  "output.zoom_headroom=1.35"])
+        self.assertEqual(_join_cap(profile), 2592)

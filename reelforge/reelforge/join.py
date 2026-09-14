@@ -19,7 +19,8 @@ def _even(value: float) -> int:
     return max(2, int(round(value / 2.0)) * 2)
 
 
-def target_shape(infos: list[MediaInfo]) -> tuple[int, int, int, int]:
+def target_shape(infos: list[MediaInfo], *,
+                 max_height: int | None = None) -> tuple[int, int, int, int]:
     """A canvas every clip fits inside, plus a frame rate and audio rate.
 
     Sized from the clips that share the dominant orientation, not from all of
@@ -34,13 +35,22 @@ def target_shape(infos: list[MediaInfo]) -> tuple[int, int, int, int]:
 
     width = _even(max(info.width for info in dominant))
     height = _even(max(info.height for info in dominant))
+
+    # Phones shoot 4K. The renderer never samples above the output size times the
+    # zoom headroom, so joining at 2160x3840 spends minutes encoding pixels that
+    # are thrown away on the next pass. Cap the long edge at what can actually be
+    # used, keeping the aspect ratio.
+    if max_height and height > max_height:
+        scale = max_height / height
+        width, height = _even(width * scale), _even(max_height)
+
     fps = max(1, int(round(max(info.fps for info in infos))))
     rates = [info.audio_rate for info in infos if info.audio_rate]
     return width, height, min(fps, 60), (max(rates) if rates else 48000)
 
 
 def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "veryfast",
-               crf: int = 18, on_status=None) -> Path:
+               crf: int = 18, max_height: int | None = None, on_status=None) -> Path:
     """Concatenate clips into one file, normalising shape, rate and audio."""
     sources = [Path(p) for p in paths]
     if not sources:
@@ -49,7 +59,7 @@ def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "very
         return sources[0]
 
     infos = [probe(path) for path in sources]
-    width, height, fps, audio_rate = target_shape(infos)
+    width, height, fps, audio_rate = target_shape(infos, max_height=max_height)
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
