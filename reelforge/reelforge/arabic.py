@@ -217,3 +217,44 @@ def is_emphatic(word: str, extra: set[str] | frozenset[str] | None = None) -> bo
 def emphasis_set(words: list[str] | None) -> frozenset[str]:
     """Normalise a user-supplied emphasis list once, for repeated lookups."""
     return frozenset(normalize_for_match(w) for w in (words or []) if normalize_for_match(w))
+
+
+LATIN_RE = re.compile(r"[A-Za-z]")
+
+
+def _is_ltr_token(token: str) -> bool:
+    """A word that must keep left-to-right order even inside an Arabic line."""
+    return bool(LATIN_RE.search(token or "")) and not ARABIC_RANGE.search(token or "")
+
+
+def visual_order(words: list[str]) -> list[int]:
+    """Indices of `words` in the order they must be drawn, left to right.
+
+    Needed because libass loses bidi across override tags: any `{\\c...}` splits
+    the line into separate runs and those runs are laid out in logical order, so
+    a right-to-left line comes out reversed. Emitting the words already in visual
+    order puts them back where they belong.
+
+    Word-level rather than character-level: Arabic letters only join inside a
+    word, so reordering whole words leaves shaping untouched. Runs of Latin words
+    keep their own left-to-right order, as the bidi algorithm requires; a bare
+    number is positioned by the surrounding right-to-left flow, and its digits
+    are ordered by the shaper regardless.
+    """
+    indices = list(range(len(words)))
+    if not any(is_arabic(word) for word in words):
+        return indices                                  # a left-to-right line
+
+    out: list[int] = []
+    latin_run: list[int] = []
+    for index in reversed(indices):
+        if _is_ltr_token(words[index]):
+            latin_run.append(index)
+            continue
+        if latin_run:
+            out.extend(reversed(latin_run))
+            latin_run = []
+        out.append(index)
+    if latin_run:
+        out.extend(reversed(latin_run))
+    return out

@@ -7,6 +7,7 @@ suite runs anywhere ffmpeg is installed and needs no sample files or models.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -1514,3 +1515,154 @@ class FiltergraphPathTests(unittest.TestCase):
         escaped = _escape_path(r"C:\Users\osama\captions.ass")
         self.assertEqual(escaped, "C\\:/Users/osama/captions.ass")
         self.assertNotIn("\\U", escaped)       # no stray backslash-letter sequences
+
+
+class VisualOrderTests(unittest.TestCase):
+    """libass loses bidi across override tags, so we order words for display."""
+
+    def order(self, words):
+        return [words[i] for i in arabic.visual_order(words)]
+
+    def test_arabic_words_are_laid_out_right_to_left(self):
+        words = ["واحد", "اثنين", "ثلاثة", "اربعة"]
+        self.assertEqual(self.order(words), ["اربعة", "ثلاثة", "اثنين", "واحد"])
+
+    def test_a_latin_only_line_is_left_alone(self):
+        words = ["hello", "world", "now"]
+        self.assertEqual(self.order(words), words)
+
+    def test_latin_runs_keep_their_own_order_inside_an_arabic_line(self):
+        # The bidi algorithm reverses the Arabic but not the Latin phrase.
+        words = ["استخدم", "Claude", "Code", "اليوم"]
+        self.assertEqual(self.order(words), ["اليوم", "Claude", "Code", "استخدم"])
+
+    def test_numbers_follow_the_right_to_left_flow(self):
+        words = ["وفرت", "90%", "من", "وقتك"]
+        self.assertEqual(self.order(words), ["وقتك", "من", "90%", "وفرت"])
+
+    def test_single_word_and_empty(self):
+        self.assertEqual(self.order(["انت"]), ["انت"])
+        self.assertEqual(arabic.visual_order([]), [])
+
+
+class CaptionOrderingTests(unittest.TestCase):
+    def line(self, texts):
+        words, t = [], 0.0
+        for text in texts:
+            words.append(Word(text, t, t + 0.4, 1.0))
+            t += 0.5
+        return CaptionLine(words=words, start=0.0, end=t)
+
+    def body(self, event):
+        return event.split(",", 9)[9]
+
+    def events(self, ass):
+        return [l for l in ass.splitlines() if l.startswith("Dialogue")]
+
+    def test_tagged_arabic_lines_are_emitted_in_visual_order(self):
+        profile = StyleProfile().apply_overrides(["captions.style=karaoke"])
+        line = self.line(["واحد", "اثنين", "ثلاثة", "اربعة"])
+        first = self.body(self.events(build_ass([line], profile))[0])
+        # The line reads right-to-left, so the last word is written first.
+        self.assertTrue(first.startswith("اربعة"), first)
+        self.assertTrue(first.rstrip().endswith("}"), first)   # active word is last
+        self.assertIn("واحد", first.split("}")[-2] if "}" in first else first)
+
+    def test_the_spoken_word_is_the_one_marked(self):
+        profile = StyleProfile().apply_overrides(["captions.style=karaoke"])
+        line = self.line(["واحد", "اثنين", "ثلاثة", "اربعة"])
+        events = self.events(build_ass([line], profile))
+        self.assertEqual(len(events), 4)
+        for index, expected in enumerate(["واحد", "اثنين", "ثلاثة", "اربعة"]):
+            body = self.body(events[index])
+            marked = body.split("{\\c&H00D7FF&}")[1].split("{")[0]
+            self.assertEqual(marked.strip(), expected)
+
+    def test_an_untagged_line_is_left_in_logical_order_for_libass(self):
+        # With no override tags libass does the bidi correctly itself.
+        profile = StyleProfile().apply_overrides(["captions.style=plain",
+                                                  "captions.emphasis=false"])
+        line = self.line(["واحد", "اثنين", "ثلاثة", "اربعة"])
+        body = self.body(self.events(build_ass([line], profile))[0])
+        self.assertTrue(body.startswith("واحد"), body)
+
+    def test_emphasis_alone_still_triggers_visual_order(self):
+        # An emphasised number inserts a tag, which costs us bidi just the same.
+        profile = StyleProfile().apply_overrides(["captions.style=plain"])
+        line = self.line(["وفرت", "90%", "وقتك"])
+        body = self.body(self.events(build_ass([line], profile))[0])
+        self.assertTrue(body.startswith("وقتك"), body)
+
+    def test_latin_captions_are_unaffected(self):
+        profile = StyleProfile().apply_overrides(["captions.style=karaoke"])
+        line = self.line(["saved", "most", "time"])
+        body = self.body(self.events(build_ass([line], profile))[0])
+        self.assertIn("saved", body.split("}")[1] if "}" in body else body)
+
+
+@needs_ffmpeg
+class CaptionPixelOrderTests(unittest.TestCase):
+    """Measured, not eyeballed - reading Arabic glyph order from a picture is
+    exactly how this bug survived review in the first place."""
+
+    def render_positions(self, profile, words):
+        from reelforge.captions import CaptionLine as Line
+        colours = ["&H0000FF&", "&H00FF00&", "&HFF0000&", "&H00FFFF&"]
+        targets = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            timed, t = [], 0.0
+            for text in words:
+                timed.append(Word(text, t, t + 0.4, 1.0))
+                t += 0.5
+            ass = build_ass([Line(words=timed, start=0.0, end=t)], profile,
+                            width=900, height=200)
+            # Recolour each word so its position can be measured unambiguously.
+            lines, done = [], False
+            for row in ass.splitlines():
+                if row.startswith("Dialogue"):
+                    if done:
+                        continue
+                    head = row.split(",", 9)
+                    body = re.sub(r"\{[^}]*\}", "", head[9])
+                    for word, colour in zip(words, colours):
+                        body = body.replace(word, "{\\c%s}%s" % (colour, word))
+                    lines.append(",".join(head[:9]) + "," + body)
+                    done = True
+                else:
+                    lines.append(row)
+            path = Path(tmp) / "m.ass"
+            path.write_text("\n".join(lines), encoding="utf-8")
+
+            fonts = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+            raw = Path(tmp) / "m.raw"
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                            "-f", "lavfi", "-i", "color=c=black:s=900x200:d=1:r=5",
+                            "-vf", f"ass={path.name}:fontsdir={fonts}",
+                            "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo",
+                            str(raw)], check=True, capture_output=True, cwd=tmp)
+            data = raw.read_bytes()
+
+        width, height = 900, 200
+        found: dict[int, list[int]] = {}
+        for y in range(height):
+            for x in range(width):
+                i = (y * width + x) * 3
+                r, g, b = data[i], data[i + 1], data[i + 2]
+                if r + g + b < 90:
+                    continue
+                for index, (tr, tg, tb) in enumerate(targets[:len(words)]):
+                    if abs(r - tr) < 70 and abs(g - tg) < 70 and abs(b - tb) < 70:
+                        found.setdefault(index, []).append(x)
+                        break
+        centres = {i: sum(xs) / len(xs) for i, xs in found.items() if xs}
+        return [i for i, _ in sorted(centres.items(), key=lambda kv: kv[1])]
+
+    def test_arabic_karaoke_line_reads_right_to_left_on_screen(self):
+        profile = StyleProfile().apply_overrides([
+            "captions.style=karaoke", "captions.font_size=64", "captions.outline=0",
+            "captions.shadow=0", "captions.y_pct=0.5", "captions.safe_area=false",
+            "captions.max_words=4"])
+        order = self.render_positions(profile, ["واحد", "اثنين", "ثلاثة", "اربعة"])
+        # Left to right on screen must be the last word first.
+        self.assertEqual(order, [3, 2, 1, 0])

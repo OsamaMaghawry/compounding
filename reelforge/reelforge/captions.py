@@ -14,7 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .arabic import clean_for_display, emphasis_set, is_arabic, is_emphatic
+from .arabic import (clean_for_display, emphasis_set, is_arabic, is_emphatic,
+                     visual_order)
 from .speech import Word
 
 # Vertical space the Instagram/TikTok UI covers at the bottom of a 1920-tall frame.
@@ -261,8 +262,12 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
     events: list[str] = []
     for line in lines:
         texts = [_escape(w.text) for w in line.words]
+        texts_raw = [w.text for w in line.words]
         emphatic = [use_emphasis and is_emphatic(w.text, extra_emphasis) for w in line.words]
-        rows = _wrap_rows([w.text for w in line.words], max_chars)
+        rows = _wrap_rows(texts_raw, max_chars)
+        # Any override tag in the line - the active-word marker or an emphasised
+        # word - means we must order the words for display ourselves.
+        tagged = spec["per_word"] or any(emphatic)
 
         def render(active: int | None) -> str:
             """The full line, with the active word marked and important words kept marked."""
@@ -273,7 +278,12 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
             parts: list[str] = []
             for row in rows:
                 chunk: list[str] = []
-                for index in row:
+                # Override tags cost us libass's bidi, so lay the words out
+                # ourselves whenever the line carries any.
+                order = row
+                if tagged:
+                    order = [row[i] for i in visual_order([texts_raw[j] for j in row])]
+                for index in order:
                     word = texts[index]
                     if active is not None and index == active:
                         chunk.append(f"{spec['active_open']}{word}{spec['active_close']}")
