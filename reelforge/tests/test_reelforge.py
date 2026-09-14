@@ -446,3 +446,144 @@ class PipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+try:
+    import faster_whisper  # noqa: F401
+    HAVE_FASTER_WHISPER = True
+except ImportError:
+    HAVE_FASTER_WHISPER = False
+
+
+@unittest.skipUnless(HAVE_FASTER_WHISPER, "faster-whisper is not installed")
+class FasterWhisperAdapterTests(unittest.TestCase):
+    """Drive the real backend with the library's own result types.
+
+    A model download is not needed to check the part that actually breaks: whether
+    we read the right fields off faster-whisper's Segment/Word objects and pass it
+    kwargs it accepts. Using the genuine dataclasses means this test fails loudly
+    if the library changes shape under us.
+    """
+
+    def real_segment(self, start, end, text, words):
+        from faster_whisper.transcribe import Segment, Word
+        return Segment(
+            id=1, seek=0, start=start, end=end, text=text,
+            tokens=[], avg_logprob=-0.2, compression_ratio=1.1, no_speech_prob=0.01,
+            words=[Word(start=s, end=e, word=w, probability=p) for w, s, e, p in words],
+            temperature=0.0,
+        )
+
+    def patched_model(self, segments, recorder):
+        """A stand-in WhisperModel that records how it was called."""
+        class FakeModel:
+            def __init__(self, name, **kwargs):
+                recorder["init"] = {"name": name, **kwargs}
+
+            def transcribe(self, audio, **kwargs):
+                recorder["transcribe"] = {"audio": audio, **kwargs}
+                return iter(segments), object()
+
+        return FakeModel
+
+    def run_backend(self, segments, profile=None, prompt=None):
+        import faster_whisper
+        from reelforge.speech import transcribe_faster_whisper
+        recorder: dict = {}
+        original = faster_whisper.WhisperModel
+        faster_whisper.WhisperModel = self.patched_model(segments, recorder)
+        try:
+            transcript = transcribe_faster_whisper(
+                Path("audio.wav"),
+                profile or StyleProfile().apply_overrides(["asr.device=cpu"]),
+                prompt=prompt,
+            )
+        finally:
+            faster_whisper.WhisperModel = original
+        return transcript, recorder
+
+    def test_words_and_probabilities_are_read_correctly(self):
+        segments = [self.real_segment(0.0, 1.2, " مرحبا بكم ",
+                                      [("مرحبا", 0.0, 0.5, 0.94), ("بكم", 0.6, 1.2, 0.81)])]
+        transcript, _ = self.run_backend(segments)
+
+        self.assertEqual(transcript.backend, "faster-whisper")
+        self.assertEqual([w.text for w in transcript.words], ["مرحبا", "بكم"])
+        self.assertAlmostEqual(transcript.words[0].prob, 0.94)
+        self.assertAlmostEqual(transcript.words[1].start, 0.6)
+        self.assertEqual(transcript.segments[0].text, "مرحبا بكم")   # whitespace cleaned
+
+    def test_words_with_missing_timestamps_are_dropped_not_crashed_on(self):
+        # Real Whisper output occasionally carries a word with no timing.
+        from faster_whisper.transcribe import Segment, Word
+        segment = Segment(
+            id=1, seek=0, start=0.0, end=1.0, text="مرحبا بكم", tokens=[],
+            avg_logprob=-0.2, compression_ratio=1.1, no_speech_prob=0.01,
+            words=[Word(start=0.0, end=0.5, word="مرحبا", probability=0.9),
+                   Word(start=None, end=None, word="بكم", probability=0.5),
+                   Word(start=0.6, end=0.9, word="   ", probability=0.4)],
+            temperature=0.0,
+        )
+        transcript, _ = self.run_backend([segment])
+        self.assertEqual([w.text for w in transcript.words], ["مرحبا"])
+
+    def test_profile_settings_reach_the_library(self):
+        profile = StyleProfile().apply_overrides([
+            "asr.device=cpu", "asr.compute_type=int8", "asr.model=large-v3",
+            "asr.language=ar", "asr.beam_size=7", "asr.vad_min_silence_ms=250",
+        ])
+        segments = [self.real_segment(0.0, 0.4, "نعم", [("نعم", 0.0, 0.4, 0.9)])]
+        _, recorder = self.run_backend(segments, profile=profile, prompt="أسامة")
+
+        self.assertEqual(recorder["init"]["name"], "large-v3")
+        self.assertEqual(recorder["init"]["compute_type"], "int8")
+        call = recorder["transcribe"]
+        self.assertEqual(call["language"], "ar")
+        self.assertEqual(call["beam_size"], 7)
+        self.assertTrue(call["word_timestamps"])
+        self.assertEqual(call["initial_prompt"], "أسامة")
+        self.assertEqual(call["vad_parameters"], {"min_silence_duration_ms": 250})
+        # Guards against Whisper's repetition loops.
+        self.assertFalse(call["condition_on_previous_text"])
+
+    def test_every_kwarg_we_send_is_accepted_by_the_installed_library(self):
+        """The failure mode that would break a real run: an unsupported kwarg."""
+        import inspect
+        from faster_whisper import WhisperModel
+        segments = [self.real_segment(0.0, 0.4, "نعم", [("نعم", 0.0, 0.4, 0.9)])]
+        _, recorder = self.run_backend(segments)
+
+        accepted = set(inspect.signature(WhisperModel.transcribe).parameters)
+        for kwarg in recorder["transcribe"]:
+            if kwarg == "audio":
+                continue
+            self.assertIn(kwarg, accepted, f"faster-whisper does not accept '{kwarg}'")
+
+        accepted_init = set(inspect.signature(WhisperModel.__init__).parameters)
+        for kwarg in recorder["init"]:
+            if kwarg == "name":
+                continue
+            self.assertIn(kwarg, accepted_init)
+
+    def test_learned_vocabulary_is_applied_to_the_result(self):
+        from reelforge.arabic import VocabCorrector
+        from reelforge.speech import transcribe
+        import faster_whisper
+
+        segments = [self.real_segment(0.0, 1.0, "انا اسامه",
+                                      [("انا", 0.0, 0.4, 0.9), ("اسامه", 0.4, 1.0, 0.6)])]
+        recorder: dict = {}
+        original = faster_whisper.WhisperModel
+        faster_whisper.WhisperModel = self.patched_model(segments, recorder)
+        try:
+            transcript = transcribe(
+                Path("audio.wav"),
+                StyleProfile().apply_overrides(["asr.backend=faster-whisper", "asr.device=cpu"]),
+                corrector=VocabCorrector({"اسامه": "أسامة"}),
+            )
+        finally:
+            faster_whisper.WhisperModel = original
+
+        self.assertEqual([w.text for w in transcript.words], ["انا", "أسامة"])
+        # ...and the same vocabulary biased the decoder up front.
+        self.assertIn("أسامة", recorder["transcribe"]["initial_prompt"])

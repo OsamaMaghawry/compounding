@@ -147,6 +147,9 @@ reelforge/
   dialect, weaker on heavy dialect and noisy audio. The vocabulary loop is what closes
   the gap on your specific recurring terms.
 - Music beat-sync, transitions and SFX are not implemented.
+- Transcription has been verified against faster-whisper's API, but the model weights
+  themselves were never downloaded during development. If your first run fails inside the
+  ASR step, `reelforge doctor` and the error text will say why.
 
 ## Tests
 
@@ -154,5 +157,8 @@ reelforge/
 python -m unittest discover -s tests -v
 ```
 
-46 tests. The media tests build their own clip with ffmpeg, so no sample files or model
-downloads are needed.
+51 tests, no sample files or model downloads needed. The media tests build their own clip
+with ffmpeg. The faster-whisper adapter is covered by integration tests that drive it with
+the library's own `Segment`/`Word` types and assert every keyword argument we send is one
+the installed version accepts — so a breaking change upstream fails the suite rather than
+your first real render.
