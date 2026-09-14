@@ -73,7 +73,8 @@ class AutoEditor:
         return BrollLibrary.load(path)
 
     # -- plan ------------------------------------------------------------
-    def plan(self, source: str | Path, *, refresh: bool = False) -> PlanResult:
+    def plan(self, source: str | Path, *, refresh: bool = False,
+             extra_vocab: dict[str, str] | None = None) -> PlanResult:
         source = Path(source).expanduser().resolve()
         profile = self.effective_profile()
         warnings: list[str] = []
@@ -88,8 +89,12 @@ class AutoEditor:
         analysis = analyze(source, profile, cache_dir=self.cache_dir, info=info, refresh=refresh)
         timings["analysis"] = time.time() - started
 
-        corrector = VocabCorrector(self.store.vocab_pairs()) \
-            if profile.get("learning.enabled") else VocabCorrector()
+        # A script for this shoot is the strongest possible prior: we already know
+        # roughly which words were said, so they stop being guesses.
+        pairs = dict(self.store.vocab_pairs()) if profile.get("learning.enabled") else {}
+        if extra_vocab:
+            pairs.update(extra_vocab)
+        corrector = VocabCorrector(pairs)
 
         started = time.time()
         transcript = Transcript(language=profile.get("asr.language"), backend="none", model="")

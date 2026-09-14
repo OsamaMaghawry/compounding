@@ -1,0 +1,25 @@
+name: story-lesson
+description: A short personal story that earns a general principle.
+best_for: Building trust, softer topics, channel-building videos.
+beats:
+  - role: hook
+    purpose: Drop the viewer into the middle of the moment. No setup.
+    seconds: 4
+  - role: situation
+    purpose: Just enough context to understand the stakes.
+    seconds: 8
+  - role: turn
+    purpose: What went wrong, or what surprised you.
+    seconds: 8
+  - role: lesson
+    purpose: The principle, stated so it applies to the viewer and not only to you.
+    seconds: 10
+  - role: proof
+    purpose: Numbers that show the principle holds beyond your story.
+    seconds: 7
+  - role: cta
+    purpose: One line.
+    seconds: 3
+rules:
+  - The story must be true. If there is no real story, use another framework.
+  - The lesson has to outlive the story - make it general in the last line.

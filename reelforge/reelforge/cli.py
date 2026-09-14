@@ -19,6 +19,8 @@ from . import __version__
 from .edl import EDL
 from .ffmpeg import FFmpegError, FFmpegMissing, build_config, probe
 from .learn import FeedbackStore
+from .knowledge import Studio
+from .llm import LLMError, describe_providers
 from .market import MarketError, MarketStore, compare, fact_sheet
 from .pipeline import PACKAGE_ROOT, AutoEditor
 from .profile import StyleProfile
@@ -79,7 +81,17 @@ def cmd_auto(args) -> int:
     source = Path(args.video).expanduser()
 
     started = time.time()
-    result = editor.plan(source, refresh=args.refresh)
+    extra_vocab = None
+    if getattr(args, "script", None):
+        from .script import Script, caption_prior, script_vocabulary  # noqa: PLC0415
+        script = Script.load(args.script)
+        profile = profile.merged({"asr": {"initial_prompt": caption_prior(script)}})
+        editor.profile = profile
+        extra_vocab = script_vocabulary(script)
+        _print(f"using script '{script.title or script.topic}' as the transcription prior "
+               f"({len(extra_vocab)} terms)")
+
+    result = editor.plan(source, refresh=args.refresh, extra_vocab=extra_vocab)
     edl = result.edl
     summary = edl.summary()
 
@@ -335,6 +347,107 @@ def _any_font() -> Path:
     return Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
 
+def _studio(args) -> Studio:
+    root = Path(args.studio) if getattr(args, "studio", None) else Path.cwd() / "studio"
+    return Studio(root)
+
+
+def cmd_studio(args) -> int:
+    studio = _studio(args)
+    if args.action == "init":
+        written = studio.init(force=args.force)
+        if written:
+            for path in written:
+                _print(f"created {path.relative_to(Path.cwd()) if path.is_relative_to(Path.cwd()) else path}")
+        else:
+            _print("studio already set up (use --force to overwrite)")
+        print()
+        _print("Now edit these three files - the writer reads them verbatim:")
+        _print(f"  {studio.root / 'background.md'}   who you are")
+        _print(f"  {studio.root / 'voice.md'}        how you sound")
+        _print(f"  {studio.root / 'audience.md'}     who is watching")
+        return 0
+
+    # status
+    if not studio.exists:
+        _print("no studio yet. Run: reelforge studio init")
+        return 0
+    _print(f"studio: {studio.root}")
+    _print(f"frameworks: {', '.join(f.name for f in studio.frameworks())}")
+    scripts = sorted(studio.scripts_dir.glob("*.json")) if studio.scripts_dir.exists() else []
+    _print(f"scripts written: {len(scripts)}")
+    if studio.is_unedited():
+        _print("background.md is still the placeholder - edit it before writing scripts")
+    print()
+    for name, ready, note in describe_providers():
+        _print(f"writer {name:<8} {'ready' if ready else 'not set up':<11} {note}")
+    return 0
+
+
+def cmd_script(args) -> int:
+    from .script import write_script  # noqa: PLC0415
+
+    studio = _studio(args)
+    if args.list_frameworks:
+        for framework in studio.frameworks():
+            _print(f"{framework.name:<14} ~{framework.seconds}s  {framework.description}")
+            if framework.best_for:
+                _print(f"{'':<14} best for: {framework.best_for}")
+        return 0
+
+    if not studio.exists:
+        _print("no studio yet - creating one with the defaults")
+        studio.init()
+    if not args.topic:
+        _print('what is it about? reelforge script "why most people never compound"')
+        return 1
+
+    facts = None
+    if args.symbol:
+        store = _market_store(args)
+        facts = fact_sheet(store, args.symbol, start=args.since, end=args.until,
+                           amount=args.amount, monthly=args.monthly)
+        _print(f"using {len(facts['statements']['en'])} verified facts about {args.symbol}")
+
+    if studio.is_unedited():
+        _print("note: studio/background.md is still the placeholder, so the voice "
+               "will be generic. Edit it and rerun for something that sounds like you.")
+
+    script = write_script(
+        args.topic, studio, framework=args.framework, facts=facts,
+        language=args.lang or "ar", seconds=args.seconds,
+        provider=args.provider or "auto", model=args.model, extra=args.direction or "",
+    )
+
+    if script.provider == "stub":
+        _print("no writing model available, so this is the empty structure only.")
+        _print("  set ANTHROPIC_API_KEY (pip install anthropic), or run Ollama locally.")
+
+    studio.scripts_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{len(list(studio.scripts_dir.glob('*.json'))) + 1:03d}-{_slug(args.topic)}"
+    json_path = script.save(studio.scripts_dir / f"{stem}.json")
+    markdown_path = studio.scripts_dir / f"{stem}.md"
+    markdown_path.write_text(script.to_markdown(), encoding="utf-8")
+
+    print()
+    print(script.to_markdown())
+    print()
+    if script.unverified_numbers:
+        _print(f"CHECK THESE - not traceable to your data: "
+               f"{', '.join(script.unverified_numbers)}")
+    elif facts:
+        _print("every number in this script traces back to your data")
+    _print(f"saved {json_path.name} and {markdown_path.name} in {studio.scripts_dir}")
+    _print(f"after you shoot it:  reelforge auto clip.mp4 --script {json_path}")
+    return 0
+
+
+def _slug(text: str, limit: int = 40) -> str:
+    import re as _re  # noqa: PLC0415
+    slug = _re.sub(r"[^\w\u0600-\u06FF]+", "-", (text or "").strip().lower())
+    return slug.strip("-")[:limit] or "script"
+
+
 def _market_store(args) -> MarketStore:
     project = Path(args.project) if getattr(args, "project", None) else Path.cwd() / ".reelforge"
     return MarketStore(project)
@@ -447,6 +560,9 @@ def cmd_doctor(args) -> int:
         except Exception:
             pass
 
+    for name, ready, note in describe_providers():
+        _print(f"writer {name}: {'ready - ' + note if ready else note}")
+
     fonts_dir = PACKAGE_ROOT / "assets" / "fonts"
     found = sorted(p.name for p in fonts_dir.glob("*")
                    if p.suffix.lower() in (".ttf", ".otf", ".ttc")) if fonts_dir.exists() else []
@@ -525,6 +641,8 @@ def build_parser() -> argparse.ArgumentParser:
                       help="record this edit as approved without reviewing")
     auto.add_argument("--plan-only", action="store_true", help="decide but do not render")
     auto.add_argument("--srt", action="store_true", help="also write .srt and .ass files")
+    auto.add_argument("--script", help="the script you shot from - used as the "
+                      "transcription prior, which sharpens Arabic captions")
     auto.add_argument("--port", type=int, default=8733)
     auto.add_argument("--no-browser", action="store_true")
     auto.set_defaults(func=cmd_auto)
@@ -572,6 +690,30 @@ def build_parser() -> argparse.ArgumentParser:
     fonts.add_argument("--force", action="store_true")
     fonts.set_defaults(func=cmd_fonts)
 
+    studio = sub.add_parser("studio", help="the files that make scripts sound like you")
+    studio.add_argument("action", nargs="?", default="status", choices=["init", "status"])
+    studio.add_argument("--studio", help="studio folder (default ./studio)")
+    studio.add_argument("--force", action="store_true", help="overwrite existing files")
+    studio.set_defaults(func=cmd_studio)
+
+    script = sub.add_parser("script", help="write a script for a video")
+    script.add_argument("topic", nargs="?", help="what the video is about")
+    script.add_argument("-f", "--framework", help="which structure to use")
+    script.add_argument("--list-frameworks", action="store_true")
+    script.add_argument("-s", "--symbol", help="cite verified facts about this symbol")
+    script.add_argument("--since")
+    script.add_argument("--until")
+    script.add_argument("--amount", type=float, default=1000.0)
+    script.add_argument("--monthly", type=float)
+    script.add_argument("--seconds", type=int, default=45)
+    script.add_argument("--lang", default="ar")
+    script.add_argument("--provider", choices=["auto", "claude", "ollama", "stub"])
+    script.add_argument("--model", help="override the writing model")
+    script.add_argument("-d", "--direction", help="extra steer for this script")
+    script.add_argument("--studio", help="studio folder (default ./studio)")
+    script.add_argument("--project")
+    script.set_defaults(func=cmd_script)
+
     market = sub.add_parser("market", help="your own price history, and facts from it")
     market.add_argument("action", nargs="?", default="facts",
                         choices=["add", "list", "facts", "compare", "remove"])
@@ -609,7 +751,7 @@ def main(argv: list[str] | None = None) -> int:
     except FFmpegMissing as exc:
         print(f"\n{exc}\n", file=sys.stderr)
         return 2
-    except (FFmpegError, MarketError, FileNotFoundError, ValueError) as exc:
+    except (FFmpegError, MarketError, LLMError, FileNotFoundError, ValueError) as exc:
         print(f"\nerror: {exc}\n", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

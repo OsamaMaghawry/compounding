@@ -970,3 +970,266 @@ class MarketStoreTests(unittest.TestCase):
             self.assertEqual(result["start_day"], "2018-01-01")
             self.assertEqual(len(result["rows"]), 2)
             self.assertTrue(all(row["cagr"] is not None for row in result["rows"]))
+
+
+class LLMProviderTests(unittest.TestCase):
+    def test_json_is_recovered_from_fences_and_prose(self):
+        from reelforge.llm import _maybe_json
+        self.assertEqual(_maybe_json('```json\n{"a": 1}\n```'), {"a": 1})
+        self.assertEqual(_maybe_json('sure thing: {"b": 2} done'), {"b": 2})
+        self.assertIsNone(_maybe_json("no json here"))
+        self.assertIsNone(_maybe_json(""))
+        self.assertIsNone(_maybe_json("[1,2,3]"))      # array is not a script payload
+
+    def test_explicit_provider_is_honoured(self):
+        from reelforge.llm import available_provider
+        self.assertEqual(available_provider("ollama"), "ollama")
+        self.assertEqual(available_provider("stub"), "stub")
+
+    def test_stub_returns_no_payload_rather_than_fake_prose(self):
+        from reelforge.llm import generate
+        response = generate("write me a script", system="x", schema={}, provider="stub")
+        self.assertEqual(response.provider, "stub")
+        self.assertIsNone(response.data)
+        self.assertEqual(response.text, "")
+
+    def _fake_anthropic(self, recorder, *, beta_raises=None, stop_reason="end_turn"):
+        """A stand-in anthropic module that records the request we build."""
+        import types
+
+        class Block:
+            def __init__(self, text):
+                self.type, self.text = "text", text
+
+        class Usage:
+            input_tokens, output_tokens = 10, 20
+
+        class Response:
+            def __init__(self):
+                self.content = [Block('{"title": "t", "caption_hook": "h", "beats": []}')]
+                self.usage = Usage()
+                self.stop_reason = stop_reason
+
+        class Messages:
+            def create(self, **kwargs):
+                recorder.setdefault("calls", []).append(("stable", kwargs))
+                return Response()
+
+        class BetaMessages:
+            def create(self, **kwargs):
+                recorder.setdefault("calls", []).append(("beta", kwargs))
+                if beta_raises:
+                    raise beta_raises
+                return Response()
+
+        class Client:
+            def __init__(self, *a, **k):
+                self.messages = Messages()
+                self.beta = types.SimpleNamespace(messages=BetaMessages())
+
+        module = types.ModuleType("anthropic")
+        module.Anthropic = Client
+        return module
+
+    def _run_claude(self, module):
+        import sys as _sys
+        from reelforge.llm import generate_claude
+        original = _sys.modules.get("anthropic")
+        _sys.modules["anthropic"] = module
+        try:
+            return generate_claude("prompt", system="system", schema={"type": "object"})
+        finally:
+            if original is None:
+                _sys.modules.pop("anthropic", None)
+            else:
+                _sys.modules["anthropic"] = original
+
+    def test_claude_request_shape(self):
+        recorder: dict = {}
+        self._run_claude(self._fake_anthropic(recorder))
+        kind, kwargs = recorder["calls"][0]
+        self.assertEqual(kind, "beta")
+        self.assertEqual(kwargs["model"], "claude-opus-5")
+        self.assertEqual(kwargs["thinking"], {"type": "adaptive"})
+        self.assertEqual(kwargs["output_config"]["format"]["type"], "json_schema")
+        self.assertEqual(kwargs["fallbacks"], "default")
+        self.assertIn("server-side-fallback-2026-07-01", kwargs["betas"])
+        # No assistant prefill - removed on current models.
+        self.assertEqual([m["role"] for m in kwargs["messages"]], ["user"])
+
+    def test_claude_falls_back_when_the_sdk_predates_fallbacks(self):
+        recorder: dict = {}
+        module = self._fake_anthropic(recorder, beta_raises=TypeError("unexpected kwarg"))
+        response = self._run_claude(module)
+        kinds = [kind for kind, _ in recorder["calls"]]
+        self.assertEqual(kinds, ["beta", "stable"])
+        self.assertIsNotNone(response.data)          # still produced a script payload
+        self.assertNotIn("fallbacks", recorder["calls"][1][1])
+
+    def test_claude_surfaces_a_refusal_clearly(self):
+        from reelforge.llm import LLMError
+        recorder: dict = {}
+        module = self._fake_anthropic(recorder, stop_reason="refusal")
+        with self.assertRaises(LLMError):
+            self._run_claude(module)
+
+
+class StudioTests(unittest.TestCase):
+    def test_init_creates_files_and_copies_frameworks(self):
+        from reelforge.knowledge import Studio
+        with tempfile.TemporaryDirectory() as tmp:
+            studio = Studio(Path(tmp) / "studio")
+            written = studio.init()
+            self.assertTrue(studio.exists)
+            self.assertTrue(any(p.name == "background.md" for p in written))
+            self.assertGreaterEqual(len(studio.frameworks()), 5)
+
+    def test_placeholder_studio_is_detected(self):
+        from reelforge.knowledge import Studio
+        with tempfile.TemporaryDirectory() as tmp:
+            studio = Studio(Path(tmp) / "studio")
+            studio.init()
+            self.assertTrue(studio.is_unedited())
+            (studio.root / "background.md").write_text("I am a real person.", encoding="utf-8")
+            self.assertFalse(studio.is_unedited())
+
+    def test_defaults_contain_no_invented_biography(self):
+        from reelforge.knowledge import BACKGROUND
+        # A plausible-sounding fake credential would get shipped by accident.
+        for invented in ("years of experience", "CFA", "portfolio manager", "I have"):
+            self.assertNotIn(invented, BACKGROUND)
+
+    def test_studio_framework_overrides_the_builtin(self):
+        from reelforge.knowledge import Studio
+        with tempfile.TemporaryDirectory() as tmp:
+            studio = Studio(Path(tmp) / "studio")
+            studio.init()
+            (studio.frameworks_dir / "number-story.yml").write_text(
+                "name: number-story\ndescription: mine\nbeats:\n  - role: hook\n"
+                "    purpose: p\n    seconds: 3\n", encoding="utf-8")
+            self.assertEqual(studio.framework("number-story").description, "mine")
+
+    def test_unknown_framework_lists_the_options(self):
+        from reelforge.knowledge import Studio
+        with tempfile.TemporaryDirectory() as tmp:
+            studio = Studio(Path(tmp) / "studio")
+            studio.init()
+            with self.assertRaises(FileNotFoundError) as caught:
+                studio.framework("nope")
+            self.assertIn("number-story", str(caught.exception))
+
+
+class ScriptTests(unittest.TestCase):
+    def facts(self):
+        return {
+            "symbol": "TEST", "name": "Test", "start_day": "2015-01-01",
+            "end_day": "2024-12-31", "years": 10.0, "start_price": 100.0,
+            "end_price": 173.5, "total_return": 0.735, "cagr": 0.0566,
+            "volatility": 0.16, "calendar_years": {"2015": 0.58},
+            "max_drawdown": {"drawdown": -0.339, "peak_day": "2020-02-19",
+                             "trough_day": "2020-03-23", "peak": 150.0, "trough": 99.0},
+            "lump_sum": {"invested": 1000.0, "value": 1735.0, "multiple": 1.735},
+            "monthly_plan": None, "best_year": (2015, 0.58), "worst_year": (2019, -0.142),
+            "statements": {"en": ["Test returned 73.5% over 10.0 years."],
+                           "ar": ["Test حقق 73.5% خلال 10.0 سنة."]},
+        }
+
+    def test_quoted_numbers_pass_the_audit(self):
+        from reelforge.script import audit_numbers
+        self.assertEqual(audit_numbers("حقق 73.5% على مدى 10 سنوات", self.facts()), [])
+        self.assertEqual(audit_numbers("worth 1,735 after 1,000 invested", self.facts()), [])
+
+    def test_invented_numbers_are_caught(self):
+        from reelforge.script import audit_numbers
+        flagged = audit_numbers("it returned 91.4% and will hit 5000 next year", self.facts())
+        self.assertIn("91.4", flagged)
+        self.assertIn("5000", flagged)
+
+    def test_arabic_indic_digits_are_audited_too(self):
+        from reelforge.script import audit_numbers
+        self.assertTrue(audit_numbers("٩١٫٤", self.facts()))
+
+    def test_small_counts_are_not_treated_as_claims(self):
+        from reelforge.script import audit_numbers
+        self.assertEqual(audit_numbers("3 steps, 5 minutes, 2 rules", self.facts()), [])
+
+    def test_rounding_is_tolerated(self):
+        from reelforge.script import audit_numbers
+        # 5.66% quoted as 5.7% is a rounding of a real number, not an invention.
+        self.assertEqual(audit_numbers("about 5.7% a year", self.facts()), [])
+
+    def test_audit_with_no_facts_flags_every_statistic(self):
+        from reelforge.script import audit_numbers
+        self.assertIn("42.5", audit_numbers("markets rose 42.5%", None))
+
+    def test_generation_parses_a_model_payload_and_audits_it(self):
+        from reelforge.knowledge import Studio
+        from reelforge.llm import PROVIDERS, LLMResponse
+        from reelforge.script import write_script
+
+        payload = {
+            "title": "T", "caption_hook": "hook",
+            "beats": [{"role": "hook", "text": "حقق 73.5% في 10 سنين", "seconds": 4,
+                       "onscreen": "73.5%", "broll": ["فلوس"]},
+                      {"role": "lesson", "text": "بس هيعمل 99.9% السنة الجاية",
+                       "seconds": 6, "onscreen": "", "broll": []}],
+        }
+
+        def fake(prompt, *, system, schema=None, model=None, max_tokens=16000):
+            fake.system = system
+            fake.prompt = prompt
+            return LLMResponse(text="", provider="claude", model="claude-opus-5",
+                               data=payload)
+
+        original = PROVIDERS["claude"]
+        PROVIDERS["claude"] = fake
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                studio = Studio(Path(tmp) / "studio")
+                studio.init()
+                script = write_script("topic", studio, framework="number-story",
+                                      facts=self.facts(), provider="claude")
+        finally:
+            PROVIDERS["claude"] = original
+
+        self.assertEqual(len(script.beats), 2)
+        self.assertEqual(script.beats[0].broll, ["فلوس"])
+        self.assertIn("99.9", script.unverified_numbers)   # the invented one
+        self.assertNotIn("73.5", script.unverified_numbers)
+        # The facts must be handed to the model, and the no-invention rule stated.
+        self.assertIn("73.5%", fake.prompt)
+        self.assertIn("never compute", fake.system.lower())
+
+    def test_stub_yields_an_obviously_empty_script(self):
+        from reelforge.knowledge import Studio
+        from reelforge.script import write_script
+        with tempfile.TemporaryDirectory() as tmp:
+            studio = Studio(Path(tmp) / "studio")
+            studio.init()
+            script = write_script("topic", studio, facts=self.facts(), provider="stub")
+            self.assertEqual(script.provider, "stub")
+            self.assertTrue(script.beats)
+            # Some beats carry facts; none carry invented prose.
+            self.assertEqual(script.unverified_numbers, [])
+            self.assertTrue(any(not b.text for b in script.beats))
+
+    def test_script_round_trip_and_editor_handoff(self):
+        from reelforge.script import Beat, Script, caption_prior, script_vocabulary
+        script = Script(topic="t", framework="number-story", language="ar",
+                        beats=[Beat("hook", "الذكاء الاصطناعي بيوفر وقتك", 4.0),
+                               Beat("cta", "تابعني", 2.0)])
+        restored = Script.from_dict(json.loads(json.dumps(script.to_dict())))
+        self.assertEqual(restored.spoken_text, script.spoken_text)
+        self.assertEqual(restored.seconds, 6.0)
+
+        self.assertIn("الذكاء", caption_prior(script))
+        vocabulary = script_vocabulary(script)
+        self.assertTrue(vocabulary)
+        self.assertTrue(all(len(word) >= 4 for word in vocabulary.values()))
+
+    def test_markdown_flags_unverified_numbers_for_the_reader(self):
+        from reelforge.script import Beat, Script
+        script = Script(topic="t", framework="f", language="ar",
+                        beats=[Beat("hook", "x", 3.0)], unverified_numbers=["91.4"])
+        self.assertIn("91.4", script.to_markdown())
+        self.assertIn("not in your data", script.to_markdown())

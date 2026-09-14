@@ -58,6 +58,27 @@ reelforge fonts                         # Arabic fonts you can install
 reelforge learn                         # what it has picked up from you so far
 ```
 
+## Writing scripts
+
+```bash
+reelforge studio init                              # then edit the three files it makes
+reelforge script "why most people never compound" -s SPX --since 2015-01-01
+#   ... shoot it ...
+reelforge auto clip.mp4 --script studio/scripts/001-....json
+```
+
+The studio holds who you are, how you sound and who is watching, as plain files you
+edit. Scripts are written against those plus a **verified fact sheet** — and every
+number in the finished script is audited back against your data, so an invented figure
+gets flagged before you say it out loud.
+
+Passing `--script` back to the editor is the point of keeping both halves in one tool:
+the script becomes the transcription prior, so Arabic captions on footage you shot from
+a script are markedly more accurate. See [docs/STUDIO.md](docs/STUDIO.md).
+
+Writers: `claude` (best Arabic, needs an API key), `ollama` (fully local and free), or
+`stub` (no model — gives you the empty structure). Pick per run with `--provider`.
+
 ## Market data
 
 If you make market content, add your price history once and every script can cite real,
@@ -218,6 +239,8 @@ also be set per run with `--set key.path=value`.
 reelforge/
   analysis.py   silence, energy, shot detection    render.py    EDL -> ffmpeg filtergraph
   market.py     your price history and fact sheets  fonts.py     Arabic font catalog
+  script.py     script writing and number auditing  llm.py       writing backends
+  knowledge.py  your background, voice and frameworks
   speech.py     ASR backends, word timings         learn.py     feedback store, tuning, model
   arabic.py     normalisation, vocabulary          review.py    local review page
   captions.py   grouping, ASS/SRT writing          pipeline.py  orchestration
@@ -247,7 +270,7 @@ reelforge/
 python -m unittest discover -s tests -v
 ```
 
-86 tests, no sample files or model downloads needed. The media tests build their own clip
+107 tests, no sample files or model downloads needed. The media tests build their own clip
 with ffmpeg. The faster-whisper adapter is covered by integration tests that drive it with
 the library's own `Segment`/`Word` types and assert every keyword argument we send is one
 the installed version accepts — so a breaking change upstream fails the suite rather than
