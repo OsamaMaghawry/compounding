@@ -19,6 +19,7 @@ from . import __version__
 from .edl import EDL
 from .ffmpeg import FFmpegError, FFmpegMissing, build_config, probe
 from .learn import FeedbackStore
+from .market import MarketError, MarketStore, compare, fact_sheet
 from .pipeline import PACKAGE_ROOT, AutoEditor
 from .profile import StyleProfile
 from .fonts import CATALOG, install as install_fonts, installed as installed_fonts
@@ -334,6 +335,90 @@ def _any_font() -> Path:
     return Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
 
+def _market_store(args) -> MarketStore:
+    project = Path(args.project) if getattr(args, "project", None) else Path.cwd() / ".reelforge"
+    return MarketStore(project)
+
+
+def cmd_market(args) -> int:
+    store = _market_store(args)
+
+    if args.action == "add":
+        # Accept both `market add a.csv` and `market add -f a.csv`.
+        args.files = (args.files or []) + [s for s in (args.symbols or [])
+                                           if Path(s).suffix.lower() in (".csv", ".txt", ".tsv")]
+        if not args.files:
+            _print("give me at least one CSV: reelforge market add prices.csv --symbol SPX")
+            return 1
+        for path in args.files:
+            symbol = args.symbol or Path(path).stem.upper()
+            result = store.add_csv(path, symbol, name=args.name or "",
+                                   currency=args.currency or "")
+            _print(f"{result['symbol']}: {result['rows']} rows, "
+                   f"{result['start']} to {result['end']}")
+        return 0
+
+    if args.action == "remove":
+        if not args.symbol:
+            _print("which symbol? reelforge market remove --symbol SPX")
+            return 1
+        removed = store.remove(args.symbol)
+        _print(f"removed {args.symbol} ({removed} rows)")
+        return 0
+
+    if args.action == "list":
+        rows = store.symbols()
+        if not rows:
+            _print("no market data yet. Add some:")
+            _print("  reelforge market add prices.csv --symbol SPX --name 'S&P 500'")
+            return 0
+        for row in rows:
+            _print(f"{row['symbol']:<10} {str(row['name'])[:26]:<28} "
+                   f"{row['rows']:>6} rows   {row['start']} to {row['end']}")
+        return 0
+
+    if args.action == "compare":
+        if len(args.symbols or []) < 2:
+            _print("give me two or more symbols: reelforge market compare SPX GOLD")
+            return 1
+        result = compare(store, args.symbols, start=args.since, end=args.until)
+        _print(f"{result['start_day']} to {result['end_day']} ({result['years']} years), "
+               f"same window for all")
+        for row in result["rows"]:
+            _print(f"{row['symbol']:<10} cagr {_fmt_pct(row['cagr']):>8}   "
+                   f"total {_fmt_pct(row['total_return']):>9}   "
+                   f"worst fall {_fmt_pct(row['max_drawdown']):>8}")
+        return 0
+
+    # default: facts
+    if not args.symbol and not args.symbols:
+        _print("which symbol? reelforge market facts SPX")
+        return 1
+    symbol = args.symbol or args.symbols[0]
+    facts = fact_sheet(store, symbol, start=args.since, end=args.until,
+                       amount=args.amount, monthly=args.monthly)
+    if args.json:
+        print(json.dumps(facts, indent=2, ensure_ascii=False))
+        return 0
+
+    _print(f"{facts['name']} ({facts['symbol']})  "
+           f"{facts['start_day']} to {facts['end_day']}  ·  {facts['bars']} trading days")
+    print()
+    for line in facts["statements"]["en"]:
+        _print(line)
+    print()
+    _print("ready to say, in Arabic:")
+    for line in facts["statements"]["ar"]:
+        print(f"      {line}")
+    print()
+    _print("every number above is computed from your data, not generated")
+    return 0
+
+
+def _fmt_pct(value) -> str:
+    return "-" if value is None else f"{value * 100:,.1f}%"
+
+
 def cmd_doctor(args) -> int:
     ok = True
     try:
@@ -487,6 +572,24 @@ def build_parser() -> argparse.ArgumentParser:
     fonts.add_argument("--force", action="store_true")
     fonts.set_defaults(func=cmd_fonts)
 
+    market = sub.add_parser("market", help="your own price history, and facts from it")
+    market.add_argument("action", nargs="?", default="facts",
+                        choices=["add", "list", "facts", "compare", "remove"])
+    market.add_argument("symbols", nargs="*", help="symbol(s) for facts/compare")
+    market.add_argument("-f", "--files", action="append", help="CSV to ingest, repeatable")
+    market.add_argument("-s", "--symbol", help="symbol to store the data under")
+    market.add_argument("--name", help="display name, e.g. 'S&P 500'")
+    market.add_argument("--currency", help="e.g. USD, EGP")
+    market.add_argument("--since", help="start date, YYYY-MM-DD")
+    market.add_argument("--until", help="end date, YYYY-MM-DD")
+    market.add_argument("--amount", type=float, default=1000.0,
+                        help="lump sum to model, default 1000")
+    market.add_argument("--monthly", type=float,
+                        help="also model investing this much every month")
+    market.add_argument("--json", action="store_true", help="machine-readable output")
+    market.add_argument("--project")
+    market.set_defaults(func=cmd_market)
+
     doctor = sub.add_parser("doctor", help="check ffmpeg, fonts and models")
     doctor.add_argument("--project")
     doctor.set_defaults(func=cmd_doctor)
@@ -506,7 +609,7 @@ def main(argv: list[str] | None = None) -> int:
     except FFmpegMissing as exc:
         print(f"\n{exc}\n", file=sys.stderr)
         return 2
-    except (FFmpegError, FileNotFoundError, ValueError) as exc:
+    except (FFmpegError, MarketError, FileNotFoundError, ValueError) as exc:
         print(f"\nerror: {exc}\n", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

@@ -761,3 +761,212 @@ class FontAndTemplateTests(unittest.TestCase):
                 ass = build_ass(group_words(words, profile), profile)
                 self.assertIn("[V4+ Styles]", ass)
                 self.assertTrue([l for l in ass.splitlines() if l.startswith("Dialogue")])
+
+
+class MarketParsingTests(unittest.TestCase):
+    def test_numbers_from_real_exports(self):
+        from reelforge.market import parse_number
+        cases = {
+            "1,234.56": 1234.56,      # US thousands
+            "1.234,56": 1234.56,      # European thousands
+            "4,500": 4500.0,          # three digits after a comma is thousands
+            "1,23": 1.23,             # two digits is a decimal comma
+            "(45.2)": -45.2,          # accounting negative
+            "$1,200.00": 1200.0,
+            "12%": 12.0,
+            "2.3M": 2_300_000.0,
+            "٤٥٫٥": 45.5,   # Arabic-Indic digits and decimal mark
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertAlmostEqual(parse_number(raw), expected, places=4)
+        for blank in ("", "n/a", "-", None):
+            self.assertIsNone(parse_number(blank))
+
+    def test_ambiguous_dates_are_resolved_from_the_whole_column(self):
+        from reelforge.market import _day_first, parse_date
+        self.assertTrue(_day_first(["05/01/2024", "15/03/2024"]))    # 15 can only be a day
+        self.assertFalse(_day_first(["03/15/2024"]))
+        self.assertEqual(parse_date("15/03/2024", day_first=True).isoformat(), "2024-03-15")
+        self.assertEqual(parse_date("03/15/2024").isoformat(), "2024-03-15")
+        self.assertEqual(parse_date("Mar 15, 2024").isoformat(), "2024-03-15")
+        self.assertIsNone(parse_date("not a date"))
+
+    def _write(self, tmp, name, text):
+        path = Path(tmp) / name
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_reads_yahoo_investing_and_arabic_exports_the_same_way(self):
+        from reelforge.market import read_csv
+        with tempfile.TemporaryDirectory() as tmp:
+            yahoo = self._write(tmp, "y.csv",
+                "Date,Open,High,Low,Close,Adj Close,Volume\n"
+                "2024-01-02,100,101,99,100.00,100.00,1000\n"
+                "2024-01-03,100,103,100,102.00,102.00,1200\n")
+            # newest first, d/m/Y, quoted, thousands separators
+            investing = self._write(tmp, "i.csv",
+                '"Date","Price","Open","High","Low","Vol.","Change %"\n'
+                '"03/01/2024","1,102.00","1,100","1,103","1,100","1.2K","2%"\n'
+                '"02/01/2024","1,100.00","1,100","1,101","1,099","1.0K","0%"\n')
+            arabic = self._write(tmp, "a.csv",
+                "التاريخ;الاغلاق\n"
+                "2024/01/02;100.00\n2024/01/03;102.00\n")
+
+            for path in (yahoo, investing, arabic):
+                bars = read_csv(path)
+                with self.subTest(path=path.name):
+                    self.assertEqual(len(bars), 2)
+                    self.assertEqual(bars[0].day.isoformat(), "2024-01-02")  # sorted oldest first
+                    self.assertLess(bars[0].close, bars[1].close)
+
+    def test_a_file_without_price_columns_says_so(self):
+        from reelforge.market import MarketError, read_csv
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "bad.csv", "foo,bar\n1,2\n")
+            with self.assertRaises(MarketError) as caught:
+                read_csv(path)
+            self.assertIn("date", str(caught.exception).lower())
+
+
+class MarketAnalyticsTests(unittest.TestCase):
+    def bars(self, pairs):
+        from reelforge.market import Bar
+        from datetime import date as _date
+        return [Bar(day=_date.fromisoformat(d), close=c) for d, c in pairs]
+
+    def test_return_and_cagr_are_exact(self):
+        from reelforge.market import cagr, total_return
+        # A clean doubling over exactly two years.
+        bars = self.bars([("2020-01-01", 100.0), ("2022-01-01", 200.0)])
+        self.assertAlmostEqual(total_return(bars), 1.0, places=6)
+        self.assertAlmostEqual(cagr(bars), 2 ** 0.5 - 1, places=3)
+
+    def test_cagr_refuses_to_annualise_a_few_days(self):
+        from reelforge.market import cagr
+        self.assertIsNone(cagr(self.bars([("2024-01-01", 100.0), ("2024-01-10", 130.0)])))
+
+    def test_max_drawdown_finds_peak_and_trough(self):
+        from reelforge.market import max_drawdown
+        bars = self.bars([("2020-01-01", 100.0), ("2020-06-01", 150.0),
+                          ("2020-09-01", 75.0), ("2021-01-01", 120.0)])
+        result = max_drawdown(bars)
+        self.assertAlmostEqual(result["drawdown"], -0.5, places=6)
+        self.assertEqual(result["peak_day"], "2020-06-01")
+        self.assertEqual(result["trough_day"], "2020-09-01")
+
+    def test_lump_sum_and_monthly_plan(self):
+        from reelforge.market import invest_lump, invest_monthly
+        bars = self.bars([("2020-01-01", 100.0), ("2020-02-01", 100.0),
+                          ("2020-03-01", 100.0), ("2021-01-01", 200.0)])
+        lump = invest_lump(bars, 1000.0)
+        self.assertAlmostEqual(lump["value"], 2000.0, places=4)
+        self.assertAlmostEqual(lump["multiple"], 2.0, places=6)
+
+        plan = invest_monthly(bars, 100.0)
+        self.assertEqual(plan["months"], 4)          # one buy per calendar month
+        self.assertAlmostEqual(plan["invested"], 400.0, places=4)
+        # Three units bought at 100 plus one at 200, all valued at 200.
+        self.assertAlmostEqual(plan["value"], (3 * 1.0 + 0.5) * 200.0, places=4)
+
+    def test_calendar_years_chain_from_the_previous_close(self):
+        from reelforge.market import calendar_years
+        bars = self.bars([("2020-01-01", 100.0), ("2020-12-31", 110.0),
+                          ("2021-12-31", 121.0)])
+        years = calendar_years(bars)
+        self.assertAlmostEqual(years[2020], 0.10, places=6)
+        self.assertAlmostEqual(years[2021], 0.10, places=6)
+
+
+class MarketStoreTests(unittest.TestCase):
+    def store_with(self, tmp, rows, symbol="TEST"):
+        from reelforge.market import MarketStore
+        path = Path(tmp) / "prices.csv"
+        path.write_text("Date,Close\n" + "".join(f"{d},{c}\n" for d, c in rows),
+                        encoding="utf-8")
+        store = MarketStore(Path(tmp) / "store")
+        store.add_csv(path, symbol, name="Test Index", currency="USD")
+        return store
+
+    def rows(self):
+        out = []
+        for year in range(2015, 2025):
+            for month in (1, 4, 7, 10):
+                out.append((f"{year}-{month:02d}-01", 100.0 * (1.10 ** (year - 2015))))
+        out.append(("2024-12-31", 100.0 * (1.10 ** 9) * 1.10))
+        return out
+
+    def test_ingest_list_and_query(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            listed = store.symbols()
+            self.assertEqual(listed[0]["symbol"], "TEST")
+            self.assertEqual(listed[0]["rows"], len(self.rows()))
+            self.assertTrue(store.has("test"))               # case-insensitive
+            self.assertEqual(len(store.bars("TEST", "2015-01-01", "2015-12-31")), 4)
+
+    def test_price_on_falls_back_to_the_previous_trading_day(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            bar = store.price_on("TEST", "2015-02-15")       # no bar that day
+            self.assertEqual(bar.day.isoformat(), "2015-01-01")
+            self.assertIsNone(store.price_on("TEST", "2000-01-01"))
+
+    def test_reingesting_updates_rather_than_duplicates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            before = store.symbols()[0]["rows"]
+            path = Path(tmp) / "prices.csv"
+            store.add_csv(path, "TEST")
+            self.assertEqual(store.symbols()[0]["rows"], before)
+
+    def test_remove(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            store.remove("TEST")
+            self.assertFalse(store.has("TEST"))
+
+    def test_fact_sheet_produces_citable_statements(self):
+        from reelforge.market import fact_sheet
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            facts = fact_sheet(store, "TEST", amount=1000, monthly=100)
+            self.assertAlmostEqual(facts["cagr"], 0.10, places=2)   # built as 10% a year
+            self.assertTrue(facts["statements"]["en"])
+            self.assertTrue(facts["statements"]["ar"])
+            self.assertIn("TEST", facts["symbol"])
+            self.assertIsNotNone(facts["monthly_plan"])
+            # Arabic statements must carry real Arabic, not a transliteration.
+            self.assertTrue(any(arabic.is_arabic(line) for line in facts["statements"]["ar"]))
+
+    def test_partial_years_are_never_quoted_as_best_or_worst(self):
+        from reelforge.market import fact_sheet
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            facts = fact_sheet(store, "TEST", start="2016-04-01", end="2023-07-01")
+            for label in ("best_year", "worst_year"):
+                if facts[label]:
+                    self.assertNotIn(facts[label][0], (2016, 2023),
+                                     f"{label} quoted a part-year")
+
+    def test_unknown_symbol_explains_how_to_add_one(self):
+        from reelforge.market import MarketError, fact_sheet
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            with self.assertRaises(MarketError) as caught:
+                fact_sheet(store, "NOPE")
+            self.assertIn("market add", str(caught.exception))
+
+    def test_compare_aligns_to_the_overlapping_window(self):
+        from reelforge.market import compare
+        with tempfile.TemporaryDirectory() as tmp:
+            store = self.store_with(tmp, self.rows())
+            short = Path(tmp) / "short.csv"
+            short.write_text("Date,Close\n2018-01-01,100\n2020-01-01,150\n2024-12-31,300\n",
+                             encoding="utf-8")
+            store.add_csv(short, "SHORT")
+            result = compare(store, ["TEST", "SHORT"])
+            # The window must start where the later series starts.
+            self.assertEqual(result["start_day"], "2018-01-01")
+            self.assertEqual(len(result["rows"]), 2)
+            self.assertTrue(all(row["cagr"] is not None for row in result["rows"]))

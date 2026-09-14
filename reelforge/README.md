@@ -58,6 +58,25 @@ reelforge fonts                         # Arabic fonts you can install
 reelforge learn                         # what it has picked up from you so far
 ```
 
+## Market data
+
+If you make market content, add your price history once and every script can cite real,
+computed numbers:
+
+```bash
+reelforge market add spx.csv --symbol SPX --name "S&P 500" --currency USD
+reelforge market facts SPX --since 2015-01-01 --monthly 100
+reelforge market compare SPX GOLD
+```
+
+It reads what real exports actually contain — newest-first rows, `1.234,56` decimals,
+Arabic headers and digits, ambiguous `15/03/2024` dates — and computes total return, CAGR,
+drawdown, per-year returns and dollar-cost-averaging plans, giving you each fact phrased
+for speech in both English and Arabic.
+
+The rule it is built around: **arithmetic in Python, language in the model.** Nothing here
+is generated, so nothing here can be hallucinated. See [docs/MARKET.md](docs/MARKET.md).
+
 ## Start here
 
 ```bash
@@ -198,6 +217,7 @@ also be set per run with `--set key.path=value`.
 ```
 reelforge/
   analysis.py   silence, energy, shot detection    render.py    EDL -> ffmpeg filtergraph
+  market.py     your price history and fact sheets  fonts.py     Arabic font catalog
   speech.py     ASR backends, word timings         learn.py     feedback store, tuning, model
   arabic.py     normalisation, vocabulary          review.py    local review page
   captions.py   grouping, ASS/SRT writing          pipeline.py  orchestration
@@ -227,7 +247,7 @@ reelforge/
 python -m unittest discover -s tests -v
 ```
 
-69 tests, no sample files or model downloads needed. The media tests build their own clip
+86 tests, no sample files or model downloads needed. The media tests build their own clip
 with ffmpeg. The faster-whisper adapter is covered by integration tests that drive it with
 the library's own `Segment`/`Word` types and assert every keyword argument we send is one
 the installed version accepts — so a breaking change upstream fails the suite rather than
