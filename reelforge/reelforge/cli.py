@@ -621,8 +621,23 @@ def _fmt_pct(value) -> str:
     return "-" if value is None else f"{value * 100:,.1f}%"
 
 
+def _checkout_revision() -> str:
+    """Which commit is actually installed - the first thing to check when a fix
+    'did not work'."""
+    import subprocess  # noqa: PLC0415
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(PACKAGE_ROOT), "log", "-1", "--format=%h %cs %s"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except Exception:
+        return "unknown"
+    return (result.stdout or "").strip()[:72] or "unknown (not a git checkout)"
+
+
 def cmd_doctor(args) -> int:
     ok = True
+    _print(f"reelforge {__version__}  ·  {_checkout_revision()}")
     try:
         config = build_config()
         first = config.splitlines()[0] if config else "ffmpeg"
