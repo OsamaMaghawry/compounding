@@ -48,6 +48,8 @@ pip install -r requirements-asr.txt
 ## Use it
 
 ```bash
+reelforge auto take1.mp4 take2.mp4 take3.mp4   # several takes -> one Reel
+reelforge auto *.MP4 --order name              # or a whole folder, in name order
 reelforge templates                     # see the ready-made looks
 reelforge templates --preview           # ...as a picture, so you can pick by eye
 reelforge auto raw.mp4 -t viral         # use one
@@ -124,6 +126,25 @@ Templates are just YAML in `templates/`. Copy one, change it, and it shows up in
 Useful flags: `--no-zoom`, `--no-broll`, `--no-cuts`, `--no-captions` to turn off a stage,
 `--set zoom.max_factor=1.3` to override any setting, `--model small` for a faster/less
 accurate transcript.
+
+## Several takes, one video
+
+You do not shoot a Reel as one file. Pass every take and they are joined into one
+timeline first, then edited as a single video:
+
+```bash
+reelforge auto IMG_7413.MP4 IMG_7414.MP4 IMG_7417.MP4 --review
+reelforge auto *.MP4 --order name --review
+```
+
+Clips may differ in resolution, frame rate and audio rate, and one of them is usually a
+silent b-roll shot — all of that is normalised before joining, and a silent clip gets
+real silence so nothing drifts out of sync. The canvas follows whichever orientation most
+of your clips share, so one landscape shot among six portrait ones does not letterbox
+everything.
+
+Order is as you typed it; `--order name` or `--order time` sorts instead. Wildcards are
+expanded by ReelForge itself, because PowerShell does not expand them for you.
 
 ## Engagement effects
 
@@ -252,6 +273,7 @@ repo looking for `studio/background.md`, it is not here by design — run
 reelforge/
   analysis.py   silence, energy, shot detection    render.py    EDL -> ffmpeg filtergraph
   market.py     your price history and fact sheets  fonts.py     Arabic font catalog
+  join.py       several takes into one timeline
   script.py     script writing and number auditing  llm.py       writing backends
   knowledge.py  your background, voice and frameworks
   speech.py     ASR backends, word timings         learn.py     feedback store, tuning, model
@@ -283,7 +305,7 @@ reelforge/
 python -m unittest discover -s tests -v
 ```
 
-107 tests, no sample files or model downloads needed. The media tests build their own clip
+120 tests, no sample files or model downloads needed. The media tests build their own clip
 with ffmpeg. The faster-whisper adapter is covered by integration tests that drive it with
 the library's own `Segment`/`Word` types and assert every keyword argument we send is one
 the installed version accepts — so a breaking change upstream fails the suite rather than

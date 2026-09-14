@@ -1233,3 +1233,147 @@ class ScriptTests(unittest.TestCase):
                         beats=[Beat("hook", "x", 3.0)], unverified_numbers=["91.4"])
         self.assertIn("91.4", script.to_markdown())
         self.assertIn("not in your data", script.to_markdown())
+
+
+class JoinTests(unittest.TestCase):
+    """Several takes shot on a phone, treated as one video."""
+
+    def info(self, width, height, fps=30.0, audio=True, rate=48000, duration=3.0):
+        from reelforge.ffmpeg import MediaInfo
+        return MediaInfo(path=Path("x.mp4"), duration=duration, width=width, height=height,
+                         fps=fps, has_audio=audio, audio_rate=rate, rotation=0, size_bytes=1)
+
+    def test_canvas_follows_the_dominant_orientation(self):
+        from reelforge.join import target_shape
+        # Six portrait phone takes plus one landscape screen recording must not
+        # produce a square canvas that pads every single clip.
+        infos = [self.info(1080, 1920) for _ in range(6)] + [self.info(1920, 1080)]
+        width, height, _fps, _rate = target_shape(infos)
+        self.assertEqual((width, height), (1080, 1920))
+
+    def test_landscape_majority_keeps_landscape(self):
+        from reelforge.join import target_shape
+        infos = [self.info(1920, 1080), self.info(1280, 720), self.info(1080, 1920)]
+        width, height, _f, _r = target_shape(infos)
+        self.assertEqual((width, height), (1920, 1080))
+
+    def test_shape_takes_the_largest_of_the_dominant_group(self):
+        from reelforge.join import target_shape
+        infos = [self.info(720, 1280, fps=24), self.info(1080, 1920, fps=30)]
+        width, height, fps, _r = target_shape(infos)
+        self.assertEqual((width, height, fps), (1080, 1920, 30))
+
+    def test_frame_rate_is_capped(self):
+        from reelforge.join import target_shape
+        _w, _h, fps, _r = target_shape([self.info(1080, 1920, fps=240)])
+        self.assertLessEqual(fps, 60)
+
+    def test_audio_rate_defaults_when_every_clip_is_silent(self):
+        from reelforge.join import target_shape
+        _w, _h, _f, rate = target_shape([self.info(1080, 1920, audio=False, rate=0)])
+        self.assertEqual(rate, 48000)
+
+    def test_single_clip_is_passed_through_untouched(self):
+        from reelforge.join import join_clips
+        with tempfile.TemporaryDirectory() as tmp:
+            only = Path(tmp) / "a.mp4"
+            only.write_bytes(b"x")
+            self.assertEqual(join_clips([only], Path(tmp) / "out.mp4"), only)
+
+
+@needs_ffmpeg
+class JoinRenderTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="reelforge-join-")
+        root = Path(cls.tmp)
+
+        def make(name, size, rate, duration, audio=True):
+            path = root / name
+            args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-f", "lavfi", "-i", f"testsrc2=s={size}:r={rate}:d={duration}"]
+            if audio:
+                args += ["-f", "lavfi", "-i", f"sine=f=300:d={duration}", "-c:a", "aac"]
+            else:
+                args += ["-an"]
+            args += ["-pix_fmt", "yuv420p", str(path)]
+            subprocess.run(args, check=True, capture_output=True)
+            return path
+
+        cls.portrait = make("a.mp4", "480x854", 30, 2)
+        cls.small = make("b.mp4", "360x640", 24, 2)
+        cls.silent = make("c.mp4", "640x360", 25, 2, audio=False)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_mismatched_clips_join_into_one_continuous_file(self):
+        from reelforge.ffmpeg import probe
+        from reelforge.join import join_clips
+        out = Path(self.tmp) / "joined.mp4"
+        join_clips([self.portrait, self.small, self.silent], out)
+
+        info = probe(out)
+        self.assertAlmostEqual(info.duration, 6.0, delta=0.5)     # 2 + 2 + 2
+        self.assertEqual((info.width, info.height), (480, 854))   # portrait majority
+        # The silent clip must not knock out the audio track for the others.
+        self.assertTrue(info.has_audio)
+
+    def test_clip_boundaries_mark_the_joins(self):
+        from reelforge.join import clip_boundaries
+        boundaries = clip_boundaries([self.portrait, self.small, self.silent])
+        self.assertEqual(len(boundaries), 2)
+        self.assertAlmostEqual(boundaries[0], 2.0, delta=0.3)
+
+    def test_a_silent_first_clip_still_yields_audio(self):
+        from reelforge.ffmpeg import probe
+        from reelforge.join import join_clips
+        out = Path(self.tmp) / "joined-silent-first.mp4"
+        join_clips([self.silent, self.portrait], out)
+        info = probe(out)
+        self.assertTrue(info.has_audio)
+        self.assertAlmostEqual(info.duration, 4.0, delta=0.5)
+
+
+class VideoResolutionTests(unittest.TestCase):
+    def test_wildcards_are_expanded_since_powershell_does_not(self):
+        from reelforge.cli import _resolve_videos
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("IMG_7413.MP4", "IMG_7414.MP4", "notes.txt"):
+                (root / name).write_bytes(b"x")
+            found = _resolve_videos([str(root / "IMG_*.MP4")])
+            self.assertEqual([p.name for p in found], ["IMG_7413.MP4", "IMG_7414.MP4"])
+
+    def test_ordering_options(self):
+        import os
+        from reelforge.cli import _resolve_videos
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first, second = root / "b.mp4", root / "a.mp4"
+            first.write_bytes(b"x")
+            second.write_bytes(b"x")
+            os.utime(first, (1_000_000, 1_000_000))       # b is older
+            os.utime(second, (2_000_000, 2_000_000))
+
+            given = _resolve_videos([str(first), str(second)], order="given")
+            self.assertEqual([p.name for p in given], ["b.mp4", "a.mp4"])
+            by_name = _resolve_videos([str(first), str(second)], order="name")
+            self.assertEqual([p.name for p in by_name], ["a.mp4", "b.mp4"])
+            by_time = _resolve_videos([str(first), str(second)], order="time")
+            self.assertEqual([p.name for p in by_time], ["b.mp4", "a.mp4"])
+
+    def test_duplicates_are_dropped(self):
+        from reelforge.cli import _resolve_videos
+        with tempfile.TemporaryDirectory() as tmp:
+            clip = Path(tmp) / "a.mp4"
+            clip.write_bytes(b"x")
+            self.assertEqual(len(_resolve_videos([str(clip), str(clip)])), 1)
+
+    def test_a_pattern_matching_nothing_says_where_it_looked(self):
+        from reelforge.cli import _resolve_videos
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(FileNotFoundError) as caught:
+                _resolve_videos([str(Path(tmp) / "*.mp4")])
+            self.assertIn(tmp, str(caught.exception))

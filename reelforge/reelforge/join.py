@@ -1,0 +1,111 @@
+"""Joining several takes into one timeline before editing.
+
+People do not shoot a Reel as one file. They shoot six takes on a phone and
+expect the editor to treat them as one video. Clips from a phone can differ in
+resolution, frame rate, rotation and audio sample rate, and one of them is
+usually a silent b-roll shot - so everything is normalised to a common shape
+before concatenation, and a clip with no audio gets real silence rather than
+being dropped or knocking the audio out of sync.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from .ffmpeg import FFmpegError, MediaInfo, ffmpeg_bin, probe, run
+
+
+def _even(value: float) -> int:
+    return max(2, int(round(value / 2.0)) * 2)
+
+
+def target_shape(infos: list[MediaInfo]) -> tuple[int, int, int, int]:
+    """A canvas every clip fits inside, plus a frame rate and audio rate.
+
+    Sized from the clips that share the dominant orientation, not from all of
+    them: taking the maximum width and height across a mixed set turns six
+    portrait phone takes plus one landscape screen recording into a square
+    canvas, padding every clip and wasting most of the frame. Ties go to
+    portrait - the output is vertical either way.
+    """
+    portrait = [info for info in infos if info.height >= info.width]
+    landscape = [info for info in infos if info.height < info.width]
+    dominant = portrait if len(portrait) >= len(landscape) else landscape
+
+    width = _even(max(info.width for info in dominant))
+    height = _even(max(info.height for info in dominant))
+    fps = max(1, int(round(max(info.fps for info in infos))))
+    rates = [info.audio_rate for info in infos if info.audio_rate]
+    return width, height, min(fps, 60), (max(rates) if rates else 48000)
+
+
+def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "veryfast",
+               crf: int = 18, on_status=None) -> Path:
+    """Concatenate clips into one file, normalising shape, rate and audio."""
+    sources = [Path(p) for p in paths]
+    if not sources:
+        raise FFmpegError("no clips to join")
+    if len(sources) == 1:
+        return sources[0]
+
+    infos = [probe(path) for path in sources]
+    width, height, fps, audio_rate = target_shape(infos)
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    if on_status:
+        on_status(f"joining {len(sources)} clips into one {width}x{height} timeline")
+
+    args: list[str] = []
+    for path in sources:
+        args += ["-i", str(path)]
+
+    silent = [index for index, info in enumerate(infos) if not info.has_audio]
+    silence_input = None
+    if silent:
+        silence_input = len(sources)
+        args += ["-f", "lavfi", "-t", "0.1", "-i",
+                 f"anullsrc=channel_layout=stereo:sample_rate={audio_rate}"]
+
+    graph: list[str] = []
+    for index, info in enumerate(infos):
+        # Fit inside the canvas and pad - never crop, the vertical reframe does that later.
+        graph.append(
+            f"[{index}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"setsar=1,fps={fps},format=yuv420p[v{index}];"
+        )
+        if info.has_audio:
+            graph.append(f"[{index}:a]aresample={audio_rate},aformat="
+                         f"sample_fmts=fltp:channel_layouts=stereo[a{index}];")
+        else:
+            # Real silence for the clip's full length keeps every later clip in sync.
+            graph.append(
+                f"[{silence_input}:a]atrim=0:{max(info.duration, 0.05):.3f},asetpts=PTS-STARTPTS,"
+                f"aresample={audio_rate},aformat=sample_fmts=fltp:channel_layouts=stereo"
+                f"[a{index}];"
+            )
+
+    pairs = "".join(f"[v{i}][a{i}]" for i in range(len(sources)))
+    graph.append(f"{pairs}concat=n={len(sources)}:v=1:a=1[outv][outa]")
+
+    run([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
+         *args, "-filter_complex", "".join(graph),
+         "-map", "[outv]", "-map", "[outa]",
+         "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+         "-movflags", "+faststart", str(dest)])
+
+    if not dest.exists() or dest.stat().st_size == 0:
+        raise FFmpegError(f"joining produced no output at {dest}")
+    return dest
+
+
+def clip_boundaries(paths: list[str | Path]) -> list[float]:
+    """Where each clip starts in the joined timeline - the natural cut points."""
+    boundaries: list[float] = []
+    cursor = 0.0
+    for path in paths[:-1]:
+        cursor += probe(path).duration
+        boundaries.append(round(cursor, 3))
+    return boundaries

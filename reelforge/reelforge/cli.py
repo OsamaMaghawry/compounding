@@ -70,6 +70,40 @@ def _profile_from_args(args) -> StyleProfile:
 VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 
 
+def _resolve_videos(raw: list[str] | str, *, order: str = "given") -> list[Path]:
+    """Expand what the user typed into a list of real video files.
+
+    PowerShell does not expand `*.mp4` for external commands the way a Unix
+    shell does, so the pattern arrives here literally and we expand it ourselves.
+    """
+    if isinstance(raw, str):
+        raw = [raw]
+
+    resolved: list[Path] = []
+    for entry in raw:
+        path = Path(entry).expanduser()
+        if any(ch in entry for ch in "*?["):
+            base = path.parent if str(path.parent) not in ("", ".") else Path.cwd()
+            matches = sorted(base.glob(path.name))
+            matches = [m for m in matches if m.suffix.lower() in VIDEO_SUFFIXES]
+            if not matches:
+                raise FileNotFoundError(f"nothing matched '{entry}' in {base}")
+            resolved.extend(matches)
+        else:
+            resolved.append(_resolve_video(entry))
+
+    if order == "name":
+        resolved.sort(key=lambda p: p.name.lower())
+    elif order == "time":
+        resolved.sort(key=lambda p: p.stat().st_mtime)
+
+    seen: list[Path] = []
+    for path in resolved:
+        if path not in seen:
+            seen.append(path)
+    return seen
+
+
 def _resolve_video(raw: str) -> Path:
     """Check the input file exists, and if not, say what is actually here.
 
@@ -109,9 +143,17 @@ def _editor(args, profile: StyleProfile) -> AutoEditor:
 def cmd_auto(args) -> int:
     profile = _profile_from_args(args)
     editor = _editor(args, profile)
-    source = _resolve_video(args.video)
-
+    clips = _resolve_videos(args.video, order=args.order)
     started = time.time()
+
+    if len(clips) > 1:
+        from .join import join_clips  # noqa: PLC0415
+        for index, clip in enumerate(clips, start=1):
+            _print(f"  {index}. {clip.name}")
+        source = join_clips(clips, editor.work_dir / "joined.mp4", on_status=_print)
+    else:
+        source = clips[0]
+
     extra_vocab = None
     if getattr(args, "script", None):
         from .script import Script, caption_prior, script_vocabulary  # noqa: PLC0415
@@ -133,7 +175,8 @@ def cmd_auto(args) -> int:
     _print(f"{summary['cuts']} segments, {summary['zooms']} zoom moves, "
            f"{summary['overlays']} b-roll layers, {summary['caption_lines']} caption lines")
 
-    output = Path(args.out) if args.out else source.with_name(f"{source.stem}-reel.mp4")
+    naming = clips[0]
+    output = Path(args.out) if args.out else naming.with_name(f"{naming.stem}-reel.mp4")
     edl_path = editor.runs_dir / f"run-{result.run_id}.edl.json"
 
     if args.plan_only:
@@ -172,7 +215,12 @@ def cmd_captions(args) -> int:
     args.no_zoom = args.no_broll = args.no_cuts = True
     profile = _profile_from_args(args)
     editor = _editor(args, profile)
-    source = _resolve_video(args.video)
+    clips = _resolve_videos(args.video, order=getattr(args, "order", "given"))
+    if len(clips) > 1:
+        from .join import join_clips  # noqa: PLC0415
+        source = join_clips(clips, editor.work_dir / "joined.mp4", on_status=_print)
+    else:
+        source = clips[0]
 
     result = editor.plan(source, refresh=args.refresh)
     for warning in result.warnings:
@@ -642,7 +690,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     def add_common(target, *, with_video: bool = True):
         if with_video:
-            target.add_argument("video", help="input video file")
+            target.add_argument("video", nargs="+",
+                                help="video file(s). Several takes are joined into one "
+                                     "timeline, in the order given. Wildcards work: *.MP4")
+            target.add_argument("--order", choices=["given", "name", "time"],
+                                default="given",
+                                help="order of multiple clips (default: as typed)")
         target.add_argument("-o", "--out", help="output path")
         target.add_argument("-t", "--template", help="ready-made look: viral, bold, clean, "
                             "word, elegant, news (see `reelforge templates`)")
@@ -797,6 +850,10 @@ WELCOME = """
 
   Edit a video (put the file in this folder, or give the full path):
     reelforge auto myvideo.mp4 --review
+
+  Shot it in several takes? Pass them all - they are joined into one Reel:
+    reelforge auto take1.mp4 take2.mp4 take3.mp4 --review
+    reelforge auto *.MP4 --order name --review
 
     ...that opens a page in your browser showing the finished cut, every
     zoom and every caption, so you can fix anything before exporting.
