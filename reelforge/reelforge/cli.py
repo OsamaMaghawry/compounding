@@ -561,8 +561,18 @@ def cmd_doctor(args) -> int:
         except Exception:
             pass
 
-    for name, ready, note in describe_providers():
-        _print(f"writer {name}: {'ready - ' + note if ready else note}")
+    # Writers are only used by `reelforge script`. Not having one does not stop
+    # any editing, so say so - an unexplained "pip install ..." line reads as a
+    # broken install to someone who just wants to cut a video.
+    writers = describe_providers()
+    if any(ready for _, ready, _ in writers):
+        for name, ready, note in writers:
+            if ready:
+                _print(f"writer {name}: ready - {note}")
+    else:
+        _print("writers: none set up (optional - only needed for `reelforge script`)")
+        for name, _ready, note in writers:
+            _print(f"    {name}: {note}")
 
     fonts_dir = PACKAGE_ROOT / "assets" / "fonts"
     found = sorted(p.name for p in fonts_dir.glob("*")
