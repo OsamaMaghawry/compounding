@@ -727,6 +727,32 @@ class TransitionTests(unittest.TestCase):
 
 
 class FontAndTemplateTests(unittest.TestCase):
+    def test_a_missing_font_is_reported_not_crashed_on(self):
+        # This path asks fontconfig before giving up, and every branch of it has
+        # to run: the fc-list call went untested long enough to ship a NameError.
+        from reelforge.render import check_font
+        with tempfile.TemporaryDirectory() as tmp:
+            empty = Path(tmp) / "fonts"
+            empty.mkdir()
+            warning = check_font(
+                StyleProfile().apply_overrides(["captions.font=Nothing Named This"]), empty)
+        self.assertIsNotNone(warning)
+        self.assertIn("Nothing Named This", warning)
+        self.assertIn("reelforge setup", warning)
+
+    def test_a_font_sitting_in_the_folder_is_accepted(self):
+        from reelforge.render import check_font
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "fonts"
+            folder.mkdir()
+            (folder / "Cairo.ttf").write_bytes(b"not really a font")
+            self.assertIsNone(check_font(StyleProfile(), folder))
+
+    def test_no_font_named_means_no_complaint(self):
+        from reelforge.render import check_font
+        self.assertIsNone(check_font(
+            StyleProfile().apply_overrides(["captions.font="]), None))
+
     def test_catalog_entries_are_well_formed(self):
         from reelforge.fonts import CATALOG, resolve
         self.assertGreaterEqual(len(CATALOG), 10)

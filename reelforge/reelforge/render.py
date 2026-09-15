@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .captions import build_ass
 from .edl import EDL, Overlay, Transition, Zoom
-from .ffmpeg import FFmpegError, probe, run_filtergraph
+from .ffmpeg import FFmpegError, probe, run, run_filtergraph
 from .profile import StyleProfile
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
