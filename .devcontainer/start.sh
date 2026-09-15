@@ -35,12 +35,25 @@ nohup reelforge serve --host 0.0.0.0 --port 8000 --data /workspaces/data \
 echo $! > "$PIDFILE"
 
 sleep 2
+
+# Codespaces publishes the forwarded-port hostname, so the exact link can be
+# printed rather than described. Terminals make it clickable.
+URL=""
+if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ]; then
+  URL="https://${CODESPACE_NAME}-8000.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+fi
+
 echo
 echo "=================================================================="
 echo "  ReelForge is running."
 echo
-echo "  1. Open the PORTS tab at the bottom of this window"
-echo "  2. Click the globe icon next to port 8000"
+if [ -n "$URL" ]; then
+  echo "  Open this in your browser (ctrl/cmd-click it):"
+  echo
+  echo "     $URL"
+else
+  echo "  Open the PORTS tab below, then click the globe next to port 8000."
+fi
 echo
 echo "  Password: ${REELFORGE_PASSWORD}"
 echo "=================================================================="
