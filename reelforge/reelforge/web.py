@@ -603,7 +603,7 @@ a{color:var(--accent)}
 
 <script>
 const $=id=>document.getElementById(id);
-let current=null, edl=null, poll=null;
+let current=null, edl=null, poll=null, drawn='', listed='';
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
 async function api(path, opts={}){
@@ -701,7 +701,7 @@ $('upload').onclick=async()=>{
     }
     $('msg').textContent='uploaded — editing has started';
     await api(`/api/jobs/${job.id}/start`,{method:'POST'});
-    $('files').value=''; current=job.id; refresh();
+    $('files').value=''; current=job.id; drawn=''; listed=''; refresh();
   }catch(e){
     $('msg').textContent='error: '+e.message;
     // Do not leave a half-made edit sitting in the list.
@@ -713,6 +713,19 @@ $('upload').onclick=async()=>{
 async function refresh(){
   let jobs=[];
   try{ jobs=await api('/api/jobs'); }catch(e){ return; }
+  const listSig = jobs.map(j=>j.id+j.status+j.stage).join('|');
+  if(listSig!==listed){ listed=listSig; renderJobs(jobs); }
+  const job = current ? jobs.find(j=>j.id===current) : null;
+  if(job) draw(job);
+  // Only keep polling while something is actually happening. Re-rendering an
+  // idle page rebuilds the video element, which restarts whatever you were
+  // watching - so once everything is finished, stop.
+  const busy = jobs.some(j=>['working','queued','exporting','uploading'].includes(j.status));
+  clearTimeout(poll);
+  if(busy) poll=setTimeout(refresh, 2500);
+}
+
+function renderJobs(jobs){
   $('jobs').innerHTML = jobs.length ? jobs.map(j=>{
     const cls = j.status==='ready'||j.status==='done' ? 'ready' : (j.status==='error'?'error':'working');
     return `<div class="job" data-id="${j.id}">
@@ -720,20 +733,25 @@ async function refresh(){
       <span class="pill ${cls}">${j.status}</span>
       <span class="pill" data-del="${j.id}" title="remove">✕</span></div>`;
   }).join('') : '<span class="dim">none yet</span>';
-  $('jobs').querySelectorAll('.job').forEach(el=>el.onclick=()=>{current=el.dataset.id;draw();});
+  $('jobs').querySelectorAll('.job').forEach(el=>el.onclick=()=>{
+    current=el.dataset.id; drawn=''; draw();          // clicking always redraws
+  });
   $('jobs').querySelectorAll('[data-del]').forEach(el=>el.onclick=async ev=>{
     ev.stopPropagation();
     await api('/api/jobs/'+el.dataset.del,{method:'DELETE'}).catch(()=>{});
-    if(current===el.dataset.del){ current=null; $('detail').innerHTML=''; }
-    refresh();
+    if(current===el.dataset.del){ current=null; drawn=''; $('detail').innerHTML=''; }
+    listed=''; refresh();
   });
-  if(current) draw(jobs.find(j=>j.id===current));
-  const busy = jobs.some(j=>j.status==='working'||j.status==='queued'||j.status==='exporting');
-  clearTimeout(poll); poll=setTimeout(refresh, busy?2500:15000);
 }
 
 async function draw(job){
   if(!job){ try{ job=await api('/api/jobs/'+current); }catch(e){ return; } }
+  // Rebuilding the panel replaces the <video>, which stops playback. Only do it
+  // when something actually changed.
+  const sig=[job.id,job.status,job.stage,job.output_name,
+             JSON.stringify(job.summary||{}),(job.progress||[]).length].join('|');
+  if(sig===drawn) return;
+  drawn=sig;
   const s=job.summary||{};
   let html=`<div class="card"><h2>${job.title}</h2>`;
   if(job.status==='error'){ html+=`<div style="color:var(--bad)">${job.error||job.stage}</div>`; }
@@ -760,7 +778,8 @@ async function draw(job){
     const rr=$('rerender'), ex=$('export');
     if(rr) rr.onclick=()=>send(job,true);
     if(ex) ex.onclick=async()=>{ ex.disabled=true; ex.textContent='queued…';
-      try{ await send(job,false); await api('/api/jobs/'+job.id+'/export',{method:'POST'}); refresh(); }
+      try{ await send(job,false); await api('/api/jobs/'+job.id+'/export',{method:'POST'});
+           drawn=''; listed=''; refresh(); }
       catch(e){ ex.textContent='error: '+e.message; ex.disabled=false; } };
   }
 }
@@ -788,7 +807,7 @@ async function send(job, rerender){
   document.querySelectorAll('[data-tr]').forEach(el=>body.transitions[el.dataset.tr]={enabled:el.checked});
   const r=await api('/api/jobs/'+job.id+'/edl',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(rerender) draw();
+  if(rerender){ drawn=''; listed=''; refresh(); }
   return r;
 }
 

@@ -114,7 +114,7 @@ DEFAULTS: dict[str, Any] = {
         "min_duration": 0.55,
         "max_duration": 3.0,
         "gap_split": 0.45,         # a pause this long starts a new line
-        "line_gap": 0.08,          # blank time between lines, so they do not run together
+        "line_gap": 0.18,          # blank time between lines - long enough to see
         "karaoke": True,           # highlight the word being spoken
         "highlight_scale": 1.0,    # >1 pops the active word (CapCut-style)
         "strip_diacritics": False,

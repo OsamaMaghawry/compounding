@@ -13,7 +13,7 @@ from .analysis import Analysis, Interval
 from .broll import BrollLibrary
 from .captions import CaptionLine, group_words
 from .edl import EDL, Cut, Overlay, Timeline, Transition, Zoom, build_timeline
-from .speech import Transcript, Word, enforce_order
+from .speech import Transcript, Word, drop_repeated_words, enforce_order
 
 
 # ------------------------------------------------------------------- cutting
@@ -332,7 +332,9 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
             continue
         retimed.append(Word(text=word.text, start=start, end=end, prob=word.prob))
 
-    retimed = enforce_order(retimed)
+    # Order matters: the duplicate is detected by its overlap, which
+    # enforce_order would otherwise remove first.
+    retimed = enforce_order(drop_repeated_words(retimed))
     lines = group_words(retimed, profile) if profile.get("captions.enabled") else []
     zooms = plan_zooms(lines or _fallback_lines(out_duration), analysis, timeline,
                        profile, scorer=scorer)

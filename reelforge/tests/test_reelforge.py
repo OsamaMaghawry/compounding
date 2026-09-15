@@ -2026,3 +2026,64 @@ class WebAppTests(unittest.TestCase):
         self.assertIsNotNone(recovered)
         self.assertEqual(recovered.status, "error")
         self.assertIn("restart", recovered.error)
+
+
+class RepeatedWordTests(unittest.TestCase):
+    """Whisper transcribes overlapping segment boundaries, so a word spoken once
+    can come back twice - the end of one caption line and the start of the next."""
+
+    def test_an_overlapping_duplicate_is_dropped(self):
+        from reelforge.speech import drop_repeated_words
+        words = [Word("هبقى", 5.90, 6.30), Word("مليونير", 6.30, 6.90),
+                 Word("خليك", 6.90, 7.40),
+                 Word("خليك", 7.20, 7.70),          # same word, overlapping time
+                 Word("صريح", 7.70, 8.20)]
+        kept = [w.text for w in drop_repeated_words(words)]
+        self.assertEqual(kept, ["هبقى", "مليونير", "خليك", "صريح"])
+
+    def test_genuine_repetition_is_kept(self):
+        from reelforge.speech import drop_repeated_words
+        # Said twice, one after the other, with no overlap.
+        words = [Word("لا", 1.0, 1.3), Word("لا", 1.4, 1.7)]
+        self.assertEqual([w.text for w in drop_repeated_words(words)], ["لا", "لا"])
+
+    def test_spelling_variants_count_as_the_same_word(self):
+        from reelforge.speech import drop_repeated_words
+        words = [Word("أسامة", 1.0, 1.5), Word("اسامه", 1.3, 1.8)]
+        self.assertEqual(len(drop_repeated_words(words)), 1)
+
+    def test_the_better_timed_copy_survives(self):
+        from reelforge.speech import drop_repeated_words
+        words = [Word("خليك", 6.90, 7.00), Word("خليك", 6.95, 7.70)]
+        kept = drop_repeated_words(words)
+        self.assertEqual(len(kept), 1)
+        self.assertAlmostEqual(kept[0].end, 7.70)      # the longer span
+
+    def test_different_words_are_untouched(self):
+        from reelforge.speech import drop_repeated_words
+        words = [Word("انت", 0.0, 0.6), Word("و", 0.55, 0.8), Word("صاحبك", 0.75, 1.3)]
+        self.assertEqual(len(drop_repeated_words(words)), 3)
+
+    def test_captions_end_up_without_the_stutter(self):
+        from reelforge.analysis import Analysis
+        from reelforge.speech import Segment, Transcript
+        profile = StyleProfile().apply_overrides(["cuts.enabled=false",
+                                                  "captions.max_words=3"])
+        analysis = Analysis(duration=10.0, width=1080, height=1920, fps=30.0,
+                            has_audio=True)
+        transcript = Transcript(language="ar", backend="test", model="t", segments=[
+            Segment(text="هبقى مليونير خليك", start=5.9, end=7.4, words=[
+                Word("هبقى", 5.90, 6.30), Word("مليونير", 6.30, 6.90),
+                Word("خليك", 6.90, 7.40)]),
+            Segment(text="خليك صريح مع نفسك", start=7.2, end=8.9, words=[
+                Word("خليك", 7.20, 7.70), Word("صريح", 7.70, 8.20),
+                Word("مع", 8.20, 8.40), Word("نفسك", 8.40, 8.90)]),
+        ])
+        edl = build_edl("x.mp4", analysis, transcript, profile)
+        spoken = " ".join(line.text for line in edl.captions).split()
+        self.assertEqual(spoken.count("خليك"), 1, " ".join(spoken))
+
+    def test_lines_have_a_visible_gap_between_them(self):
+        profile = StyleProfile()
+        self.assertGreaterEqual(profile.get("captions.line_gap"), 0.15,
+                                "a gap under ~0.15s is too brief to read as a pause")

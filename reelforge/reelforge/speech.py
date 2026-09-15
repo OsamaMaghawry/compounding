@@ -312,6 +312,35 @@ def snap_words_to_energy(words: list[Word], analysis: Analysis, *,
     return snapped
 
 
+def drop_repeated_words(words: list[Word]) -> list[Word]:
+    """Remove a word that repeats the one before it and overlaps it in time.
+
+    Whisper transcribes each segment independently and the segments overlap
+    slightly, so a word spoken once at a boundary comes back twice - the end of
+    one caption line and the start of the next carry the same word, which reads
+    as a stutter.
+
+    Overlap in time is what distinguishes this from real repetition: someone
+    saying "لا لا" produces two words one after the other, and those are kept.
+    Only a word that claims time already claimed by an identical word is dropped.
+    """
+    from .arabic import normalize_for_match  # noqa: PLC0415
+
+    kept: list[Word] = []
+    for word in sorted(words, key=lambda w: (w.start, w.end)):
+        if kept:
+            previous = kept[-1]
+            same = normalize_for_match(previous.text) == normalize_for_match(word.text)
+            overlaps = word.start < previous.end - 1e-6
+            if same and overlaps and normalize_for_match(word.text):
+                # Keep whichever spans more time; it is the better-timed copy.
+                if word.duration > previous.duration:
+                    kept[-1] = word
+                continue
+        kept.append(word)
+    return kept
+
+
 def enforce_order(words: list[Word], *, min_duration: float = 0.06) -> list[Word]:
     """Sort words and remove any overlap between them.
 
