@@ -34,7 +34,8 @@ from .profile import StyleProfile
 # against module globals - a name imported inside a function is invisible to it
 # and silently becomes a query parameter.
 try:
-    from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
+    from fastapi import (BackgroundTasks, Depends, FastAPI, Form, HTTPException,
+                         Request, UploadFile)
     from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
     HAVE_FASTAPI = True
 except ImportError:                                  # the core tool works without it
@@ -323,6 +324,7 @@ class Runner:
         # Restoring happens on whichever thread asked for the edit, which is the
         # request thread as often as the worker.
         self._lock = threading.Lock()
+        self._proxy_lock = threading.Lock()
         thread = threading.Thread(target=self._loop, daemon=True)
         thread.start()
 
@@ -478,16 +480,29 @@ class Runner:
         _changed, message = font_catalog.download(entry, self.fonts_dir)
         note(message)
 
-    def _ensure_proxy(self, job: Job, source: Path) -> Path | None:
-        """The small copy the browser plays. Built once per upload."""
+    def _ensure_proxy(self, job: Job, source: Path | None = None) -> Path | None:
+        """The small copy the browser plays. Built once, then kept.
+
+        Also reachable from the request that wants it, because edits made before
+        there was a player have no proxy: without this they would open to an
+        empty black box, which looks a great deal like the edit being gone.
+        """
         from .render import build_proxy  # noqa: PLC0415
         proxy = self.store.dir(job.id) / "proxy.mp4"
         if proxy.exists() and proxy.stat().st_size > 0:
             return proxy
-        try:
-            return build_proxy(source, proxy)
-        except Exception:
-            return None            # playback falls back to the rendered preview
+        if source is None:
+            source = Path(job.prepared) if job.prepared else None
+        if not source or not source.exists():
+            return None
+        # A video element asks for several ranges at once; one build, not five.
+        with self._proxy_lock:
+            if proxy.exists() and proxy.stat().st_size > 0:
+                return proxy
+            try:
+                return build_proxy(source, proxy)
+            except Exception:
+                return None
 
     def _plan_into(self, job: Job, source: Path, editor: AutoEditor, note,
                    *, render: bool = True) -> None:
@@ -732,6 +747,45 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                 "version": f"{__version__} · {_checkout_revision()}"}
 
     # -- jobs -----------------------------------------------------------
+    @app.post("/api/update", dependencies=[Depends(require_login)])
+    def update(background: BackgroundTasks) -> dict:
+        """Fetch the newest version and restart, without opening a terminal.
+
+        The alternative was telling someone to find a terminal, remember two
+        commands and type them in the right folder to get a fix - which is a
+        strange thing to ask of a person whose job is making videos.
+        """
+        import subprocess  # noqa: PLC0415
+        repo = PACKAGE_ROOT.parent
+        script = repo / ".devcontainer" / "restart.sh"
+        if not (repo / ".git").exists():
+            raise HTTPException(status_code=409,
+                                detail="this copy was not installed from git, so it "
+                                       "cannot update itself")
+        # --ff-only: never invent a merge on a machine nobody is watching.
+        pull = subprocess.run(["git", "-C", str(repo), "pull", "--ff-only"],
+                              capture_output=True, text=True)
+        if pull.returncode != 0:
+            detail = (pull.stderr or pull.stdout or "").strip().splitlines()
+            raise HTTPException(status_code=409,
+                                detail=f"could not update: {detail[-1] if detail else 'unknown'}")
+        moved = "Already up to date" not in (pull.stdout or "")
+        if not moved:
+            return {"ok": True, "updated": False, "message": "already the newest version"}
+        if not script.exists():
+            return {"ok": True, "updated": True, "restarting": False,
+                    "message": "updated - restart it to pick the new version up"}
+
+        def restart() -> None:
+            # After the response has gone, because this kills the process serving it.
+            time.sleep(1.0)
+            subprocess.Popen(["bash", str(script)], start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        background.add_task(restart)
+        return {"ok": True, "updated": True, "restarting": True,
+                "message": "updated - reload the page in a few seconds"}
+
     @app.get("/api/templates", dependencies=[Depends(require_login)])
     def templates() -> list[dict]:
         out = []
@@ -1168,8 +1222,12 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
     @app.get("/api/jobs/{job_id}/proxy.mp4", dependencies=[Depends(require_login)])
     def proxy(job_id: str, request: Request) -> Response:
         """The untouched footage, small. The browser plays the edit over this."""
-        job_or_404(job_id)
-        return ranged(store.dir(job_id) / "proxy.mp4", request, "video/mp4")
+        job = job_or_404(job_id)
+        path = runner._ensure_proxy(job)
+        if path is None:
+            raise HTTPException(status_code=409,
+                                detail="the footage for this edit is no longer here")
+        return ranged(path, request, "video/mp4")
 
     @app.get("/api/fonts/{family}", dependencies=[Depends(require_login)])
     def font_file(family: str, request: Request) -> Response:
@@ -1322,7 +1380,11 @@ input[type=color]{height:44px;padding:4px}
 <div id="app" hidden>
   <div class="card">
     <h1>New edit</h1>
-    <div class="dim" id="ver" style="font-size:11px;margin-bottom:6px"></div>
+    <div class="dim" style="font-size:11px;margin-bottom:6px">
+      <span id="ver"></span>
+      <a href="#" id="updateLink" style="margin-left:8px">check for an update</a>
+      <span id="updateMsg"></span>
+    </div>
     <div class="dim">Pick every take of one video. They are joined in the order chosen.</div>
     <input type="file" id="files" accept="video/*" multiple>
     <select id="template"></select>
@@ -2057,6 +2119,21 @@ async function send(job, rerender){
   if(rerender){ drawn=''; listed=''; refresh(); }
   return r;
 }
+
+$('updateLink').onclick=async ev=>{
+  ev.preventDefault();
+  $('updateMsg').textContent=' · checking…';
+  try{
+    const r=await api('/api/update',{method:'POST'});
+    $('updateMsg').textContent=' · '+r.message;
+    // The server is restarting under us; wait for it to answer again, then
+    // reload, so the page you end up on is the new one.
+    if(r.restarting) setTimeout(async function wait(){
+      try{ await api('/api/me'); location.reload(); }
+      catch(e){ setTimeout(wait, 1500); }
+    }, 4000);
+  }catch(e){ $('updateMsg').textContent=' · '+e.message; }
+};
 
 api('/api/me').then(d=>{
   show(d.authenticated);

@@ -151,8 +151,26 @@ That address is a normal link. Bookmark it; it stays the same for that Codespace
 from any computer you sign in to GitHub, start the Codespace and open the bookmark.
 Forwarded ports are **private to your account** by default - nobody else can reach it.
 
-The app starts itself whenever the Codespace starts, so there is nothing to type. To
-see the password again:
+The app starts itself whenever the Codespace starts, and checks for a newer version
+while it does, so the normal way to get an update is simply to open it. There is
+also a **check for an update** link next to the version number on the page, which
+fetches and restarts without a terminal.
+
+Codespaces sleep after thirty idle minutes, and a sleeping machine cannot serve a
+link. So the address is not a thing you can hand to someone and expect to answer -
+opening the Codespace is what wakes it. Two bookmarks make that about as short as
+it gets:
+
+1. `https://github.com/codespaces` - click yours to wake it
+2. `https://<your-codespace>-8000.app.github.dev` - the app itself
+
+For an address that answers without waking anything, the machine has to stay on,
+which Codespaces deliberately do not. That means a small always-on server of your
+own with a Cloudflare Tunnel in front - the app runs the same way there, but it is
+a machine you rent and pay for by the month. Worth it only once you are editing
+most days.
+
+To see the password again:
 
 ```bash
 cat /workspaces/.reelforge-keys

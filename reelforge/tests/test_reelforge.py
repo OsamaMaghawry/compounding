@@ -2026,9 +2026,22 @@ class WebAppTests(unittest.TestCase):
     # -- security --------------------------------------------------------
     def test_everything_needs_a_password(self):
         client = self.client("sec")
-        for path in ("/api/jobs", "/api/templates"):
+        for path in ("/api/jobs", "/api/templates", "/api/broll"):
             self.assertEqual(client.get(path).status_code, 401, path)
         self.assertEqual(client.post("/api/jobs").status_code, 401)
+        # Updating restarts the server. It is not something a stranger may do.
+        self.assertEqual(client.post("/api/update").status_code, 401)
+
+    def test_a_copy_that_cannot_update_itself_says_so(self):
+        # Installed from a zip rather than cloned: there is nothing to pull.
+        client = self.client("noupdate")
+        self.login(client)
+        import reelforge.web as web
+        if (web.PACKAGE_ROOT.parent / ".git").exists():
+            self.skipTest("this checkout is a git clone")
+        response = client.post("/api/update")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("cannot update itself", response.json()["detail"])
 
     def test_a_wrong_password_is_refused(self):
         client = self.client("sec2")
@@ -2660,6 +2673,30 @@ class WebAppTests(unittest.TestCase):
         self.assertLessEqual(made.height, min(640, original.height))
         self.assertLessEqual(made.width, original.width)
         self.assertTrue(made.has_audio, "you cannot judge a cut without the audio")
+
+    def test_an_edit_made_before_the_player_existed_still_plays(self):
+        # Every edit already in the library predates the proxy. Opening one to an
+        # empty black box looks a great deal like the edit being gone.
+        client = self.client("oldjob")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        proxy = self.app.state.store.dir(job["id"]) / "proxy.mp4"
+        proxy.unlink()                       # what a pre-player edit looks like
+
+        response = client.get(f"/api/jobs/{job['id']}/proxy.mp4",
+                              headers={"Range": "bytes=0-1023"})
+        self.assertEqual(response.status_code, 206, response.text)
+        self.assertTrue(proxy.exists(), "it should have been built on the way past")
+
+    def test_an_edit_whose_footage_is_gone_says_so(self):
+        client = self.client("nofootage")
+        self.login(client)
+        store = self.app.state.store
+        job = store.create("clip", "", "small")
+        store.update(job, status="ready", prepared=str(Path(self.tmp) / "not-here.mp4"))
+        response = client.get(f"/api/jobs/{job.id}/proxy.mp4")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("no longer here", response.json()["detail"])
 
     def test_trying_a_setting_changes_nothing_on_disk(self):
         client = self.client("try")

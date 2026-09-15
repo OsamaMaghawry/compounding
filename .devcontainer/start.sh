@@ -4,8 +4,22 @@
 set -euo pipefail
 
 PIDFILE=/workspaces/.reelforge.pid
-cd "$(dirname "$0")/../reelforge"
+repo="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo/reelforge"
 mkdir -p /workspaces/data /workspaces/models
+
+# Pick up new code every time the machine starts, so the usual way to get an
+# update is simply to open it - no terminal, nothing to type, nothing to
+# remember. --ff-only so this can never invent a merge on its own; if the pull
+# cannot fast-forward, the old version keeps running and says so.
+if [ -z "${REELFORGE_NO_UPDATE:-}" ] && git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "checking for a newer version…"
+  if git -C "$repo" pull --ff-only --quiet 2>/dev/null; then
+    pip install -e . --quiet --no-deps 2>/dev/null || true
+  else
+    echo "could not update automatically - carrying on with what is here."
+  fi
+fi
 
 running() {
   [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
