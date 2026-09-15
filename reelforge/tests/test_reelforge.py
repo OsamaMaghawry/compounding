@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -1808,3 +1809,138 @@ class JoinCacheTests(unittest.TestCase):
         messages = []
         join_clips([self.b, self.a], dest, on_status=messages.append)
         self.assertTrue(any("joining" in m for m in messages), messages)
+
+
+try:
+    import fastapi  # noqa: F401
+    from fastapi.testclient import TestClient
+    HAVE_WEB = True
+except ImportError:
+    HAVE_WEB = False
+
+
+@unittest.skipUnless(HAVE_WEB and HAVE_FFMPEG, "the web app needs fastapi and ffmpeg")
+class WebAppTests(unittest.TestCase):
+    """The server version: uploads, a queue, and a password."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="reelforge-web-")
+        cls.clip_a = make_clip(Path(cls.tmp) / "a.mp4", duration=4)
+        cls.clip_b = make_clip(Path(cls.tmp) / "b.mp4", duration=4)
+        os.environ["REELFORGE_ASR_BACKEND"] = "stub"
+
+    @classmethod
+    def tearDownClass(cls):
+        os.environ.pop("REELFORGE_ASR_BACKEND", None)
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def client(self, name="c"):
+        from reelforge.web import create_app
+        app = create_app(data_dir=Path(self.tmp) / name, password="letmein",
+                         secret="fixed-secret")
+        return TestClient(app)
+
+    def login(self, client):
+        self.assertEqual(client.post("/api/login", json={"password": "letmein"}).status_code, 200)
+
+    # -- security --------------------------------------------------------
+    def test_everything_needs_a_password(self):
+        client = self.client("sec")
+        for path in ("/api/jobs", "/api/templates"):
+            self.assertEqual(client.get(path).status_code, 401, path)
+        self.assertEqual(client.post("/api/jobs").status_code, 401)
+
+    def test_a_wrong_password_is_refused(self):
+        client = self.client("sec2")
+        self.assertEqual(client.post("/api/login", json={"password": "guess"}).status_code, 401)
+        self.assertEqual(client.get("/api/jobs").status_code, 401)
+
+    def test_logging_out_revokes_access(self):
+        client = self.client("sec3")
+        self.login(client)
+        self.assertEqual(client.get("/api/jobs").status_code, 200)
+        client.post("/api/logout")
+        self.assertEqual(client.get("/api/jobs").status_code, 401)
+
+    def test_session_tokens_are_signed(self):
+        from reelforge.web import make_token, valid_token
+        token = make_token("secret")
+        self.assertTrue(valid_token("secret", token))
+        self.assertFalse(valid_token("secret", token[:-1] + "0"))    # tampered
+        self.assertFalse(valid_token("other", token))                # forged
+        self.assertFalse(valid_token("secret", None))
+
+    # -- the job flow ----------------------------------------------------
+    def upload(self, client, paths, **data):
+        files = [("files", (Path(p).name, open(p, "rb"), "video/mp4")) for p in paths]
+        return client.post("/api/jobs", files=files,
+                           data={"template": "", "model": "small", **data})
+
+    def wait(self, client, job_id, limit=240):
+        for _ in range(limit):
+            job = client.get(f"/api/jobs/{job_id}").json()
+            if job["status"] in ("ready", "error"):
+                return job
+            time.sleep(1)
+        self.fail("job never finished")
+
+    def test_upload_two_clips_and_export(self):
+        client = self.client("flow")
+        self.login(client)
+
+        response = self.upload(client, [self.clip_a, self.clip_b])
+        self.assertEqual(response.status_code, 200)
+        job = self.wait(client, response.json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        # Two 4s clips joined, then trimmed.
+        self.assertGreater(job["summary"]["source_duration"], 7.0)
+
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertTrue(edl["captions"])
+
+        # Range requests, so the preview can be scrubbed on a phone.
+        preview = client.get(f"/api/jobs/{job['id']}/preview.mp4",
+                             headers={"Range": "bytes=0-1023"})
+        self.assertEqual(preview.status_code, 206)
+        self.assertIn("bytes 0-1023/", preview.headers.get("content-range", ""))
+
+        edit = client.post(f"/api/jobs/{job['id']}/edl", json={
+            "rerender": False, "captions": [{"text": "نص جديد"}],
+            "zooms": [{"enabled": False}], "overlays": [], "transitions": []})
+        self.assertEqual(edit.status_code, 200)
+
+        exported = client.post(f"/api/jobs/{job['id']}/export")
+        self.assertEqual(exported.status_code, 200)
+        download = client.get(f"/api/jobs/{job['id']}/download")
+        self.assertEqual(download.status_code, 200)
+        self.assertGreater(len(download.content), 10_000)
+
+    def test_a_non_video_upload_is_rejected(self):
+        client = self.client("bad")
+        self.login(client)
+        notes = Path(self.tmp) / "notes.txt"
+        notes.write_text("not a video", encoding="utf-8")
+        response = client.post("/api/jobs",
+                               files=[("files", ("notes.txt", open(notes, "rb"), "text/plain"))],
+                               data={"template": "", "model": "small"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_unknown_job_is_a_404(self):
+        client = self.client("missing")
+        self.login(client)
+        self.assertEqual(client.get("/api/jobs/nope").status_code, 404)
+        self.assertEqual(client.get("/api/jobs/nope/edl").status_code, 404)
+
+    def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
+        from reelforge.web import Job, JobStore
+        root = Path(self.tmp) / "restart"
+        store = JobStore(root)
+        job = store.create("clip", "", "small")
+        store.update(job, status="working", stage="rendering")
+        # A new store is what a process restart looks like.
+        reopened = JobStore(root)
+        recovered = reopened.get(job.id)
+        self.assertIsNotNone(recovered)
+        self.assertEqual(recovered.status, "error")
+        self.assertIn("restart", recovered.error)

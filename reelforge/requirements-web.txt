@@ -1,0 +1,5 @@
+# The web app, for running ReelForge on a server instead of your own computer.
+#   pip install -r requirements-web.txt
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9

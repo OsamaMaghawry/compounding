@@ -696,6 +696,12 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 0
 
 
+def cmd_serve(args) -> int:
+    from .web import serve  # noqa: PLC0415
+    serve(host=args.host, port=args.port, data_dir=args.data, password=args.password)
+    return 0
+
+
 def cmd_check(args) -> int:
     """Self-test the caption fixes and report, so one paste settles what is running."""
     from .captions import CaptionLine, build_ass, group_words  # noqa: PLC0415
@@ -906,6 +912,14 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="check ffmpeg, fonts and models")
     doctor.add_argument("--project")
     doctor.set_defaults(func=cmd_doctor)
+
+    serve_cmd = sub.add_parser("serve", help="run the web app, so you can edit from anywhere")
+    serve_cmd.add_argument("--host", default="0.0.0.0")
+    serve_cmd.add_argument("--port", type=int, default=8000)
+    serve_cmd.add_argument("--data", default="data", help="where uploads and edits are kept")
+    serve_cmd.add_argument("--password", help="defaults to $REELFORGE_PASSWORD, "
+                           "or a random one printed at startup")
+    serve_cmd.set_defaults(func=cmd_serve)
 
     check = sub.add_parser("check", help="self-test the caption fixes and show the version")
     check.set_defaults(func=cmd_check)

@@ -100,6 +100,20 @@ for speech in both English and Arabic.
 The rule it is built around: **arithmetic in Python, language in the model.** Nothing here
 is generated, so nothing here can be hallucinated. See [docs/MARKET.md](docs/MARKET.md).
 
+## Running it online
+
+The CLI needs your own computer. To edit from anywhere - a phone, a borrowed laptop:
+
+```bash
+pip install -e ".[web]"
+reelforge serve
+```
+
+That starts a web app with uploads, a job queue, progress you can watch, review and
+download. It prints a password. For a server, `docker compose up -d --build` and put
+HTTPS in front of it - see [docs/HOSTING.md](docs/HOSTING.md), which also explains why
+recording at 1080p instead of 4K matters more than the server you choose.
+
 ## Start here
 
 ```bash
@@ -273,7 +287,7 @@ repo looking for `studio/background.md`, it is not here by design — run
 reelforge/
   analysis.py   silence, energy, shot detection    render.py    EDL -> ffmpeg filtergraph
   market.py     your price history and fact sheets  fonts.py     Arabic font catalog
-  join.py       several takes into one timeline
+  join.py       several takes into one timeline    web.py       the server version
   script.py     script writing and number auditing  llm.py       writing backends
   knowledge.py  your background, voice and frameworks
   speech.py     ASR backends, word timings         learn.py     feedback store, tuning, model
@@ -305,7 +319,7 @@ reelforge/
 python -m unittest discover -s tests -v
 ```
 
-120 tests, no sample files or model downloads needed. The media tests build their own clip
+161 tests, no sample files or model downloads needed. The media tests build their own clip
 with ffmpeg. The faster-whisper adapter is covered by integration tests that drive it with
 the library's own `Segment`/`Word` types and assert every keyword argument we send is one
 the installed version accepts — so a breaking change upstream fails the suite rather than
