@@ -1837,9 +1837,9 @@ class WebAppTests(unittest.TestCase):
 
     def client(self, name="c"):
         from reelforge.web import create_app
-        app = create_app(data_dir=Path(self.tmp) / name, password="letmein",
-                         secret="fixed-secret")
-        return TestClient(app)
+        self.app = create_app(data_dir=Path(self.tmp) / name, password="letmein",
+                              secret="fixed-secret")
+        return TestClient(self.app)
 
     def login(self, client):
         self.assertEqual(client.post("/api/login", json={"password": "letmein"}).status_code, 200)
@@ -1867,9 +1867,16 @@ class WebAppTests(unittest.TestCase):
         from reelforge.web import make_token, valid_token
         token = make_token("secret")
         self.assertTrue(valid_token("secret", token))
-        self.assertFalse(valid_token("secret", token[:-1] + "0"))    # tampered
+        # Flip the last character to something it is not. Appending a fixed "0"
+        # silently does nothing one time in sixteen, because the signature is hex
+        # and may already end in zero - which made this test pass or fail at random.
+        tampered = token[:-1] + ("1" if token[-1] == "0" else "0")
+        self.assertNotEqual(tampered, token)
+        self.assertFalse(valid_token("secret", tampered))
         self.assertFalse(valid_token("other", token))                # forged
         self.assertFalse(valid_token("secret", None))
+        self.assertFalse(valid_token("secret", "no-dot-here"))
+        self.assertFalse(valid_token("secret", token.split(".")[0]))  # signature dropped
 
     # -- the job flow ----------------------------------------------------
     def upload(self, client, paths, **data):
@@ -1910,8 +1917,19 @@ class WebAppTests(unittest.TestCase):
             "zooms": [{"enabled": False}], "overlays": [], "transitions": []})
         self.assertEqual(edit.status_code, 200)
 
+        # Export is queued, not run on the request - a render takes minutes and
+        # every proxy in between would time out first.
         exported = client.post(f"/api/jobs/{job['id']}/export")
         self.assertEqual(exported.status_code, 200)
+        self.assertTrue(exported.json().get("queued"))
+
+        for _ in range(240):
+            state = client.get(f"/api/jobs/{job['id']}").json()
+            if state["status"] in ("done", "error"):
+                break
+            time.sleep(1)
+        self.assertEqual(state["status"], "done", state.get("error"))
+
         download = client.get(f"/api/jobs/{job['id']}/download")
         self.assertEqual(download.status_code, 200)
         self.assertGreater(len(download.content), 10_000)
@@ -1925,6 +1943,19 @@ class WebAppTests(unittest.TestCase):
                                files=[("files", ("notes.txt", open(notes, "rb"), "text/plain"))],
                                data={"template": "", "model": "small"})
         self.assertEqual(response.status_code, 400)
+
+    def test_exporting_an_unloaded_edit_is_refused_clearly(self):
+        # After a restart the plan is gone; say so rather than failing obscurely.
+        client = self.client("unloaded")
+        self.login(client)
+        # A job the app knows about, but whose plan is not in memory - which is
+        # exactly the state after a restart.
+        store = self.app.state.store
+        job = store.create("clip", "", "small")
+        store.update(job, status="ready")
+        response = client.post(f"/api/jobs/{job.id}/export")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("upload it again", response.json()["detail"])
 
     def test_unknown_job_is_a_404(self):
         client = self.client("missing")

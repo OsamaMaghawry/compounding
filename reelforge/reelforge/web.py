@@ -129,23 +129,42 @@ class Runner:
     def __init__(self, store: JobStore, fonts_dir: Path):
         self.store = store
         self.fonts_dir = fonts_dir
-        self.queue: queue.Queue[str] = queue.Queue()
+        self.queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self.editors: dict[str, AutoEditor] = {}
         self.edls: dict[str, EDL] = {}
+        self._recent: list[str] = []
         thread = threading.Thread(target=self._loop, daemon=True)
         thread.start()
 
-    def submit(self, job_id: str) -> None:
-        self.queue.put(job_id)
+    def submit(self, job_id: str, task: str = "plan") -> None:
+        """Queue work. Rendering can take minutes, which is far too long to hold
+        an HTTP request open - every proxy in between would give up first."""
+        self.queue.put((task, job_id))
+
+    def _remember(self, job_id: str, editor: AutoEditor, edl: EDL) -> None:
+        self.editors[job_id] = editor
+        self.edls[job_id] = edl
+        if job_id in self._recent:
+            self._recent.remove(job_id)
+        self._recent.append(job_id)
+        while len(self._recent) > 20:                     # a server runs for months
+            stale = self._recent.pop(0)
+            self.editors.pop(stale, None)
+            self.edls.pop(stale, None)
 
     def _loop(self) -> None:
         while True:
-            job_id = self.queue.get()
+            task, job_id = self.queue.get()
             job = self.store.get(job_id)
             if job is None:
                 continue
             try:
-                self._process(job)
+                if task == "plan":
+                    self._process(job)
+                elif task == "rerender":
+                    self._rerender(job)
+                elif task == "export":
+                    self._export(job)
             except Exception as exc:                      # a failed job must not kill the worker
                 self.store.update(job, status="error", stage="failed",
                                   error=f"{type(exc).__name__}: {exc}"[:400])
@@ -170,8 +189,6 @@ class Runner:
         profile = profile.apply_overrides(overrides)
         editor = AutoEditor(profile, project_dir=directory / "project",
                             fonts_dir=self.fonts_dir, on_status=note)
-        self.editors[job.id] = editor
-
         clips = [Path(p) for p in job.sources]
         if len(clips) > 1:
             from .join import join_clips  # noqa: PLC0415
@@ -183,35 +200,38 @@ class Runner:
             source = clips[0]
 
         result = editor.plan(source)
-        self.edls[job.id] = result.edl
+        self._remember(job.id, editor, result.edl)
         note("rendering preview")
         editor.render(result.edl, directory / "preview.mp4", preview=True)
 
         self.store.update(job, status="ready", stage="ready to review",
                           run_id=result.run_id, summary=result.edl.summary())
 
-    def rerender(self, job: Job) -> None:
-        editor, edl = self.editors.get(job.id), self.edls.get(job.id)
-        if not editor or not edl:
-            raise RuntimeError("this job is no longer loaded - re-upload to edit it")
-        editor.render(edl, self.store.dir(job.id) / "preview.mp4", preview=True)
-        self.store.update(job, summary=edl.summary())
+    def loaded(self, job_id: str) -> bool:
+        return job_id in self.edls
 
-    def export(self, job: Job) -> Path:
+    def _rerender(self, job: Job) -> None:
         editor, edl = self.editors.get(job.id), self.edls.get(job.id)
         if not editor or not edl:
-            raise RuntimeError("this job is no longer loaded - re-upload to edit it")
+            raise RuntimeError("this edit is no longer loaded - upload it again")
+        self.store.update(job, status="working", stage="re-rendering the preview")
+        editor.render(edl, self.store.dir(job.id) / "preview.mp4", preview=True)
+        self.store.update(job, status="ready", stage="ready to review",
+                          summary=edl.summary())
+
+    def _export(self, job: Job) -> None:
+        editor, edl = self.editors.get(job.id), self.edls.get(job.id)
+        if not editor or not edl:
+            raise RuntimeError("this edit is no longer loaded - upload it again")
         self.store.update(job, status="exporting", stage="rendering the final video")
         name = f"{Path(job.title).stem or 'reel'}-reel.mp4"
-        output = self.store.dir(job.id) / name
-        editor.render(edl, output, preview=False)
+        editor.render(edl, self.store.dir(job.id) / name, preview=False)
         if job.run_id:
             try:
                 editor.accept(job.run_id, edl)
             except Exception:
                 pass                                       # learning must never block a download
         self.store.update(job, status="done", stage="finished", output_name=name)
-        return output
 
 
 # ------------------------------------------------------------------ security
@@ -254,6 +274,10 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
     secret = secret or os.environ.get("REELFORGE_SECRET") or secrets.token_hex(16)
     app = FastAPI(title="ReelForge", docs_url=None, redoc_url=None)
     app.state.password = password
+    # Exposed so an embedding process - or a test - can reach the same store and
+    # worker the routes use, rather than a second instance over the same folder.
+    app.state.store = store
+    app.state.runner = runner
 
     def require_login(request: Request) -> None:
         if not valid_token(secret, request.cookies.get(COOKIE)):
@@ -415,15 +439,20 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                     apply_text_edit(edl.captions[index], text)
 
         if body.get("rerender"):
-            runner.rerender(job)
-        return {"ok": True, "summary": edl.summary()}
+            store.update(job, status="working", stage="queued for re-render")
+            runner.submit(job.id, "rerender")
+        return {"ok": True, "queued": bool(body.get("rerender")),
+                "summary": edl.summary()}
 
     @app.post("/api/jobs/{job_id}/export", dependencies=[Depends(require_login)])
     def export_job(job_id: str) -> dict:
         job = job_or_404(job_id)
-        output = runner.export(job)
-        return {"ok": True, "download": f"/api/jobs/{job_id}/download",
-                "name": output.name}
+        if not runner.loaded(job_id):
+            raise HTTPException(status_code=409,
+                                detail="this edit is no longer loaded - upload it again")
+        store.update(job, status="exporting", stage="queued for export")
+        runner.submit(job_id, "export")
+        return {"ok": True, "queued": True}
 
     @app.get("/api/jobs/{job_id}/preview.mp4", dependencies=[Depends(require_login)])
     def preview(job_id: str, request: Request) -> Response:
@@ -619,7 +648,7 @@ async function draw(job){
     if(edl) renderControls(job);
     const rr=$('rerender'), ex=$('export');
     if(rr) rr.onclick=()=>send(job,true);
-    if(ex) ex.onclick=async()=>{ ex.disabled=true; ex.textContent='rendering…';
+    if(ex) ex.onclick=async()=>{ ex.disabled=true; ex.textContent='queued…';
       try{ await send(job,false); await api('/api/jobs/'+job.id+'/export',{method:'POST'}); refresh(); }
       catch(e){ ex.textContent='error: '+e.message; ex.disabled=false; } };
   }
