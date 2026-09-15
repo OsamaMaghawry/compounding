@@ -11,6 +11,41 @@ reelforge serve
 It prints an address and a password. That is the whole thing locally. The rest of this
 page is about putting it somewhere you can reach from anywhere.
 
+## The quickest route: GitHub Codespaces
+
+If you have a GitHub account, you already have a server. A Codespace is a Linux
+machine in the cloud with a browser terminal and an HTTPS address that only you can
+open. No card, no new account, no Docker.
+
+1. Open the repository on GitHub
+2. **Code** → **Codespaces** → **Create codespace on
+   `claude/ai-video-editor-reels-52docy`**
+3. Wait a few minutes the first time - ffmpeg, the app and the fonts install themselves
+4. Open the **PORTS** tab at the bottom, click the globe icon next to port 8000
+5. Log in with the password printed in the terminal
+
+That address is a normal link. Bookmark it; it stays the same for that Codespace, so
+from any computer you sign in to GitHub, start the Codespace and open the bookmark.
+Forwarded ports are **private to your account** by default - nobody else can reach it.
+
+The app starts itself whenever the Codespace starts, so there is nothing to type. To
+see the password again:
+
+```bash
+cat /workspaces/.reelforge-keys
+```
+
+Worth knowing:
+
+- Codespaces **stop after 30 minutes idle** and your files are kept. Restarting is quick.
+- The free allowance is generous for occasional editing but it is measured in
+  core-hours, so a 4-core machine uses it twice as fast as a 2-core one. Stop the
+  Codespace when you are finished rather than leaving it running.
+- Uploads, exports and the speech model live in `/workspaces`, outside the repository,
+  so nothing you record is ever committed.
+- For a permanent address of your own, run a **Cloudflare Tunnel** inside the Codespace
+  pointing at `localhost:8000`. Codespaces' own link is enough to start with.
+
 ## Read this before you pay for anything
 
 **Record at 1080p, not 4K.** The output is 1080x1920 whatever you feed it, so 4K buys

@@ -102,6 +102,10 @@ is generated, so nothing here can be hallucinated. See [docs/MARKET.md](docs/MAR
 
 ## Running it online
 
+**On a new computer, with nothing installed:** open this repo on GitHub → **Code** →
+**Codespaces** → **Create codespace**. It installs everything, starts the app, and gives
+you a private HTTPS link on port 8000. See [docs/HOSTING.md](docs/HOSTING.md).
+
 The CLI needs your own computer. To edit from anywhere - a phone, a borrowed laptop:
 
 ```bash
