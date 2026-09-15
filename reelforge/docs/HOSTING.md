@@ -43,6 +43,28 @@ says which. Each control is a real profile key, so anything the panel does is th
 as `--set captions.style=word` on the command line, and a look you settle on can be
 written into a template.
 
+## Leaving and coming back
+
+Everything saves itself as you go, to whatever `--data` points at - `/workspaces/data`
+in a Codespace, which sits outside the repository and survives the machine stopping.
+There is no save button and nothing to remember.
+
+A Codespace stops after thirty idle minutes. When you open it again, the edit is
+listed, the preview plays, the caption and effect lists are there, and Export works -
+the edit is read back from disk the moment anything asks for it. What you changed
+before you left is what comes back, not what the editor originally proposed.
+
+If the machine stopped *during* a render, that edit is marked failed, because it was.
+Your clips are still on it, so it shows a **Try again** button rather than asking you
+to upload them a second time.
+
+Two things do not survive, by design:
+
+- The transcript cache and the speech model are re-used, not re-downloaded, so a
+  restart costs nothing there - but a **deleted** edit is gone, including its clips.
+- Nothing is recoverable if you delete the Codespace itself. `/workspaces/data` lives
+  on that machine. Download anything you care about, or copy the folder out.
+
 ## The quickest route: GitHub Codespaces
 
 If you have a GitHub account, you already have a server. A Codespace is a Linux

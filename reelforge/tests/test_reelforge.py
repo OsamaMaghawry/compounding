@@ -2021,18 +2021,108 @@ class WebAppTests(unittest.TestCase):
         stored = Path(self.app.state.store.get(job_id).sources[0])
         self.assertEqual(stored.read_bytes(), data, "reassembled clip differs from the original")
 
-    def test_exporting_an_unloaded_edit_is_refused_clearly(self):
-        # After a restart the plan is gone; say so rather than failing obscurely.
+    def test_exporting_an_edit_with_nothing_behind_it_is_refused_clearly(self):
         client = self.client("unloaded")
         self.login(client)
-        # A job the app knows about, but whose plan is not in memory - which is
-        # exactly the state after a restart.
+        # A job the app knows about with no plan on disk and none in memory -
+        # there is genuinely nothing to render, so say so.
         store = self.app.state.store
         job = store.create("clip", "", "small")
         store.update(job, status="ready")
         response = client.post(f"/api/jobs/{job.id}/export")
         self.assertEqual(response.status_code, 409)
         self.assertIn("upload it again", response.json()["detail"])
+
+    # -- surviving a restart ---------------------------------------------
+    def restart(self, name):
+        """A new app on the same folder is exactly what a restart looks like."""
+        client = self.client(name)
+        self.login(client)
+        return client
+
+    def test_an_edit_comes_back_after_a_restart(self):
+        # A Codespace stops after thirty idle minutes. Coming back to a video you
+        # can watch but cannot export - under a message telling you to upload it
+        # again - loses an evening's work that is sitting right there on disk.
+        client = self.client("survive")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        before = client.get(f"/api/jobs/{job['id']}/edl").json()
+
+        client = self.restart("survive")
+        after = client.get(f"/api/jobs/{job['id']}/edl")
+        self.assertEqual(after.status_code, 200, "the edit did not come back")
+        self.assertEqual([line["text"] for line in after.json()["captions"]],
+                         [line["text"] for line in before["captions"]])
+        self.assertEqual(client.post(f"/api/jobs/{job['id']}/export").status_code, 200)
+
+    def test_edits_made_before_a_restart_are_still_there(self):
+        # The plan is re-read from the working copy, not from what was proposed,
+        # so a caption fixed and a zoom switched off survive the gap.
+        client = self.client("survive2")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertTrue(edl["zooms"], "need at least one zoom to switch off")
+
+        client.post(f"/api/jobs/{job['id']}/edl", json={
+            "rerender": False,
+            "captions": [{"text": "كلام مصحح"}],
+            "zooms": [{"enabled": False}],
+            "overlays": [], "transitions": []})
+
+        client = self.restart("survive2")
+        after = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertEqual(after["captions"][0]["text"], "كلام مصحح")
+        self.assertFalse(after["zooms"][0]["enabled"])
+
+    def test_the_proposal_is_kept_separate_from_what_you_edited(self):
+        # The difference between the two is the whole training signal, so saving
+        # the working copy must not overwrite what the editor proposed.
+        client = self.client("proposal")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        proposed_text = client.get(f"/api/jobs/{job['id']}/edl").json()["captions"][0]["text"]
+        client.post(f"/api/jobs/{job['id']}/edl", json={
+            "rerender": False, "captions": [{"text": "شيء مختلف"}],
+            "zooms": [], "overlays": [], "transitions": []})
+
+        runs = sorted((self.app.state.store.dir(job["id"]) / "project" / "runs")
+                      .glob("run-*.edl.json"))
+        self.assertTrue(runs)
+        proposal = json.loads(runs[-1].read_text("utf-8"))
+        self.assertEqual(proposal["captions"][0]["text"], proposed_text)
+
+    def test_a_restart_mid_render_leaves_an_edit_that_can_be_retried(self):
+        client = self.client("interrupted")
+        self.login(client)
+        store = self.app.state.store
+        job = store.create("clip", "", "small")
+        store.update(job, status="working", stage="rendering",
+                     sources=[str(self.clip_a)])
+
+        client = self.restart("interrupted")
+        state = client.get(f"/api/jobs/{job.id}").json()
+        self.assertEqual(state["status"], "error")
+        self.assertIn("restart", state["error"])
+        # The clips are still on disk, so starting again must not need another
+        # upload.
+        self.assertTrue(state["sources"])
+        self.assertEqual(client.post(f"/api/jobs/{job.id}/start").status_code, 200)
+        self.assertEqual(self.wait(client, job.id)["status"], "ready")
+
+    def test_an_edit_whose_footage_was_deleted_does_not_come_back(self):
+        client = self.client("gone")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        store = self.app.state.store
+        shutil.rmtree(store.dir(job["id"]) / "uploads")
+
+        client = self.restart("gone")
+        response = client.get(f"/api/jobs/{job['id']}/edl")
+        self.assertEqual(response.status_code, 409,
+                         "an edit with no footage behind it must not look loadable")
 
     def test_unknown_job_is_a_404(self):
         client = self.client("missing")

@@ -229,6 +229,9 @@ class Runner:
         self.editors: dict[str, AutoEditor] = {}
         self.edls: dict[str, EDL] = {}
         self._recent: list[str] = []
+        # Restoring happens on whichever thread asked for the edit, which is the
+        # request thread as often as the worker.
+        self._lock = threading.Lock()
         thread = threading.Thread(target=self._loop, daemon=True)
         thread.start()
 
@@ -238,15 +241,68 @@ class Runner:
         self.queue.put((task, job_id))
 
     def _remember(self, job_id: str, editor: AutoEditor, edl: EDL) -> None:
-        self.editors[job_id] = editor
-        self.edls[job_id] = edl
-        if job_id in self._recent:
-            self._recent.remove(job_id)
-        self._recent.append(job_id)
-        while len(self._recent) > 20:                     # a server runs for months
-            stale = self._recent.pop(0)
-            self.editors.pop(stale, None)
-            self.edls.pop(stale, None)
+        with self._lock:
+            self.editors[job_id] = editor
+            self.edls[job_id] = edl
+            if job_id in self._recent:
+                self._recent.remove(job_id)
+            self._recent.append(job_id)
+            while len(self._recent) > 20:                 # a server runs for months
+                stale = self._recent.pop(0)
+                self.editors.pop(stale, None)
+                self.edls.pop(stale, None)
+
+    # -- keeping the edit ------------------------------------------------
+    #
+    # The plan lives in memory, twenty at a time. That was fine until you could
+    # leave: a Codespace stops after thirty idle minutes, and coming back to a
+    # video you can watch but cannot export - under a message telling you to
+    # upload it again, which is not true - is the kind of thing that loses an
+    # evening. So the working edit goes to disk beside the preview, and is read
+    # back the moment anything asks for it.
+    #
+    # Beside, not instead of: `project/runs/run-N.edl.json` is what the editor
+    # proposed and must stay untouched, because the difference between that and
+    # what you kept is the whole training signal.
+
+    def _working_path(self, job_id: str) -> Path:
+        return self.store.dir(job_id) / "edl.json"
+
+    def keep(self, job_id: str) -> None:
+        """Write the current edit to disk. Called after anything changes it."""
+        edl = self.edls.get(job_id)
+        if edl is None:
+            return
+        try:
+            edl.save(self._working_path(job_id))
+        except OSError:
+            pass                        # a full disk must not lose the render too
+
+    def edl_for(self, job: Job) -> EDL | None:
+        """The current edit, read back from disk if the server restarted."""
+        edl = self.edls.get(job.id)
+        if edl is not None:
+            return edl
+
+        path = self._working_path(job.id)
+        if not path.exists():
+            # An edit made before the working copy was saved. The proposal is
+            # still there, so offer that rather than nothing.
+            runs = sorted((self.store.dir(job.id) / "project" / "runs").glob("run-*.edl.json"))
+            if not runs:
+                return None
+            path = max(runs, key=lambda p: p.stat().st_mtime)
+        try:
+            edl = EDL.load(path)
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            return None
+        if not Path(edl.source).exists():
+            return None                 # the footage is gone; nothing to render
+        editor = AutoEditor(self.profile_for(job),
+                            project_dir=self.store.dir(job.id) / "project",
+                            fonts_dir=self.fonts_dir)
+        self._remember(job.id, editor, edl)
+        return edl
 
     def _loop(self) -> None:
         while True:
@@ -330,6 +386,7 @@ class Runner:
         self._remember(job.id, editor, result.edl)
         for warning in result.warnings:
             note(warning)
+        self.keep(job.id)
         note("rendering preview")
         editor.render(result.edl, self.store.dir(job.id) / "preview.mp4", preview=True)
         self.store.update(job, status="ready", stage="ready to review",
@@ -361,6 +418,7 @@ class Runner:
         self._plan_into(job, source, editor, note)
         if fixes:
             self._apply_fixes(job, fixes)
+            self.keep(job.id)
             self.store.update(job, summary=self.edls[job.id].summary())
 
     def _typed_fixes(self, job: Job) -> dict[str, str]:
@@ -373,11 +431,10 @@ class Runner:
         costs nothing and keeps what you typed.
         """
         from .learn import _diff_caption_words  # noqa: PLC0415
-        edl = self.edls.get(job.id)
-        editor = self.editors.get(job.id)
-        if edl is None or editor is None or not job.run_id:
+        edl = self.edl_for(job)                  # a restart must not lose them either
+        if edl is None or not job.run_id:
             return {}
-        proposed_path = editor.runs_dir / f"run-{job.run_id}.edl.json"
+        proposed_path = self.editors[job.id].runs_dir / f"run-{job.run_id}.edl.json"
         if not proposed_path.exists():
             return {}
         try:
@@ -393,22 +450,21 @@ class Runner:
             for word in line.words:
                 word.text = corrector.correct_word(word.text)
 
-    def loaded(self, job_id: str) -> bool:
-        return job_id in self.edls
-
     def _rerender(self, job: Job) -> None:
-        editor, edl = self.editors.get(job.id), self.edls.get(job.id)
-        if not editor or not edl:
+        edl = self.edl_for(job)
+        if edl is None:
             raise RuntimeError("this edit is no longer loaded - upload it again")
+        editor = self.editors[job.id]
         self.store.update(job, status="working", stage="re-rendering the preview")
         editor.render(edl, self.store.dir(job.id) / "preview.mp4", preview=True)
         self.store.update(job, status="ready", stage="ready to review",
                           summary=edl.summary())
 
     def _export(self, job: Job) -> None:
-        editor, edl = self.editors.get(job.id), self.edls.get(job.id)
-        if not editor or not edl:
+        edl = self.edl_for(job)
+        if edl is None:
             raise RuntimeError("this edit is no longer loaded - upload it again")
+        editor = self.editors[job.id]
         self.store.update(job, status="exporting", stage="rendering the final video")
         name = f"{Path(job.title).stem or 'reel'}-reel.mp4"
         editor.render(edl, self.store.dir(job.id) / name, preview=False)
@@ -633,8 +689,7 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
 
     @app.get("/api/jobs/{job_id}/edl", dependencies=[Depends(require_login)])
     def get_edl(job_id: str) -> dict:
-        job_or_404(job_id)
-        edl = runner.edls.get(job_id)
+        edl = runner.edl_for(job_or_404(job_id))
         if edl is None:
             raise HTTPException(status_code=409, detail="not planned yet")
         return edl.to_dict()
@@ -643,7 +698,7 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
     def update_edl(job_id: str, body: dict) -> dict:
         from .captions import apply_text_edit  # noqa: PLC0415
         job = job_or_404(job_id)
-        edl = runner.edls.get(job_id)
+        edl = runner.edl_for(job)
         if edl is None:
             raise HTTPException(status_code=409, detail="not planned yet")
 
@@ -662,6 +717,7 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                 if text and text != edl.captions[index].text:
                     apply_text_edit(edl.captions[index], text)
 
+        runner.keep(job.id)
         if body.get("rerender"):
             store.update(job, status="working", stage="queued for re-render")
             runner.submit(job.id, "rerender")
@@ -740,7 +796,7 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
     @app.post("/api/jobs/{job_id}/export", dependencies=[Depends(require_login)])
     def export_job(job_id: str) -> dict:
         job = job_or_404(job_id)
-        if not runner.loaded(job_id):
+        if runner.edl_for(job) is None:
             raise HTTPException(status_code=409,
                                 detail="this edit is no longer loaded - upload it again")
         store.update(job, status="exporting", stage="queued for export")
@@ -1023,7 +1079,12 @@ async function draw(job){
   drawn=sig;
   const s=job.summary||{};
   let html=`<div class="card"><h2>${job.title}</h2>`;
-  if(job.status==='error'){ html+=`<div style="color:var(--bad)">${job.error||job.stage}</div>`; }
+  if(job.status==='error'){
+    html+=`<div style="color:var(--bad)">${job.error||job.stage}</div>`;
+    // The clips are still here. A render cut off by an idle timeout should cost
+    // a button, not another upload.
+    if((job.sources||[]).length) html+=`<button id="retry">Try again</button>`;
+  }
   if(job.status==='working'||job.status==='queued'||job.status==='exporting'){
     html+=`<div class="dim">${job.stage}…</div><div class="log">${(job.progress||[]).join('\\n')}</div>`;
   }
@@ -1040,6 +1101,13 @@ async function draw(job){
   }
   html+='</div>';
   $('detail').innerHTML=html;
+
+  const retry=$('retry');
+  if(retry) retry.onclick=async()=>{
+    retry.disabled=true; retry.textContent='starting…';
+    try{ await api('/api/jobs/'+job.id+'/start',{method:'POST'}); drawn=''; listed=''; refresh(); }
+    catch(e){ retry.textContent='error: '+e.message; retry.disabled=false; }
+  };
 
   if(job.status==='ready'||job.status==='done'){
     try{ edl=await api('/api/jobs/'+job.id+'/edl'); }catch(e){ edl=null; }
