@@ -1,0 +1,14 @@
+services:
+  reelforge:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Change this. Anything reachable from the internet will be found.
+      REELFORGE_PASSWORD: "change-me"
+      # Keeps you logged in across restarts; any long random string.
+      REELFORGE_SECRET: "change-me-too"
+    volumes:
+      - ./data:/data        # uploads, previews, exports, learning history
+      - ./models:/models    # the speech model, downloaded once
+    restart: unless-stopped

@@ -1,0 +1,26 @@
+name: myth-bust
+description: Take a belief the audience holds, show it is wrong, replace it.
+best_for: Common financial advice, "everyone says", inherited wisdom.
+beats:
+  - role: hook
+    purpose: State the myth in the audience's own words, as if you believe it.
+    seconds: 4
+  - role: turn
+    purpose: Say plainly that it is wrong. One sentence, no hedging.
+    seconds: 3
+  - role: evidence
+    purpose: The data that disproves it. Quote the supplied numbers.
+    seconds: 12
+  - role: why
+    purpose: Why the myth persists anyway - this is what makes it memorable.
+    seconds: 8
+  - role: replace
+    purpose: What to believe instead, stated as a rule you can act on.
+    seconds: 8
+  - role: cta
+    purpose: One line.
+    seconds: 3
+rules:
+  - The myth must be stated fairly, not as a strawman.
+  - Disprove with data, never with opinion.
+  - Give the viewer something to do, not just something to stop doing.

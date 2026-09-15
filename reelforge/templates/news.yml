@@ -1,0 +1,20 @@
+name: news
+description: Almarai in a dark box. Sober, high contrast, minimal movement. Market and data content.
+captions:
+  style: box
+  font: Almarai
+  font_size: 82
+  max_words: 5
+  box_color: "#101820"
+  box_text: "#FFFFFF"
+  box_padding: 12
+  emphasis_color: "#3DDC97"
+  y_pct: 0.76
+zoom:
+  rate_per_min: 5.0
+  max_factor: 1.08
+transitions:
+  enabled: false
+broll:
+  max_per_min: 4.0
+  mode: band

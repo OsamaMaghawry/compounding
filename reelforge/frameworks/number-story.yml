@@ -1,0 +1,28 @@
+name: number-story
+description: Lead with one number that stops the scroll, then explain what it means.
+best_for: Market returns, compounding, anything where the data is the story.
+default: true
+beats:
+  - role: hook
+    purpose: State the single most surprising number and nothing else. No greeting, no intro.
+    seconds: 3
+  - role: stakes
+    purpose: Say why that number matters to the viewer specifically.
+    seconds: 5
+  - role: context
+    purpose: Give the number its frame - over what period, from what starting point.
+    seconds: 8
+  - role: twist
+    purpose: The part most people get wrong, or the cost hidden inside the number.
+    seconds: 10
+  - role: lesson
+    purpose: The one principle the viewer should take away. Say it as a rule.
+    seconds: 8
+  - role: cta
+    purpose: One line. Ask for the follow or point to the next video.
+    seconds: 3
+rules:
+  - Open on the number itself. Never open with a greeting or your name.
+  - Use only the numbers supplied in the facts. Do not compute new ones.
+  - One idea per sentence. Short sentences carry better over captions.
+  - Name the time period every time you quote a return.

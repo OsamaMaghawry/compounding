@@ -1,0 +1,9 @@
+# Just burn accurate Arabic captions. No cuts, no moves, no layers.
+name: captions_only
+description: Subtitle pass only - keeps your original edit untouched.
+cuts:
+  enabled: false
+zoom:
+  enabled: false
+broll:
+  enabled: false

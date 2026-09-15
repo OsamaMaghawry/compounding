@@ -1,0 +1,25 @@
+name: mistake-fix
+description: Name an expensive mistake, quantify it, show the fix.
+best_for: Behavioural topics - panic selling, timing, fees, over-trading.
+beats:
+  - role: hook
+    purpose: Name the mistake and its cost in one sentence.
+    seconds: 4
+  - role: recognise
+    purpose: Describe the moment the viewer makes it, so they see themselves.
+    seconds: 8
+  - role: cost
+    purpose: Quantify it with the supplied numbers.
+    seconds: 10
+  - role: fix
+    purpose: The correction, concrete enough to do this week.
+    seconds: 10
+  - role: proof
+    purpose: What the fix would have produced instead.
+    seconds: 6
+  - role: cta
+    purpose: One line.
+    seconds: 3
+rules:
+  - Describe the mistake without insulting the person making it.
+  - The fix must be specific and doable, not "be patient".

@@ -1,0 +1,26 @@
+name: compare
+description: Two options, same window, one verdict.
+best_for: Asset A vs asset B, strategy vs strategy.
+beats:
+  - role: hook
+    purpose: Pose the comparison as the question the viewer already has.
+    seconds: 4
+  - role: setup
+    purpose: State the window and the starting amount, so the comparison is fair.
+    seconds: 6
+  - role: side_a
+    purpose: The first option's result, with its numbers.
+    seconds: 9
+  - role: side_b
+    purpose: The second option's result, with its numbers.
+    seconds: 9
+  - role: verdict
+    purpose: Say which won and, more importantly, what that does not prove.
+    seconds: 9
+  - role: cta
+    purpose: One line.
+    seconds: 3
+rules:
+  - Both sides must be measured over exactly the same window. Say the window out loud.
+  - Name the risk, not only the return.
+  - A past result is not a recommendation. Never imply it is.
