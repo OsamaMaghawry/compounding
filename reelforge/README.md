@@ -114,11 +114,11 @@ reelforge serve
 ```
 
 That starts a web app with uploads, a job queue, progress you can watch, review and
-download. A **Look** panel under the preview changes the caption style, font, words per
-line, colours, transitions and pacing and re-renders - without listening to the audio
-again, so trying four caption styles costs four previews, not four transcriptions. It
-prints a password. Edits save themselves as you go and come back after the server
-stops, so an idle timeout costs you nothing. For a server, `docker compose up -d --build` and put
+download. The player draws the edit over your untouched footage rather than playing a
+rendered file, so caption styles, zooms and trims change **while the video plays** and
+nothing is written down until you press Save. The timeline under it scrubs, selects and
+trims by dragging. It prints a password. Edits save themselves as you go and come back
+after the server stops, so an idle timeout costs you nothing. For a server, `docker compose up -d --build` and put
 HTTPS in front of it - see [docs/HOSTING.md](docs/HOSTING.md), which also explains why
 recording at 1080p instead of 4K matters more than the server you choose.
 

@@ -43,30 +43,56 @@ says which. Each control is a real profile key, so anything the panel does is th
 as `--set captions.style=word` on the command line, and a look you settle on can be
 written into a template.
 
-## The Timeline
+## Editing while it plays
 
-Above the Look panel is a **Timeline** card: a bar drawn to scale, then one row
-per segment with the seconds it runs and the words spoken in it.
+The player is not a rendered file. It plays your untouched footage and draws the
+edit over it - skipping what is cut, showing the captions, applying the zooms - so
+a change is something you watch happen rather than something you queue.
 
-A segment is a stretch of speech that survived the silence cutting. Untick any of
-them and press **Apply the trim** to cut it - a fluffed line, a retake, a throat
-clear the silence detector kept. Tick one back and it returns, words and all.
+Press play and start changing things. Caption style, font, colours, position: the
+video keeps playing and the captions change under you. Words per line, zoom rate,
+transitions, pacing: those are decisions rather than appearance, so the edit is
+re-decided on the server - about a second, and still no render.
 
-Times shown are positions in your **original footage**, not in the finished video,
-and that is also how a trim is stored. It means a trim keeps pointing at the same
-moment of your recording however else you change the edit: pick another caption
-style, make the pacing more aggressive, restart the machine, and the piece you cut
-stays cut.
+**Nothing is written down until you press Save.** Try six caption styles and keep
+none; the banner tells you when you are looking at something unsaved, and
+**Discard** puts it back.
 
-What moves with a trim: every zoom, transition and caption after it, because all
-of them are positioned in finished-video time and would otherwise land on the
-wrong sentence. What does not survive: a zoom that lived inside the segment you
-removed, since its moment no longer exists. That is not recorded as you rejecting
-the zoom - cutting a weak take says nothing about the zoom that happened to sit
-in it, and the editor would otherwise learn to propose fewer of them.
+### The timeline
 
-Trimming re-decides the edit, so it costs a preview render but not another
-transcription.
+The strip under the video is your footage end to end. Lit areas are what survives;
+dark areas are already cut.
+
+- **Tap** it to jump there.
+- **Drag across** it to select a stretch. Two handles appear; drag either to
+  adjust, and the video scrubs as you drag so you set the point by seeing the
+  frame.
+- **Start here** / **End here** set an edge from wherever the playhead is.
+- **Cut the selection** removes it. **Keep only this** throws away everything else.
+- **Undo all trims** puts it all back.
+
+Selections are made against the finished video, which is what you were watching,
+and stored as positions in the **original footage**. That is what lets a trim keep
+meaning the same thing after you change the caption style, make the pacing more
+aggressive, or restart the machine.
+
+A selection rarely lines up with the segments the silence cutter made, so those
+are split at the edges of what you selected and only the pieces inside it are
+dropped. Splitting changes nothing you can see: two halves play exactly as the
+whole did.
+
+What moves with a trim: every zoom, transition and caption after it, because they
+are positioned in finished-video time and would otherwise land on the wrong
+sentence. What goes: a zoom that lived inside what you cut, since its moment no
+longer exists. That is not recorded as you rejecting the zoom - cutting a weak
+take says nothing about the zoom that happened to sit in it.
+
+### What the live view is not
+
+It is the browser laying out text; the export is libass. They are close, not
+identical, and Arabic shaping is exactly where they can differ. Use the live view
+to judge timing, wording, framing and pacing - then **Render a real preview** to
+check the Arabic reads correctly before exporting.
 
 ## The b-roll library
 

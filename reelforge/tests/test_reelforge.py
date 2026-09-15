@@ -1950,6 +1950,32 @@ class TrimTests(unittest.TestCase):
         pairs = _diff_caption_words(proposed, final)
         self.assertEqual([right for _wrong, right in pairs], ["ثالث"])
 
+    def test_a_selection_maps_back_to_the_footage_behind_it(self):
+        # The browser selects on the finished video. Mapping only the two ends
+        # would claim the silence between them as something you chose to cut.
+        from reelforge.edl import Cut, Timeline
+        # Two 10s pieces, taken from 0-10 and 30-40 of the original.
+        timeline = Timeline([Cut(0.0, 10.0, 0.0, 10.0, id="a"),
+                             Cut(30.0, 40.0, 10.0, 20.0, id="b")])
+        # A selection wholly inside the first piece.
+        self.assertEqual(timeline.to_source_spans(2.0, 5.0), [(2.0, 5.0)])
+        # One wholly inside the second: output 12s is 32s of the original.
+        self.assertEqual(timeline.to_source_spans(12.0, 15.0), [(32.0, 35.0)])
+        # One spanning the join comes back as two spans, not one that would
+        # swallow the twenty seconds already removed between them.
+        self.assertEqual(timeline.to_source_spans(8.0, 13.0),
+                         [(8.0, 10.0), (30.0, 33.0)])
+
+    def test_a_trim_splits_a_segment_rather_than_dropping_all_of_it(self):
+        from reelforge.edl import EDL, Cut
+        from reelforge.web import apply_drops
+        edl = EDL(source="x.mp4", output={},
+                  cuts=[Cut(0.0, 10.0, 0.0, 10.0, id="seg000")])
+        apply_drops(edl, [[4.0, 6.0]])
+        self.assertEqual([(c.src_start, c.src_end, c.enabled) for c in edl.cuts],
+                         [(0.0, 4.0, True), (4.0, 6.0, False), (6.0, 10.0, True)])
+        self.assertEqual(edl.duration, 8.0)
+
     def test_segments_carry_what_is_said_in_them(self):
         from reelforge.brain import label_cuts
         from reelforge.edl import Cut
@@ -2610,6 +2636,128 @@ class WebAppTests(unittest.TestCase):
                         f"a clip tagged '{spoken}' was never cut in")
         self.assertTrue(all(Path(o["asset"]).name == "clip.mp4" for o in edl["overlays"]))
         self.assertGreater(job["summary"]["overlays"], 0)
+
+    # -- editing while it plays -------------------------------------------
+    def test_the_browser_gets_plain_footage_to_play(self):
+        # The player draws the edit over the untouched take, so the proxy must
+        # be the whole thing - not the already-cut preview.
+        client = self.client("proxy")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        proxy = client.get(f"/api/jobs/{job['id']}/proxy.mp4",
+                           headers={"Range": "bytes=0-1023"})
+        self.assertEqual(proxy.status_code, 206)
+
+        from reelforge.ffmpeg import probe
+        path = self.app.state.store.dir(job["id"]) / "proxy.mp4"
+        made, original = probe(path), probe(self.clip_a)
+        self.assertAlmostEqual(made.duration, original.duration, delta=0.6)
+        # Scaled down, because this is streamed again on every scrub, often to a
+        # phone - and never scaled up, which would make the stand-in heavier
+        # than the footage it stands in for. (File size is not the check: these
+        # clips are a synthetic pattern and compress nothing like real footage.)
+        self.assertLessEqual(made.height, min(640, original.height))
+        self.assertLessEqual(made.width, original.width)
+        self.assertTrue(made.has_audio, "you cannot judge a cut without the audio")
+
+    def test_trying_a_setting_changes_nothing_on_disk(self):
+        client = self.client("try")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        before = client.get(f"/api/jobs/{job['id']}/edl").json()
+
+        response = client.post(f"/api/jobs/{job['id']}/preview-plan",
+                               json={"values": {"captions.max_words": 1}})
+        self.assertEqual(response.status_code, 200, response.text)
+        tried = response.json()
+        self.assertTrue(all(len(line["words"]) == 1 for line in tried["edl"]["captions"]))
+        self.assertEqual(tried["look"]["max_words"], 1)
+
+        # Nothing kept: not the settings, not the stored edit.
+        self.assertEqual(self.app.state.store.get(job["id"]).overrides, {})
+        self.assertEqual(client.get(f"/api/jobs/{job['id']}/edl").json(), before)
+
+    def test_trying_a_setting_does_not_fill_the_history_with_runs(self):
+        # The browser asks for one on every slider move. Recorded as runs they
+        # would bury the edits actually kept, which is what the editor learns
+        # from.
+        client = self.client("tryruns")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        editor = self.app.state.runner.editors[job["id"]]
+        before = len(editor.store.list_runs(limit=100))
+        for words in (1, 2, 3):
+            client.post(f"/api/jobs/{job['id']}/preview-plan",
+                        json={"values": {"captions.max_words": words}})
+        self.assertEqual(len(editor.store.list_runs(limit=100)), before)
+
+    def test_a_selection_becomes_a_trim_without_being_saved(self):
+        client = self.client("livetrim")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        length = job["summary"]["output_duration"]
+
+        # Cut a second out of the middle of the finished video.
+        middle = length / 2.0
+        response = client.post(f"/api/jobs/{job['id']}/trim",
+                               json={"ranges": [[middle, middle + 1.0]]})
+        self.assertEqual(response.status_code, 200, response.text)
+        drops = response.json()["drops"]
+        self.assertTrue(drops)
+        # Offered back, not stored: Save is what makes it real.
+        self.assertEqual(self.app.state.store.get(job["id"]).drops, [])
+
+        shorter = client.post(f"/api/jobs/{job['id']}/preview-plan",
+                              json={"drops": drops}).json()
+        self.assertAlmostEqual(shorter["summary"]["output_duration"], length - 1.0,
+                               delta=0.25)
+
+    def test_saving_keeps_the_trim_and_the_look_without_rendering(self):
+        client = self.client("save")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        length = job["summary"]["output_duration"]
+        preview = self.app.state.store.dir(job["id"]) / "preview.mp4"
+        stamp = preview.stat().st_mtime
+
+        drops = client.post(f"/api/jobs/{job['id']}/trim",
+                            json={"ranges": [[1.0, 2.0]]}).json()["drops"]
+        saved = client.post(f"/api/jobs/{job['id']}/save",
+                            json={"values": {"captions.max_words": 2}, "drops": drops})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertFalse(saved.json()["render"])
+
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        stored = self.app.state.store.get(job["id"])
+        self.assertEqual(stored.overrides, {"captions.max_words": "2"})
+        self.assertTrue(stored.drops)
+        self.assertLess(job["summary"]["output_duration"], length)
+        self.assertEqual(preview.stat().st_mtime, stamp,
+                         "saving must not spend minutes rendering")
+
+    def test_a_trim_that_removes_everything_is_refused(self):
+        client = self.client("triml")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        length = job["summary"]["output_duration"]
+        response = client.post(f"/api/jobs/{job['id']}/trim",
+                               json={"ranges": [[0.0, length + 5.0]]})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("whole video", response.json()["detail"])
+
+    def test_the_caption_font_is_served_to_the_browser(self):
+        # The overlay uses the same file libass will, so the letters are not a
+        # guess at what the export will look like.
+        client = self.client("font")
+        self.login(client)
+        from reelforge import fonts
+        fonts.download(fonts.resolve("Cairo"), self.app.state.runner.fonts_dir)
+        response = client.get("/api/fonts/Cairo")
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.content), 2048)
+        self.assertEqual(client.get("/api/fonts/Nonesuch").status_code, 404)
 
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore

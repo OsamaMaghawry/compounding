@@ -151,6 +151,23 @@ class Timeline:
                 return cut.src_start + (out_t - cut.out_start)
         return None
 
+    def to_source_spans(self, out_start: float, out_end: float) -> list[tuple[float, float]]:
+        """The stretches of original footage behind a span of finished video.
+
+        A selection made while watching the edit can cover several segments with
+        already-removed footage between them. Mapping only its two ends would
+        silently claim that footage as well, so each surviving segment inside the
+        selection is converted on its own.
+        """
+        spans: list[tuple[float, float]] = []
+        for cut in self.cuts:
+            low = max(out_start, cut.out_start)
+            high = min(out_end, cut.out_end)
+            if high - low > 0.01:
+                spans.append((cut.src_start + (low - cut.out_start),
+                              cut.src_start + (high - cut.out_start)))
+        return spans
+
     def cut_boundaries(self) -> list[float]:
         """Output-time positions where a jump cut happens."""
         return [c.out_start for c in self.cuts[1:]]

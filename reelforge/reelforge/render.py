@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .captions import build_ass
 from .edl import EDL, Overlay, Transition, Zoom
-from .ffmpeg import FFmpegError, probe, run, run_filtergraph
+from .ffmpeg import FFmpegError, probe, run, run_ffmpeg, run_filtergraph
 from .profile import StyleProfile
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
@@ -393,6 +393,35 @@ class Renderer:
         if not output.exists() or output.stat().st_size == 0:
             raise FFmpegError(f"render produced no output at {output}")
         return output
+
+
+def build_proxy(source: str | Path, dest: str | Path, *, height: int = 640) -> Path:
+    """A small, plain copy of the footage for the browser to scrub.
+
+    Nothing is applied to it - no cuts, no captions, no effects. The point is the
+    opposite: the browser gets the whole take and plays the edit on top of it, so
+    trimming and restyling are things you watch happen rather than things you
+    queue and wait for. The original stays untouched for the export.
+
+    Small matters more than pretty here. This is streamed over whatever
+    connection you are on, often to a phone, every time you scrub.
+    """
+    source, dest = Path(source), Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    run_ffmpeg([
+        "-i", str(source),
+        # min(): never upscale. Scaling a small take *up* would make the file
+        # streamed on every scrub bigger than the footage it stands in for.
+        "-vf", f"scale=-2:'min({height},ih)'",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
+        "-profile:v", "baseline", "-level", "3.1", "-pix_fmt", "yuv420p",
+        # +faststart so playback can begin before the whole file has arrived, and
+        # a keyframe every half second so scrubbing lands where you clicked.
+        "-g", "15", "-movflags", "+faststart",
+        "-c:a", "aac", "-b:a", "96k", "-ac", "1",
+        "-y", str(dest),
+    ])
+    return dest
 
 
 def check_font(profile: StyleProfile, fonts_dir: Path | None) -> str | None:

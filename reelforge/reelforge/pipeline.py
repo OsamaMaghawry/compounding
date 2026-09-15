@@ -74,7 +74,8 @@ class AutoEditor:
 
     # -- plan ------------------------------------------------------------
     def plan(self, source: str | Path, *, refresh: bool = False,
-             extra_vocab: dict[str, str] | None = None) -> PlanResult:
+             extra_vocab: dict[str, str] | None = None,
+             record: bool = True) -> PlanResult:
         source = Path(source).expanduser().resolve()
         profile = self.effective_profile()
         warnings: list[str] = []
@@ -129,9 +130,15 @@ class AutoEditor:
         if font_warning and profile.get("captions.enabled"):
             warnings.append(font_warning)
 
-        run_id = self.store.record_run(str(source), profile, edl,
-                                       video_key=content_key(source))
-        edl.save(self.runs_dir / f"run-{run_id}.edl.json")
+        # A plan made to answer "what would this look like" is not a run: the
+        # browser asks for one every time a setting moves, and recording them
+        # would bury the edits you actually kept - which is what the editor
+        # learns from - under thousands of previews nobody ever saw.
+        run_id = 0
+        if record:
+            run_id = self.store.record_run(str(source), profile, edl,
+                                           video_key=content_key(source))
+            edl.save(self.runs_dir / f"run-{run_id}.edl.json")
         return PlanResult(edl=edl, run_id=run_id, analysis=analysis,
                           transcript=transcript, warnings=warnings, timings=timings)
 

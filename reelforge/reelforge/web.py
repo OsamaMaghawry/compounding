@@ -24,7 +24,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import broll
-from .edl import EDL
+from .edl import EDL, Cut
+from .fonts import resolve as font_catalog_resolve
 from .pipeline import PACKAGE_ROOT, AutoEditor
 from .profile import StyleProfile
 
@@ -139,20 +140,66 @@ LOOK_LABELS = {field["key"]: f"{field['group'].lower()}: {field['label'].lower()
                for field in LOOK_FIELDS}
 
 
-def apply_drops(edl: EDL, drops: list) -> None:
-    """Switch off the segments covering trimmed-away stretches of the source.
+def _remaining(edl: EDL, drops: list) -> list[tuple[float, float]]:
+    """Source stretches still kept, once these drops are taken out."""
+    ranges = [(float(a), float(b)) for a, b in drops if float(b) > float(a)]
+    kept: list[tuple[float, float]] = []
+    for cut in edl.cuts:
+        if not cut.enabled:
+            continue
+        pieces = [(cut.src_start, cut.src_end)]
+        for low, high in ranges:
+            nxt = []
+            for start, end in pieces:
+                if high <= start or low >= end:
+                    nxt.append((start, end))
+                    continue
+                if start < low:
+                    nxt.append((start, low))
+                if high < end:
+                    nxt.append((high, end))
+            pieces = nxt
+        kept += pieces
+    return kept
 
-    Matched by overlap rather than by segment id, so a trim holds even when a new
-    plan splits the footage differently - which it does the moment the pacing
-    settings change.
+
+def apply_drops(edl: EDL, drops: list) -> None:
+    """Take trimmed-away stretches of the original footage out of the edit.
+
+    A selection made while watching rarely lines up with the segments the silence
+    cutter produced - it starts halfway through one and ends halfway through
+    another. So segments are split at the edges of what you selected first, and
+    only the pieces actually inside it are dropped. Splitting does not change the
+    edit: two halves of a segment play exactly as the whole did.
+
+    Matched by overlap in source time rather than by segment id, so a trim holds
+    even when a new plan divides the footage differently - which it does the
+    moment the pacing settings change.
     """
-    if not drops:
+    ranges = [(float(start), float(end)) for start, end in (drops or [])
+              if float(end) > float(start)]
+    if not ranges:
         return
-    ranges = [(float(start), float(end)) for start, end in drops if float(end) > float(start)]
+
+    edges = sorted({edge for span in ranges for edge in span})
+    pieces: list[Cut] = []
+    for cut in edl.cuts:
+        points = sorted({cut.src_start, cut.src_end}
+                        | {e for e in edges if cut.src_start < e < cut.src_end})
+        cursor = cut.out_start
+        for start, end in zip(points, points[1:]):
+            pieces.append(Cut(src_start=start, src_end=end,
+                              out_start=cursor, out_end=cursor + (end - start),
+                              kind=cut.kind, id=f"seg{len(pieces):03d}",
+                              enabled=cut.enabled, text=cut.text))
+            cursor += end - start
+    edl.cuts = pieces
+
     wanted = {}
     for cut in edl.cuts:
         middle = (cut.src_start + cut.src_end) / 2.0
-        wanted[cut.id] = not any(start <= middle <= end for start, end in ranges)
+        wanted[cut.id] = cut.enabled and not any(low <= middle <= high
+                                                 for low, high in ranges)
     if any(wanted.values()):
         edl.retime(wanted)
 
@@ -361,6 +408,8 @@ class Runner:
                     self._rerender(job)
                 elif task == "replan":
                     self._replan(job)
+                elif task == "replan_only":
+                    self._replan(job, render=False)
                 elif task == "export":
                     self._export(job)
             except Exception as exc:                      # a failed job must not kill the worker
@@ -390,10 +439,12 @@ class Runner:
             source = clips[0]
 
         self.store.update(job, prepared=str(source))
+        note("preparing the footage for playback")
+        self._ensure_proxy(job, source)
         self._plan_into(job, source, editor, note)
 
-    def profile_for(self, job: Job) -> StyleProfile:
-        """Template, then the model, then whatever look settings were chosen."""
+    def profile_for(self, job: Job, values: dict | None = None) -> StyleProfile:
+        """Template, then the model, then the look - saved, or merely proposed."""
         profile = StyleProfile.resolve(job.template or None,
                                        [PACKAGE_ROOT / "templates", PACKAGE_ROOT / "profiles"])
         overrides = [f"asr.model={job.model}",
@@ -401,7 +452,9 @@ class Runner:
         backend = os.environ.get("REELFORGE_ASR_BACKEND")
         if backend:
             overrides.append(f"asr.backend={backend}")
-        overrides += [f"{key}={value}" for key, value in (job.overrides or {}).items()]
+        chosen = dict(job.overrides or {})
+        chosen.update(values or {})
+        overrides += [f"{key}={value}" for key, value in chosen.items()]
         return profile.apply_overrides(overrides)
 
     def _ensure_font(self, profile: StyleProfile, note) -> None:
@@ -425,20 +478,56 @@ class Runner:
         _changed, message = font_catalog.download(entry, self.fonts_dir)
         note(message)
 
-    def _plan_into(self, job: Job, source: Path, editor: AutoEditor, note) -> None:
-        """Decide the edit for `source` and render a preview into the job folder."""
+    def _ensure_proxy(self, job: Job, source: Path) -> Path | None:
+        """The small copy the browser plays. Built once per upload."""
+        from .render import build_proxy  # noqa: PLC0415
+        proxy = self.store.dir(job.id) / "proxy.mp4"
+        if proxy.exists() and proxy.stat().st_size > 0:
+            return proxy
+        try:
+            return build_proxy(source, proxy)
+        except Exception:
+            return None            # playback falls back to the rendered preview
+
+    def _plan_into(self, job: Job, source: Path, editor: AutoEditor, note,
+                   *, render: bool = True) -> None:
+        """Decide the edit for `source`, and render a preview only if asked.
+
+        Not rendering is the normal case now: the browser plays the proxy and
+        draws the edit over it, so a new decision is something you see rather
+        than something you queue.
+        """
         result = editor.plan(source)
         apply_drops(result.edl, job.drops)
         self._remember(job.id, editor, result.edl)
         for warning in result.warnings:
             note(warning)
         self.keep(job.id)
-        note("rendering preview")
-        editor.render(result.edl, self.store.dir(job.id) / "preview.mp4", preview=True)
+        if render:
+            note("rendering preview")
+            editor.render(result.edl, self.store.dir(job.id) / "preview.mp4", preview=True)
         self.store.update(job, status="ready", stage="ready to review",
                           run_id=result.run_id, summary=result.edl.summary())
 
-    def _replan(self, job: Job) -> None:
+    def plan_preview(self, job: Job, values: dict, drops: list) -> dict:
+        """What the edit would be with these settings - committing nothing.
+
+        This is what makes the panel feel live: the answer comes back in about a
+        second, nothing is stored, and nothing is rendered. Saving is a separate
+        act, which is the point - you can try six caption styles and keep none.
+        """
+        source = Path(job.prepared) if job.prepared else None
+        if not source or not source.exists():
+            raise RuntimeError("this edit is no longer loaded - upload it again")
+        profile = self.profile_for(job, values)
+        editor = AutoEditor(profile, project_dir=self.store.dir(job.id) / "project",
+                            fonts_dir=self.fonts_dir)
+        result = editor.plan(source, record=False)
+        apply_drops(result.edl, drops)
+        return {"edl": result.edl.to_dict(), "summary": result.edl.summary(),
+                "look": profile.section("captions")}
+
+    def _replan(self, job: Job, *, render: bool = True) -> None:
         """Re-decide the edit with new look settings.
 
         Fast, because the analysis and the transcript are cached against the
@@ -461,7 +550,7 @@ class Runner:
         self._ensure_font(profile, note)
         editor = AutoEditor(profile, project_dir=self.store.dir(job.id) / "project",
                             fonts_dir=self.fonts_dir, on_status=note)
-        self._plan_into(job, source, editor, note)
+        self._plan_into(job, source, editor, note, render=render)
         if fixes:
             self._apply_fixes(job, fixes)
             self.keep(job.id)
@@ -990,6 +1079,109 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         runner.submit(job_id, "export")
         return {"ok": True, "queued": True}
 
+    @app.post("/api/jobs/{job_id}/preview-plan", dependencies=[Depends(require_login)])
+    def preview_plan(job_id: str, body: dict) -> dict:
+        """Try settings and trims without keeping them. Nothing is stored."""
+        job = job_or_404(job_id)
+        values = body.get("values") or {}
+        if not isinstance(values, dict):
+            raise HTTPException(status_code=400, detail="settings must be an object")
+        unknown = sorted(set(values) - LOOK_KEYS)
+        if unknown:
+            raise HTTPException(status_code=400,
+                                detail=f"not a setting you can change here: {unknown[0]}")
+        try:
+            return runner.plan_preview(job, {k: str(v) for k, v in values.items()},
+                                       body.get("drops") or job.drops)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/jobs/{job_id}/trim", dependencies=[Depends(require_login)])
+    def trim(job_id: str, body: dict) -> dict:
+        """Turn selections made while watching into trims of the original footage.
+
+        The browser hands back spans of the *finished* video, because that is what
+        it was playing. Stored as source ranges, for the same reason segment ids
+        are not: source time is the one frame of reference that survives the next
+        plan.
+        """
+        job = job_or_404(job_id)
+        edl = runner.edl_for(job)
+        if edl is None:
+            raise HTTPException(status_code=409, detail="not planned yet")
+        if body.get("reset"):
+            return {"ok": True, "drops": []}
+
+        ranges = body.get("ranges")
+        if not isinstance(ranges, list):
+            raise HTTPException(status_code=400, detail="no selection was sent")
+        timeline = edl.timeline
+        drops = [list(span) for span in (job.drops or [])]
+        for item in ranges:
+            try:
+                start, end = float(item[0]), float(item[1])
+            except (TypeError, ValueError, IndexError) as exc:
+                raise HTTPException(status_code=400, detail="a selection was malformed") from exc
+            if end <= start:
+                continue
+            drops += [[low, high] for low, high in timeline.to_source_spans(start, end)]
+        kept = sum(max(0.0, high - low) for low, high in
+                   _remaining(edl, drops))
+        if kept < 0.4:
+            raise HTTPException(status_code=400, detail="that would remove the whole video")
+        return {"ok": True, "drops": drops}
+
+    @app.post("/api/jobs/{job_id}/save", dependencies=[Depends(require_login)])
+    def save_edit(job_id: str, body: dict) -> dict:
+        """Keep what is on screen. Until this, nothing you tried was written down."""
+        job = job_or_404(job_id)
+        if job.status in ("working", "queued", "exporting"):
+            raise HTTPException(status_code=409, detail="this edit is still busy")
+        values = body.get("values")
+        if values is not None:
+            if not isinstance(values, dict):
+                raise HTTPException(status_code=400, detail="settings must be an object")
+            unknown = sorted(set(values) - LOOK_KEYS)
+            if unknown:
+                raise HTTPException(status_code=400,
+                                    detail=f"not a setting you can change here: {unknown[0]}")
+            base = StyleProfile.resolve(job.template or None,
+                                        [PACKAGE_ROOT / "templates", PACKAGE_ROOT / "profiles"])
+            posted = {key: str(value) for key, value in values.items()}
+            try:
+                candidate = base.apply_overrides([f"{k}={v}" for k, v in posted.items()])
+            except (ValueError, KeyError) as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            job.overrides = {key: value for key, value in posted.items()
+                             if _differs(candidate.get(key, None), base.get(key, None))}
+
+        drops = body.get("drops")
+        if drops is not None:
+            if not isinstance(drops, list):
+                raise HTTPException(status_code=400, detail="drops must be a list")
+            job.drops = [[float(a), float(b)] for a, b in drops if float(b) > float(a)]
+
+        store.update(job, status="queued", stage="saving", error="")
+        runner.submit(job.id, "replan" if body.get("render") else "replan_only")
+        return {"ok": True, "queued": True, "render": bool(body.get("render"))}
+
+    @app.get("/api/jobs/{job_id}/proxy.mp4", dependencies=[Depends(require_login)])
+    def proxy(job_id: str, request: Request) -> Response:
+        """The untouched footage, small. The browser plays the edit over this."""
+        job_or_404(job_id)
+        return ranged(store.dir(job_id) / "proxy.mp4", request, "video/mp4")
+
+    @app.get("/api/fonts/{family}", dependencies=[Depends(require_login)])
+    def font_file(family: str, request: Request) -> Response:
+        """The caption font itself, so the live overlay uses the real face."""
+        entry = font_catalog_resolve(family)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"no font called {family}")
+        path = runner.fonts_dir / entry.filename
+        if not path.exists():
+            raise HTTPException(status_code=404, detail=f"{family} is not downloaded")
+        return ranged(path, request, "font/ttf")
+
     @app.get("/api/jobs/{job_id}/preview.mp4", dependencies=[Depends(require_login)])
     def preview(job_id: str, request: Request) -> Response:
         job_or_404(job_id)
@@ -1090,6 +1282,31 @@ input[type=color]{height:44px;padding:4px}
 .asset .no{width:58px;height:58px;border-radius:8px;background:#10101a;flex:none}
 .asset input[type=text]{margin-top:4px;padding:8px;font-size:15px}
 .asset .nm{font-size:12px;color:var(--dim);word-break:break-all}
+.stage{position:relative;border-radius:12px;overflow:hidden;background:#000;
+  aspect-ratio:9/16;max-height:62vh;margin:0 auto}
+.stage video{width:100%;height:100%;object-fit:contain;display:block;
+  transform-origin:center center;will-change:transform,filter}
+#caps{position:absolute;left:0;right:0;pointer-events:none;text-align:center;
+  padding:0 5%;line-height:1.25;white-space:pre-wrap;word-break:break-word}
+#caps span{transition:color .08s linear}
+.transport{display:flex;align-items:center;gap:10px;margin-top:10px}
+.transport button{width:auto;margin:0;padding:10px 16px;flex:none}
+.clock{font:12px ui-monospace,Menlo,monospace;color:var(--dim);flex:1;text-align:right}
+.track{position:relative;height:52px;margin-top:10px;background:#10101a;border-radius:9px;
+  overflow:hidden;touch-action:none;cursor:crosshair;user-select:none}
+.track .keep{position:absolute;top:0;bottom:0;background:#2b2b3d}
+.track .sel{position:absolute;top:0;bottom:0;background:rgba(255,210,74,.28);
+  border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+.track .grip{position:absolute;top:0;bottom:0;width:18px;margin-left:-9px;
+  cursor:ew-resize;touch-action:none}
+.track .grip::after{content:'';position:absolute;top:50%;left:7px;width:4px;height:20px;
+  margin-top:-10px;border-radius:2px;background:var(--accent)}
+.track .head{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
+.track .lbl{position:absolute;bottom:3px;left:6px;font:10px ui-monospace,monospace;color:var(--dim)}
+.tools{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.tools button{width:auto;margin:0;padding:9px 13px;font-size:13px;flex:none}
+.bar{display:flex;gap:8px;margin-top:12px}.bar>*{flex:1}
+.unsaved{color:var(--accent);font-size:13px;margin-top:8px;min-height:18px}
 </style></head><body>
 
 <div id="login" hidden>
@@ -1347,6 +1564,10 @@ async function draw(job){
   const sig=[job.id,job.status,job.stage,job.output_name,
              JSON.stringify(job.summary||{}),(job.progress||[]).length].join('|');
   if(sig===drawn) return;
+  // Rebuilding throws away the video position, the selection on the timeline and
+  // anything tried but not saved. A poll arriving mid-edit must not do that, so
+  // while there is work on screen the panel stays exactly as it is.
+  if(P && P.job.id===job.id && (P.dirty || P.sel || !P.video.paused)) return;
   drawn=sig;
   const s=job.summary||{};
   let html=`<div class="card"><h2>${job.title}</h2>`;
@@ -1360,13 +1581,32 @@ async function draw(job){
     html+=`<div class="dim">${job.stage}…</div><div class="log">${(job.progress||[]).join('\\n')}</div>`;
   }
   if(job.status==='ready'||job.status==='done'){
-    html+=`<video controls playsinline preload="metadata" src="/api/jobs/${job.id}/preview.mp4?v=${Date.now()}"></video>
-      <div class="stats">
-        <div class="stat"><b>${s.output_duration??'-'}s</b><span>from ${s.source_duration??'-'}s</span></div>
-        <div class="stat"><b>${s.removed??'-'}s</b><span>dead air cut</span></div>
-        <div class="stat"><b>${s.zooms??0}</b><span>zooms</span></div>
+    html+=`<div class="stage"><video id="pv" playsinline preload="metadata"
+             src="/api/jobs/${job.id}/proxy.mp4"></video><div id="caps"></div></div>
+      <div class="transport">
+        <button id="playBtn">Play</button>
+        <button class="ghost" id="markIn">Start here</button>
+        <button class="ghost" id="markOut">End here</button>
+        <span class="clock" id="clock">0:00</span>
       </div>
-      <button class="ghost" id="rerender">Re-render preview</button>
+      <div class="track" id="track"></div>
+      <div class="tools">
+        <button class="ghost" id="cutSel">Cut the selection</button>
+        <button class="ghost" id="keepSel">Keep only this</button>
+        <button class="ghost" id="clearSel">Clear selection</button>
+        <button class="ghost" id="undoTrims">Undo all trims</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="statOut">${s.output_duration??'-'}s</b><span>from ${s.source_duration??'-'}s</span></div>
+        <div class="stat"><b id="statCut">${s.removed??'-'}s</b><span>cut away</span></div>
+        <div class="stat"><b id="statZoom">${s.zooms??0}</b><span>zooms</span></div>
+      </div>
+      <div class="unsaved" id="dirty"></div>
+      <div class="bar">
+        <button id="saveEdit" disabled>Save</button>
+        <button class="ghost" id="discardEdit" disabled>Discard</button>
+      </div>
+      <button class="ghost" id="rerender">Render a real preview</button>
       <button id="export">${job.status==='done'?'Export again':'Approve &amp; export'}</button>`;
     if(job.output_name) html+=`<button class="ghost" onclick="location.href='/api/jobs/${job.id}/download'">Download ${job.output_name}</button>`;
   }
@@ -1382,7 +1622,7 @@ async function draw(job){
 
   if(job.status==='ready'||job.status==='done'){
     try{ edl=await api('/api/jobs/'+job.id+'/edl'); }catch(e){ edl=null; }
-    if(edl){ renderSegments(job); renderControls(job); }
+    if(edl){ mountPlayer(job); renderControls(job); }
     renderLook(job);
     const rr=$('rerender'), ex=$('export');
     if(rr) rr.onclick=()=>send(job,true);
@@ -1393,59 +1633,287 @@ async function draw(job){
   }
 }
 
-// The timeline. Each segment is a stretch of speech that survived the silence
-// cutting; the bar above is the same list drawn to scale, so the shape of the
-// video is visible before any of it is read.
-function renderSegments(job){
-  const cuts=edl.cuts||[];
-  if(!cuts.length) return;
-  const total=cuts.reduce((n,c)=>n+(c.src_end-c.src_start),0)||1;
-  const bar=cuts.map((c,i)=>
-    `<div class="${c.enabled?'':'off'}" data-bar="${i}"
-      style="flex:${((c.src_end-c.src_start)/total*100).toFixed(3)}"
-      title="${fmt(c.src_start)}"></div>`).join('');
-  const rows=cuts.map((c,i)=>{
-    const secs=(c.src_end-c.src_start).toFixed(1);
-    const text=(c.text||'').replace(/</g,'&lt;') || '<span class="dim">no speech here</span>';
-    return `<div class="seg ${c.enabled?'':'off'}" data-seg="${i}">
-      <input type="checkbox" data-cut="${c.id}" ${c.enabled?'checked':''}>
-      <span class="grow"><span class="t">${fmt(c.src_start)} · ${secs}s</span>
-        <div class="txt" dir="auto">${text}</div></span></div>`;
-  }).join('');
-  const dropped=cuts.filter(c=>!c.enabled).length;
-  $('detail').insertAdjacentHTML('beforeend',
-    `<div class="card"><h2>Timeline</h2>
-      <div class="strip">${bar}</div>
-      <div class="dim" style="font-size:12px;margin-bottom:6px">
-        Untick a segment to cut it. Times are in the original footage, so they
-        keep meaning the same thing however else you change the edit${dropped
-          ? ` — ${dropped} cut so far; tick one back to bring it and its words back`
-          : ''}.</div>
-      ${rows}
-      <button id="applyTrim">Apply the trim</button>
-      <div id="trimMsg" class="dim"></div>
-    </div>`);
+// ---------------------------------------------------------------- the player
+//
+// The browser plays the untouched footage and draws the edit over it: segments
+// it should skip, captions it should show, zooms it should apply. Nothing here
+// is rendered, so a caption style or a trim is something you watch change while
+// the video keeps playing, instead of something you queue and wait for.
+//
+// What you see is close, not identical: this is the browser laying out text,
+// while the export is libass. Use it to judge timing, wording and framing, and
+// the rendered preview to check the Arabic reads correctly.
 
-  document.querySelectorAll('[data-cut]').forEach(el=>el.onchange=()=>{
-    const row=el.closest('.seg'), index=row.dataset.seg;
-    row.classList.toggle('off', !el.checked);
-    const bar=document.querySelector(`[data-bar="${index}"]`);
-    if(bar) bar.classList.toggle('off', !el.checked);
-  });
+let P = null;        // the live editing session for the open job
 
-  $('applyTrim').onclick=async()=>{
-    const keep={};
-    document.querySelectorAll('[data-cut]').forEach(el=>keep[el.dataset.cut]=el.checked);
-    $('applyTrim').disabled=true; $('trimMsg').textContent='queued…';
-    try{
-      await api('/api/jobs/'+job.id+'/segments',{method:'POST',
-        headers:{'Content-Type':'application/json'},body:JSON.stringify({keep})});
-      drawn=''; listed=''; refresh();
-    }catch(e){
-      $('trimMsg').textContent='error: '+e.message;
-      $('applyTrim').disabled=false;
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const stamp=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+
+function mountPlayer(job){
+  const video=$('pv'), track=$('track'), caps=$('caps');
+  if(!video||!track) return;
+
+  P={job, video, track, caps, plan:edl, look:null,
+     values:{}, drops:(job.drops||[]).map(d=>[d[0],d[1]]),
+     savedDrops:(job.drops||[]).map(d=>[d[0],d[1]]),
+     sel:null, dirty:false, raf:0, pending:0};
+
+  P.duration = Math.max(...(P.plan.cuts||[]).map(c=>c.src_end), 1);
+  drawTrack(); wireTransport(); wireTrack(); tick();
+  video.addEventListener('loadedmetadata', drawTrack);
+}
+
+function kept(){ return (P.plan.cuts||[]).filter(c=>c.enabled); }
+
+// -- where are we, in the finished video? ------------------------------------
+function outAt(src){
+  for(const c of kept()) if(src>=c.src_start && src<=c.src_end)
+    return c.out_start + (src - c.src_start);
+  return null;
+}
+function nextKeptAfter(src){
+  let best=null;
+  for(const c of kept()) if(c.src_start>src && (!best || c.src_start<best.src_start)) best=c;
+  return best;
+}
+
+function tick(){
+  cancelAnimationFrame(P.raf);
+  const step=()=>{
+    if(!P || !document.body.contains(P.video)) return;
+    const v=P.video, t=v.currentTime;
+    let out=outAt(t);
+    if(out===null){
+      // In footage that is cut. Jump to the next piece that survives, so
+      // playback is the edit rather than the raw take.
+      const nxt=nextKeptAfter(t);
+      if(nxt){ v.currentTime=nxt.src_start; out=nxt.out_start; }
+      else if(!v.paused){ v.pause(); const first=kept()[0]; if(first) v.currentTime=first.src_start; }
     }
+    paint(out===null?0:out, t);
+    P.raf=requestAnimationFrame(step);
   };
+  P.raf=requestAnimationFrame(step);
+}
+
+function paint(out, src){
+  drawCaption(out);
+  drawZoom(out);
+  const head=P.track.querySelector('.head');
+  if(head) head.style.left=(100*src/P.duration).toFixed(3)+'%';
+  const total=kept().reduce((n,c)=>n+(c.src_end-c.src_start),0);
+  $('clock').textContent=`${stamp(out)} / ${stamp(total)}`;
+}
+
+// -- captions ---------------------------------------------------------------
+function drawCaption(out){
+  const look=P.look||{}, caps=P.caps;
+  const line=(P.plan.captions||[]).find(l=>out>=l.start-0.02 && out<=l.end+0.02);
+  if(!line){ caps.innerHTML=''; return; }
+  const h=P.video.clientHeight||P.caps.parentElement.clientHeight||600;
+  const scale=h/(P.plan.output?.height||1920);
+  const style=(look.style||'karaoke');
+  const one=style==='word';
+  const size=(look.font_size||92)*scale*(one?(look.word_size_boost||1.55):1);
+  const primary=look.primary||'#FFFFFF', hot=look.highlight||'#FFD700';
+
+  caps.style.bottom=((1-(look.y_pct??0.72))*h)+'px';
+  caps.style.fontFamily=`"${look.font||'Cairo'}", system-ui, sans-serif`;
+  caps.style.fontSize=size.toFixed(1)+'px';
+  caps.style.fontWeight=(look.bold===false)?'600':'800';
+  caps.style.color=primary;
+  const edge=Math.max(1,(look.outline||7)*scale);
+  caps.style.textShadow=[`0 0 ${edge}px ${look.outline_color||'#101010'}`,
+    `${edge*0.5}px ${edge*0.5}px ${edge}px rgba(0,0,0,.85)`].join(',');
+
+  const words=line.words&&line.words.length?line.words
+    :[{text:line.text,start:line.start,end:line.end}];
+  const active=words.findIndex(w=>out>=w.start&&out<=w.end);
+  const shown=one?(active>=0?[words[active]]:[words[0]]):words;
+  caps.innerHTML=shown.map(w=>{
+    const on=(w===words[active]);
+    const colour=(style==='plain')?primary:(on?hot:primary);
+    const box=(style==='box'&&on)
+      ?`background:${look.box_color||'#FFD700'};color:${look.box_text||'#101010'};`
+      +`padding:.04em .16em;border-radius:.12em;`:'';
+    return `<span style="color:${colour};${box}">${escapeHtml(w.text)}</span>`;
+  }).join(' ');
+  if(style==='pop'&&active===0) caps.animate(
+    [{transform:'scale(1.10)'},{transform:'scale(1)'}],{duration:150,easing:'ease-out'});
+}
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+// -- zooms and transitions ---------------------------------------------------
+function drawZoom(out){
+  let factor=1, filter='';
+  for(const z of (P.plan.zooms||[])){
+    if(!z.enabled || out<z.out_start || out>z.out_end) continue;
+    const p=(out-z.out_start)/Math.max(0.001,z.out_end-z.out_start);
+    const eased=p*p*(3-2*p);                       // the renderer's smooth ease
+    factor=z.start_factor+(z.end_factor-z.start_factor)*eased;
+  }
+  for(const t of (P.plan.transitions||[])){
+    if(!t.enabled) continue;
+    const p=(out-t.out_time)/Math.max(0.001,t.duration);
+    if(p<0||p>1) continue;
+    const fade=1-p;
+    if(t.kind==='punch') factor*=1+0.06*t.strength*fade;
+    else if(t.kind==='flash') filter=`brightness(${1+0.5*t.strength*fade})`;
+    else if(t.kind==='blur') filter=`blur(${(4*t.strength*fade).toFixed(2)}px)`;
+  }
+  P.video.style.transform=`scale(${factor.toFixed(4)})`;
+  P.video.style.filter=filter;
+}
+
+// -- the track ---------------------------------------------------------------
+function drawTrack(){
+  const marks=[];
+  for(const c of (P.plan.cuts||[])){
+    if(!c.enabled) continue;
+    marks.push(`<div class="keep" style="left:${(100*c.src_start/P.duration).toFixed(3)}%;`
+      +`width:${(100*(c.src_end-c.src_start)/P.duration).toFixed(3)}%"></div>`);
+  }
+  const sel=P.sel?`<div class="sel" style="left:${(100*P.sel[0]/P.duration).toFixed(3)}%;`
+    +`width:${(100*(P.sel[1]-P.sel[0])/P.duration).toFixed(3)}%"></div>`
+    +`<div class="grip" data-grip="0" style="left:${(100*P.sel[0]/P.duration).toFixed(3)}%"></div>`
+    +`<div class="grip" data-grip="1" style="left:${(100*P.sel[1]/P.duration).toFixed(3)}%"></div>`:'';
+  const label=P.sel?`<div class="lbl">${stamp(P.sel[0])} → ${stamp(P.sel[1])} `
+    +`(${(P.sel[1]-P.sel[0]).toFixed(1)}s selected)</div>`
+    :`<div class="lbl">drag across to select · dark areas are already cut</div>`;
+  P.track.innerHTML=marks.join('')+sel+label+'<div class="head"></div>';
+  wireGrips();
+}
+
+function atX(clientX){
+  const box=P.track.getBoundingClientRect();
+  return clamp((clientX-box.left)/box.width,0,1)*P.duration;
+}
+
+function wireTrack(){
+  let anchor=null, moved=false;
+  P.track.addEventListener('pointerdown', ev=>{
+    if(ev.target.dataset.grip!==undefined) return;     // a handle owns this one
+    anchor=atX(ev.clientX); moved=false;
+    P.track.setPointerCapture(ev.pointerId);
+  });
+  P.track.addEventListener('pointermove', ev=>{
+    if(anchor===null) return;
+    const now=atX(ev.clientX);
+    if(Math.abs(now-anchor) > P.duration*0.005) moved=true;
+    if(moved){ P.sel=[Math.min(anchor,now),Math.max(anchor,now)]; drawTrack(); }
+  });
+  P.track.addEventListener('pointerup', ev=>{
+    if(anchor===null) return;
+    if(!moved) seekTo(atX(ev.clientX));               // a tap is a seek
+    anchor=null;
+  });
+}
+
+function wireGrips(){
+  P.track.querySelectorAll('[data-grip]').forEach(grip=>{
+    grip.addEventListener('pointerdown', ev=>{
+      ev.stopPropagation();
+      const which=Number(grip.dataset.grip);
+      grip.setPointerCapture(ev.pointerId);
+      const move=e=>{
+        const at=atX(e.clientX);
+        P.sel=which===0?[Math.min(at,P.sel[1]-0.05),P.sel[1]]
+                       :[P.sel[0],Math.max(at,P.sel[0]+0.05)];
+        drawTrack();
+        // Scrub as the handle moves: you set an in-point by seeing the frame.
+        seekTo(which===0?P.sel[0]:P.sel[1], {quiet:true});
+      };
+      const done=()=>{ grip.removeEventListener('pointermove',move);
+                       grip.removeEventListener('pointerup',done); };
+      grip.addEventListener('pointermove',move);
+      grip.addEventListener('pointerup',done);
+    });
+  });
+}
+
+function seekTo(src, opts={}){
+  P.video.currentTime=clamp(src,0,P.duration);
+  if(!opts.quiet && P.video.paused) paint(outAt(src)??0, src);
+}
+
+function wireTransport(){
+  const v=P.video;
+  $('playBtn').onclick=()=>{
+    if(v.paused){ if(outAt(v.currentTime)===null){ const c=kept()[0]; if(c) v.currentTime=c.src_start; }
+      v.play(); $('playBtn').textContent='Pause'; }
+    else { v.pause(); $('playBtn').textContent='Play'; }
+  };
+  v.addEventListener('pause',()=>$('playBtn').textContent='Play');
+  v.addEventListener('play',()=>$('playBtn').textContent='Pause');
+  $('markIn').onclick=()=>{ const t=v.currentTime;
+    P.sel=[t, Math.max(t+0.2, P.sel?P.sel[1]:t+1)]; drawTrack(); };
+  $('markOut').onclick=()=>{ const t=v.currentTime;
+    P.sel=[Math.min(P.sel?P.sel[0]:Math.max(0,t-1), t-0.2), t]; drawTrack(); };
+  $('clearSel').onclick=()=>{ P.sel=null; drawTrack(); };
+  $('cutSel').onclick=()=>{ if(P.sel) applyTrim([P.sel]); };
+  $('keepSel').onclick=()=>{ if(P.sel) applyTrim([[0,P.sel[0]],[P.sel[1],P.duration]]); };
+  $('undoTrims').onclick=()=>{ P.drops=[]; P.sel=null; markDirty(); repaintPlan(); };
+  $('saveEdit').onclick=saveEdit;
+  $('discardEdit').onclick=()=>{ P.values={}; P.drops=P.savedDrops.map(d=>[d[0],d[1]]);
+    P.sel=null; markDirty(false); repaintPlan(); renderLook(P.job); };
+}
+
+// A selection is made against the finished video, so hand back output time and
+// let the server work out which footage that was.
+function applyTrim(ranges){
+  const out=ranges.map(([a,b])=>[outAt(a)??nearestOut(a),outAt(b)??nearestOut(b)])
+                  .filter(([a,b])=>b>a);
+  if(!out.length){ $('dirty').textContent='that selection is already cut'; return; }
+  api(`/api/jobs/${P.job.id}/trim`,{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ranges:out})})
+    .then(r=>{ P.drops=r.drops; P.sel=null; markDirty(); repaintPlan(); })
+    .catch(e=>{ $('dirty').textContent='error: '+e.message; });
+}
+function nearestOut(src){
+  let best=0;
+  for(const c of kept()){
+    if(c.src_end<=src) best=c.out_end;
+    else if(c.src_start>=src) return c.out_start;
+  }
+  return best;
+}
+
+// -- asking the server what this would look like -----------------------------
+function repaintPlan(){
+  clearTimeout(P.pending);
+  P.pending=setTimeout(async()=>{
+    try{
+      const r=await api(`/api/jobs/${P.job.id}/preview-plan`,{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({values:P.values, drops:P.drops})});
+      P.plan=r.edl; P.look=r.look; edl=r.edl;
+      $('statOut').textContent=(r.summary.output_duration??'-')+'s';
+      $('statCut').textContent=(r.summary.removed??'-')+'s';
+      $('statZoom').textContent=r.summary.zooms??0;
+      drawTrack();
+    }catch(e){ $('dirty').textContent='error: '+e.message; }
+  }, 260);
+}
+
+function markDirty(on=true){
+  P.dirty=on;
+  $('saveEdit').disabled=!on; $('discardEdit').disabled=!on;
+  $('dirty').textContent=on
+    ? 'not saved yet — what you are watching is a try-out'
+    : '';
+}
+
+async function saveEdit(){
+  $('saveEdit').disabled=true; $('dirty').textContent='saving…';
+  try{
+    await api(`/api/jobs/${P.job.id}/save`,{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({values:P.values, drops:P.drops})});
+    P.savedDrops=P.drops.map(d=>[d[0],d[1]]);
+    markDirty(false);
+    drawn=''; listed=''; refresh();
+  }catch(e){ $('dirty').textContent='error: '+e.message; $('saveEdit').disabled=false; }
 }
 
 function renderControls(job){
@@ -1500,11 +1968,9 @@ async function renderLook(job){
     `<div class="card"><h2>Look</h2>
       <div class="tabs">${tabs}</div>${panes}
       <div class="dim" style="margin-top:10px;font-size:12px">
-        Applying re-decides the edit with the transcript already taken, so it is
-        the preview render you wait for, not the listening. Caption wording you
-        typed is kept; the zoom and transition ticks reset, because a new setting
-        gives you different moves.</div>
-      <button id="applyLook">Apply and re-render</button>
+        Changes show on the video as you make them — keep it playing and watch.
+        Nothing is written down until you press Save, so try as many as you
+        like.${changed}</div>
       <button class="ghost" id="resetLook">Back to the template</button>
       <div id="lookMsg" class="dim"></div>
     </div>`);
@@ -1515,25 +1981,70 @@ async function renderLook(job){
       pane.hidden = pane.dataset.pane !== el.dataset.tab;
     });
   });
-  $('applyLook').onclick=()=>applyLook(job, false);
-  $('resetLook').onclick=()=>applyLook(job, true);
+
+  if(P){
+    // Whatever the panel shows is the look the player should already be using,
+    // so the first frame drawn matches the controls without a round trip.
+    P.look={}; look.fields.forEach(f=>{
+      if(f.key.startsWith('captions.')) P.look[f.key.slice(9)]=f.value;
+    });
+    loadFont(P.look.font);
+  }
+
+  const readPanel=()=>{
+    const values={};
+    document.querySelectorAll('[data-set]').forEach(el=>{
+      values[el.dataset.set]=el.type==='checkbox'?(el.checked?'true':'false'):el.value;
+    });
+    return values;
+  };
+
+  document.querySelectorAll('[data-set]').forEach(el=>{
+    const live=()=>{
+      if(!P) return;
+      P.values=readPanel();
+      // Anything purely about appearance is applied in the browser on the next
+      // frame. Anything that changes a decision - how many words to a line, how
+      // often to zoom - has to be re-decided, which the server does without
+      // rendering, in about a second.
+      const key=el.dataset.set;
+      if(key.startsWith('captions.') && !LIVE_REPLAN.has(key)){
+        P.look[key.slice(9)]=el.type==='checkbox'?el.checked:coerce(el.value);
+        if(key==='captions.font') loadFont(el.value);
+      } else {
+        repaintPlan();
+      }
+      markDirty();
+    };
+    el.addEventListener('input', live);
+    el.addEventListener('change', live);
+  });
+
+  $('resetLook').onclick=()=>{
+    if(!P) return;
+    P.values={};
+    api('/api/jobs/'+job.id+'/settings',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({reset:true})})
+      .then(()=>{ drawn=''; listed=''; refresh(); })
+      .catch(e=>{ $('lookMsg').textContent='error: '+e.message; });
+  };
 }
 
-async function applyLook(job, reset){
-  const values={};
-  if(!reset) document.querySelectorAll('[data-set]').forEach(el=>{
-    values[el.dataset.set] = el.type==='checkbox' ? (el.checked?'true':'false') : el.value;
-  });
-  $('applyLook').disabled=$('resetLook').disabled=true;
-  $('lookMsg').textContent='queued…';
-  try{
-    await api('/api/jobs/'+job.id+'/settings',{method:'POST',
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({values, reset})});
-    drawn=''; listed=''; refresh();
-  }catch(e){
-    $('lookMsg').textContent='error: '+e.message;
-    $('applyLook').disabled=$('resetLook').disabled=false;
-  }
+// Settings the browser cannot fake: they change what the editor decides, not
+// how it looks, so the plan has to be made again.
+const LIVE_REPLAN=new Set(['captions.max_words','captions.enabled']);
+const coerce=v=>{ const n=Number(v); return Number.isFinite(n)&&v.trim!==undefined&&v!==''?n:v; };
+
+const FONTS=new Set();
+function loadFont(family){
+  if(!family||FONTS.has(family)) return;
+  FONTS.add(family);
+  // The same file libass will use, so the shape of the letters is not a guess.
+  const style=document.createElement('style');
+  style.textContent=`@font-face{font-family:"${family}";`
+    +`src:url("/api/fonts/${encodeURIComponent(family)}") format("truetype");`
+    +`font-display:swap}`;
+  document.head.appendChild(style);
 }
 
 async function send(job, rerender){
