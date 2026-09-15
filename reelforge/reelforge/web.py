@@ -370,32 +370,46 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         return [job.to_dict() for job in store.list()]
 
     @app.post("/api/jobs", dependencies=[Depends(require_login)])
-    async def create_job(files: list[UploadFile], template: str = Form(""),
-                         model: str = Form("small")) -> dict:
-        usable = [f for f in files if Path(f.filename or "").suffix.lower() in VIDEO_SUFFIXES]
-        if not usable:
-            raise HTTPException(status_code=400, detail="no video files in that upload")
+    def create_job(body: dict) -> dict:
+        """Open an empty edit. Clips are added one request each, then started."""
+        job = store.create(title=str(body.get("title") or "reel"),
+                           template=str(body.get("template") or ""),
+                           model=str(body.get("model") or "small"))
+        store.update(job, status="uploading", stage="waiting for clips")
+        return job.to_dict()
 
-        title = Path(usable[0].filename or "reel").stem
-        job = store.create(title=title, template=template, model=model)
+    @app.post("/api/jobs/{job_id}/files", dependencies=[Depends(require_login)])
+    async def add_file(job_id: str, file: UploadFile) -> dict:
+        """One clip per request: progress is visible and a failure retries cheaply."""
+        job = job_or_404(job_id)
+        name = Path(file.filename or "clip.mp4").name
+        if Path(name).suffix.lower() not in VIDEO_SUFFIXES:
+            raise HTTPException(status_code=400, detail=f"{name} is not a video file")
+
         uploads = store.dir(job.id) / "uploads"
         uploads.mkdir(parents=True, exist_ok=True)
+        target = uploads / f"{len(job.sources):02d}-{name}"
 
-        total = 0
-        saved: list[str] = []
-        for index, upload in enumerate(usable):
-            name = f"{index:02d}-{Path(upload.filename or 'clip').name}"
-            target = uploads / name
-            with target.open("wb") as handle:
-                while chunk := await upload.read(1 << 20):
-                    total += len(chunk)
-                    if total > MAX_UPLOAD_BYTES:
-                        store.delete(job.id)
-                        raise HTTPException(status_code=413, detail="upload too large")
-                    handle.write(chunk)
-            saved.append(str(target))
+        written = sum(Path(p).stat().st_size for p in job.sources if Path(p).exists())
+        with target.open("wb") as handle:
+            while chunk := await file.read(1 << 20):
+                written += len(chunk)
+                if written > MAX_UPLOAD_BYTES:
+                    target.unlink(missing_ok=True)
+                    raise HTTPException(status_code=413, detail="that is more than 4 GB in total")
+                handle.write(chunk)
 
-        store.update(job, sources=saved)
+        store.update(job, sources=[*job.sources, str(target)],
+                     stage=f"{len(job.sources) + 1} clip(s) uploaded")
+        return {"ok": True, "uploaded": len(job.sources), "name": name}
+
+    @app.post("/api/jobs/{job_id}/start", dependencies=[Depends(require_login)])
+    def start_job(job_id: str) -> dict:
+        job = job_or_404(job_id)
+        if not job.sources:
+            raise HTTPException(status_code=400, detail="no clips were uploaded")
+        job.title = Path(job.sources[0]).stem.split("-", 1)[-1] or job.title
+        store.update(job, status="queued", stage="queued")
         runner.submit(job.id)
         return job.to_dict()
 
@@ -568,10 +582,37 @@ let current=null, edl=null, poll=null;
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
 async function api(path, opts={}){
-  const r = await fetch(path, {credentials:'same-origin', ...opts});
+  let r;
+  try{ r = await fetch(path, {credentials:'same-origin', ...opts}); }
+  catch(e){ throw new Error('could not reach the server ('+(e.message||'connection lost')+')'); }
   if(r.status===401){ show(false); throw new Error('please log in'); }
-  if(!r.ok){ throw new Error((await r.json().catch(()=>({detail:r.statusText}))).detail); }
+  if(!r.ok){
+    const text = await r.text().catch(()=>'');
+    let detail='';
+    try{ detail = JSON.parse(text).detail || ''; }catch(_){ detail = text.slice(0,180); }
+    throw new Error(`${r.status} ${detail || r.statusText || 'request failed'}`);
+  }
   return r.headers.get('content-type')?.includes('json') ? r.json() : r;
+}
+
+function putFile(url, file, onProgress){
+  // XHR rather than fetch: it is the only way to report upload progress, and a
+  // large clip over a slow connection needs to show that it is moving.
+  return new Promise((resolve, reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.withCredentials=true;
+    xhr.upload.onprogress=e=>{ if(e.lengthComputable) onProgress(e.loaded/e.total); };
+    xhr.onload=()=>{
+      if(xhr.status>=200 && xhr.status<300) return resolve();
+      let detail=''; try{ detail=JSON.parse(xhr.responseText).detail||''; }catch(_){}
+      reject(new Error(`${xhr.status} ${detail||xhr.statusText||'upload failed'}`));
+    };
+    xhr.onerror=()=>reject(new Error('the connection dropped during upload'));
+    xhr.ontimeout=()=>reject(new Error('the upload timed out'));
+    const body=new FormData(); body.append('file', file);
+    xhr.send(body);
+  });
 }
 function show(authed){ $('login').hidden=authed; $('app').hidden=!authed; if(authed){loadTemplates();refresh();} }
 
@@ -591,16 +632,25 @@ async function loadTemplates(){
 }
 
 $('upload').onclick=async()=>{
-  const files=$('files').files;
+  const files=[...$('files').files];
   if(!files.length){ $('msg').textContent='choose at least one video'; return; }
-  const body=new FormData();
-  for(const f of files) body.append('files', f);
-  body.append('template', $('template').value);
-  body.append('model', $('model').value);
-  $('upload').disabled=true; $('msg').textContent='uploading…';
+  const total=files.reduce((n,f)=>n+f.size,0);
+  $('upload').disabled=true;
   try{
-    const job=await api('/api/jobs',{method:'POST',body});
+    const job=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({template:$('template').value, model:$('model').value,
+                           title:files[0].name.replace(/\.[^.]+$/,'')})});
+    let done=0;
+    for(let i=0;i<files.length;i++){
+      const f=files[i];
+      await putFile(`/api/jobs/${job.id}/files`, f, frac=>{
+        const pct=Math.round(100*(done+frac*f.size)/total);
+        $('msg').textContent=`uploading ${i+1} of ${files.length} — ${f.name} — ${pct}%`;
+      });
+      done+=f.size;
+    }
     $('msg').textContent='uploaded — editing has started';
+    await api(`/api/jobs/${job.id}/start`,{method:'POST'});
     $('files').value=''; current=job.id; refresh();
   }catch(e){ $('msg').textContent='error: '+e.message; }
   finally{ $('upload').disabled=false; }

@@ -1880,9 +1880,17 @@ class WebAppTests(unittest.TestCase):
 
     # -- the job flow ----------------------------------------------------
     def upload(self, client, paths, **data):
-        files = [("files", (Path(p).name, open(p, "rb"), "video/mp4")) for p in paths]
-        return client.post("/api/jobs", files=files,
-                           data={"template": "", "model": "small", **data})
+        """Create the edit, add each clip, then start it."""
+        created = client.post("/api/jobs", json={"template": "", "model": "small", **data})
+        self.assertEqual(created.status_code, 200, created.text)
+        job_id = created.json()["id"]
+        for path in paths:
+            with open(path, "rb") as handle:
+                response = client.post(f"/api/jobs/{job_id}/files",
+                                       files={"file": (Path(path).name, handle, "video/mp4")})
+            if response.status_code != 200:
+                return response
+        return client.post(f"/api/jobs/{job_id}/start")
 
     def wait(self, client, job_id, limit=240):
         for _ in range(limit):
@@ -1939,10 +1947,29 @@ class WebAppTests(unittest.TestCase):
         self.login(client)
         notes = Path(self.tmp) / "notes.txt"
         notes.write_text("not a video", encoding="utf-8")
-        response = client.post("/api/jobs",
-                               files=[("files", ("notes.txt", open(notes, "rb"), "text/plain"))],
-                               data={"template": "", "model": "small"})
+        response = self.upload(client, [notes])
         self.assertEqual(response.status_code, 400)
+        self.assertIn("not a video", response.json()["detail"])
+
+    def test_starting_with_no_clips_is_refused(self):
+        client = self.client("empty")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        response = client.post(f"/api/jobs/{job_id}/start")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("no clips", response.json()["detail"])
+
+    def test_clips_are_kept_in_the_order_uploaded(self):
+        client = self.client("order")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        for path in (self.clip_b, self.clip_a):
+            with open(path, "rb") as handle:
+                client.post(f"/api/jobs/{job_id}/files",
+                            files={"file": (Path(path).name, handle, "video/mp4")})
+        sources = self.app.state.store.get(job_id).sources
+        self.assertEqual([Path(s).name.split("-", 1)[1] for s in sources],
+                         [Path(self.clip_b).name, Path(self.clip_a).name])
 
     def test_exporting_an_unloaded_edit_is_refused_clearly(self):
         # After a restart the plan is gone; say so rather than failing obscurely.
