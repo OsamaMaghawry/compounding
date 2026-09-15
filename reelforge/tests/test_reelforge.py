@@ -2486,6 +2486,131 @@ class WebAppTests(unittest.TestCase):
         self.assertTrue(any(cut["text"] for cut in cuts),
                         "a segment with no words cannot be judged before cutting it")
 
+    # -- the b-roll library ----------------------------------------------
+    def add_broll(self, client, path, name=None):
+        name = name or Path(path).name
+        return client.post("/api/broll/chunk",
+                           data={"name": name, "offset": "0", "final": "true"},
+                           files={"file": (name, Path(path).read_bytes(), "video/mp4")})
+
+    def test_a_clip_added_to_the_library_is_listed_with_a_picture(self):
+        client = self.client("broll")
+        self.login(client)
+        self.assertEqual(client.get("/api/broll").json(), [])
+        self.assertEqual(self.add_broll(client, self.clip_a, "فلوس.mp4").status_code, 200)
+
+        listed = client.get("/api/broll").json()
+        self.assertEqual([a["name"] for a in listed], ["فلوس.mp4"])
+        self.assertEqual(listed[0]["kind"], "video")
+        # With no keywords set, the filename is what it answers to.
+        self.assertTrue(listed[0]["from_filename"])
+        self.assertTrue(listed[0]["keywords"])
+        thumb = client.get("/api/broll/فلوس.mp4/thumb.jpg")
+        self.assertEqual(thumb.status_code, 200)
+        self.assertGreater(len(thumb.content), 500)
+
+    def test_keywords_are_kept_as_typed(self):
+        # The matcher normalises them, and the normalised form reads like a typo.
+        # Showing you that instead of what you wrote would look like a bug.
+        client = self.client("brollkw")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        response = client.post("/api/broll/clip.mp4",
+                               json={"keywords": "أرباح, مكسب , money"})
+        self.assertEqual(response.status_code, 200, response.text)
+        listed = client.get("/api/broll").json()[0]
+        self.assertEqual(listed["keywords"], ["أرباح", "مكسب", "money"])
+        self.assertFalse(listed["from_filename"])
+
+    def test_clearing_the_keywords_falls_back_to_the_filename(self):
+        client = self.client("brollclear")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "money.mp4")
+        client.post("/api/broll/money.mp4", json={"keywords": "ارباح"})
+        client.post("/api/broll/money.mp4", json={"keywords": ""})
+        listed = client.get("/api/broll").json()[0]
+        self.assertTrue(listed["from_filename"])
+        self.assertEqual(listed["keywords"], ["money"])
+
+    def test_the_library_does_not_offer_its_own_thumbnails_as_broll(self):
+        # Thumbnails are images in the library folder. Without the hidden-folder
+        # rule the library would cut its own preview pictures into your video.
+        client = self.client("brollthumb")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        client.get("/api/broll/clip.mp4/thumb.jpg")
+        self.assertEqual([a["name"] for a in client.get("/api/broll").json()], ["clip.mp4"])
+
+    def test_a_name_that_climbs_out_of_the_library_is_refused(self):
+        # The library is reachable over the network, so a name is not to be
+        # trusted just because it arrived in a path parameter.
+        client = self.client("brolltraversal")
+        self.login(client)
+        root = Path(self.tmp) / "brolltraversal"
+        secret = root / "jobs" / "secret.txt"
+        secret.parent.mkdir(parents=True, exist_ok=True)
+        secret.write_text("private", encoding="utf-8")
+
+        for name in ("../jobs/secret.txt", "..%2Fjobs%2Fsecret.txt",
+                     "....//jobs/secret.txt", "%2e%2e%2fjobs%2fsecret.txt"):
+            client.delete(f"/api/broll/{name}")
+            client.get(f"/api/broll/{name}/thumb.jpg")
+        self.assertTrue(secret.exists(), "a file outside the library was deleted")
+
+        # The keyword file is not a clip and must not be deletable as one.
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        client.post("/api/broll/clip.mp4", json={"keywords": "ارباح"})
+        self.assertEqual(client.delete("/api/broll/library.json").status_code, 404)
+        from reelforge.broll import read_manifest
+        self.assertTrue(read_manifest(self.app.state.runner.broll_dir))
+
+    def test_a_document_is_not_a_clip(self):
+        client = self.client("brollbad")
+        self.login(client)
+        response = client.post("/api/broll/chunk",
+                               data={"name": "notes.txt", "offset": "0", "final": "true"},
+                               files={"file": ("notes.txt", b"hello", "text/plain")})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("not a video or an image", response.json()["detail"])
+
+    def test_removing_a_clip_takes_its_keywords_with_it(self):
+        client = self.client("brollrm")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        client.post("/api/broll/clip.mp4", json={"keywords": "ارباح"})
+        self.assertEqual(client.delete("/api/broll/clip.mp4").status_code, 200)
+        self.assertEqual(client.get("/api/broll").json(), [])
+        from reelforge.broll import read_manifest
+        self.assertEqual(read_manifest(self.app.state.runner.broll_dir), {})
+
+    def test_the_library_reaches_the_edit(self):
+        # The whole point: a tagged clip must actually be cut into the video.
+        client = self.client("brolluse")
+        self.login(client)
+        self.add_broll(client, self.clip_b, "clip.mp4")
+
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertFalse(edl["overlays"], "nothing is tagged yet")
+
+        # Tag the clip with a word that is actually said, past the opening hook
+        # the planner protects. Reading it from the edit rather than assuming it
+        # keeps the test honest whatever the transcript turns out to be.
+        spoken = next((word for line in edl["captions"] if line["start"] > 2.0
+                       for word in line["text"].split() if len(word) > 3), None)
+        self.assertIsNotNone(spoken, "no word late enough in the edit to match on")
+        client.post("/api/broll/clip.mp4", json={"keywords": spoken})
+
+        client.post(f"/api/jobs/{job['id']}/settings", json={"values": {}})
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertTrue(edl["overlays"],
+                        f"a clip tagged '{spoken}' was never cut in")
+        self.assertTrue(all(Path(o["asset"]).name == "clip.mp4" for o in edl["overlays"]))
+        self.assertGreater(job["summary"]["overlays"], 0)
+
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore
         root = Path(self.tmp) / "restart"

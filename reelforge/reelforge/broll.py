@@ -93,6 +93,11 @@ class BrollLibrary:
         for path in sorted(directory.rglob("*")):
             if not path.is_file():
                 continue
+            # Skip hidden files and anything inside a hidden folder: that is where
+            # the thumbnails live, and a thumbnail is an image, so without this the
+            # library would happily cut its own preview pictures into your video.
+            if any(part.startswith(".") for part in path.relative_to(directory).parts):
+                continue
             suffix = path.suffix.lower()
             if suffix not in VIDEO_EXT and suffix not in IMAGE_EXT:
                 continue
@@ -125,3 +130,57 @@ class BrollLibrary:
                 if score >= min_score and (best is None or score > best[2]):
                     best = (asset, keyword, min(score, 1.0))
         return best
+
+
+# ------------------------------------------------------------------ managing
+
+MANIFEST = "library.json"
+
+
+def read_manifest(directory: str | Path) -> dict:
+    """The keyword file, as a plain mapping. Missing or broken reads as empty."""
+    path = Path(directory) / MANIFEST
+    if not path.exists():
+        return {}
+    try:
+        import json  # noqa: PLC0415
+        raw = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def write_manifest(directory: str | Path, data: dict) -> Path:
+    import json  # noqa: PLC0415
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / MANIFEST
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def is_supported(name: str) -> bool:
+    suffix = Path(name).suffix.lower()
+    return suffix in VIDEO_EXT or suffix in IMAGE_EXT
+
+
+def thumbnail(asset: str | Path, dest: str | Path, *, width: int = 240) -> Path | None:
+    """One frame from a clip, or a scaled copy of a still.
+
+    A library listed by filename alone is nearly useless - you end up opening
+    things to remember what they are. A picture makes it a library.
+    """
+    from .ffmpeg import run_ffmpeg  # noqa: PLC0415 - avoid a cycle at import time
+    asset, dest = Path(asset), Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    args = []
+    if asset.suffix.lower() in VIDEO_EXT:
+        # A frame from just inside the clip: the very first one is often black.
+        args += ["-ss", "0.5"]
+    args += ["-i", str(asset), "-frames:v", "1",
+             "-vf", f"scale={width}:-2", "-y", str(dest)]
+    try:
+        run_ffmpeg(args)
+    except Exception:
+        return None
+    return dest if dest.exists() and dest.stat().st_size > 0 else None

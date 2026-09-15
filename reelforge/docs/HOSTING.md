@@ -68,6 +68,24 @@ in it, and the editor would otherwise learn to propose fewer of them.
 Trimming re-decides the edit, so it costs a preview render but not another
 transcription.
 
+## The b-roll library
+
+Your own clips and stills, kept in `<data>/broll` - beside your edits, not inside
+the package, which is replaced on every update.
+
+Add them from the main page, then give each one **the words that should bring it
+up**. Say one of those words and the clip is cut in over you. A clip with no words
+never appears, so tagging is the whole job; with nothing typed it falls back to the
+filename, which means naming a file `ارباح.mp4` is already enough.
+
+Keywords are stored as you typed them in `library.json`. The matcher normalises
+them when it reads them - that is why what you see in the box is your spelling
+rather than the stripped-down form it matches on.
+
+The **B-roll** tab in the Look panel controls how often clips appear, how sure the
+word match has to be, and whether a clip covers the screen, sits in a corner, or
+runs as a band across the middle.
+
 ## Leaving and coming back
 
 Everything saves itself as you go, to whatever `--data` points at - `/workspaces/data`

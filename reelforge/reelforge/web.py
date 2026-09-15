@@ -23,6 +23,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from . import broll
 from .edl import EDL
 from .pipeline import PACKAGE_ROOT, AutoEditor
 from .profile import StyleProfile
@@ -106,6 +107,23 @@ LOOK_FIELDS: list[dict] = [
      "type": "number", "min": 0.0, "max": 1.0, "step": 0.05},
     {"group": "Motion", "key": "transitions.max_per_min", "label": "Transitions per minute",
      "type": "number", "min": 0, "max": 60, "step": 1},
+
+    {"group": "B-roll", "key": "broll.enabled", "label": "Cut in b-roll", "type": "bool",
+     "help": "Covers you with a clip from your library when you say a word it matches."},
+    {"group": "B-roll", "key": "broll.max_per_min", "label": "Clips per minute",
+     "type": "number", "min": 0, "max": 20, "step": 1},
+    {"group": "B-roll", "key": "broll.min_score", "label": "Match confidence",
+     "type": "number", "min": 0.3, "max": 1.0, "step": 0.05,
+     "help": "How sure the word match must be. Raise it if the wrong clips appear."},
+    {"group": "B-roll", "key": "broll.mode", "label": "How it appears", "type": "select",
+     "options": [
+         ("cover", "Cover — fills the screen"),
+         ("pip", "Corner — a smaller inset over you"),
+         ("band", "Band — a strip across the middle"),
+     ]},
+    {"group": "B-roll", "key": "broll.max_duration", "label": "Longest clip",
+     "type": "number", "min": 0.6, "max": 6.0, "step": 0.2,
+     "help": "Seconds. Short is the point - it is a cutaway, not a scene."},
 
     {"group": "Pacing", "key": "cuts.enabled", "label": "Cut dead air", "type": "bool"},
     {"group": "Pacing", "key": "cuts.min_silence", "label": "Shortest silence to cut",
@@ -245,9 +263,12 @@ class JobStore:
 class Runner:
     """One worker thread. Renders saturate the CPU, so they do not overlap."""
 
-    def __init__(self, store: JobStore, fonts_dir: Path):
+    def __init__(self, store: JobStore, fonts_dir: Path, broll_dir: Path):
         self.store = store
         self.fonts_dir = fonts_dir
+        # Beside the jobs, not inside the package: the package sits in the repo
+        # and is replaced on every update, which is no place to keep your footage.
+        self.broll_dir = Path(broll_dir)
         self.queue: queue.Queue[tuple[str, str]] = queue.Queue()
         self.editors: dict[str, AutoEditor] = {}
         self.edls: dict[str, EDL] = {}
@@ -375,7 +396,8 @@ class Runner:
         """Template, then the model, then whatever look settings were chosen."""
         profile = StyleProfile.resolve(job.template or None,
                                        [PACKAGE_ROOT / "templates", PACKAGE_ROOT / "profiles"])
-        overrides = [f"asr.model={job.model}"]
+        overrides = [f"asr.model={job.model}",
+                     f"broll.library={self.broll_dir}"]
         backend = os.environ.get("REELFORGE_ASR_BACKEND")
         if backend:
             overrides.append(f"asr.backend={backend}")
@@ -534,7 +556,7 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
 
     data_dir = Path(data_dir)
     store = JobStore(data_dir / "jobs")
-    runner = Runner(store, PACKAGE_ROOT / "assets" / "fonts")
+    runner = Runner(store, PACKAGE_ROOT / "assets" / "fonts", data_dir / "broll")
 
     password = password or os.environ.get("REELFORGE_PASSWORD") or secrets.token_urlsafe(9)
     secret = secret or os.environ.get("REELFORGE_SECRET") or secrets.token_hex(16)
@@ -633,6 +655,107 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                 out.append({"name": path.stem,
                             "description": profile.get("description", "")})
         return out
+
+    # -- the b-roll library ---------------------------------------------
+    def broll_or_404(name: str) -> Path:
+        """Resolve a library file by name, refusing anything that escapes it."""
+        safe = Path(name).name
+        path = runner.broll_dir / safe
+        # resolve() before comparing: a name is not trustworthy just because it
+        # has no slashes in it, and the library is reachable over the network.
+        try:
+            inside = path.resolve().parent == runner.broll_dir.resolve()
+        except OSError:
+            inside = False
+        if not safe or not inside or not path.is_file() or safe == broll.MANIFEST:
+            raise HTTPException(status_code=404, detail=f"no clip called {safe}")
+        return path
+
+    @app.get("/api/broll", dependencies=[Depends(require_login)])
+    def list_broll() -> list[dict]:
+        manifest = broll.read_manifest(runner.broll_dir)
+        library = broll.BrollLibrary.load(runner.broll_dir)
+        out = []
+        for asset in library.assets:
+            entry = manifest.get(asset.name) or {}
+            out.append({
+                "name": asset.name,
+                "kind": "image" if asset.is_image else "video",
+                # What you typed, not what the matcher normalised it to - the
+                # normalised form strips the vowels and reads like a typo.
+                "keywords": list(entry.get("keywords") or asset.keywords),
+                "from_filename": not entry.get("keywords"),
+                "size": asset.path.stat().st_size,
+            })
+        return out
+
+    @app.post("/api/broll/chunk", dependencies=[Depends(require_login)])
+    async def add_broll(file: UploadFile, name: str = Form(...),
+                        offset: int = Form(0), final: str = Form("false")) -> dict:
+        safe = Path(name).name
+        if not broll.is_supported(safe):
+            raise HTTPException(status_code=400,
+                                detail=f"{safe} is not a video or an image")
+        runner.broll_dir.mkdir(parents=True, exist_ok=True)
+        target = runner.broll_dir / safe
+        payload = await file.read()
+        if offset + len(payload) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="that clip is too large")
+        mode = "r+b" if target.exists() and offset else "wb"
+        with target.open(mode) as handle:
+            handle.seek(offset)
+            handle.write(payload)
+        done = str(final).lower() == "true"
+        if done:
+            broll.thumbnail(target, runner.broll_dir / ".thumbs" / f"{safe}.jpg")
+        return {"ok": True, "complete": done, "size": target.stat().st_size}
+
+    @app.post("/api/broll/{name}", dependencies=[Depends(require_login)])
+    def set_broll_keywords(name: str, body: dict) -> dict:
+        """The words that make this clip appear. Without them it never will."""
+        path = broll_or_404(name)
+        raw = body.get("keywords")
+        if isinstance(raw, str):
+            raw = raw.replace("،", ",").split(",")
+        if not isinstance(raw, list):
+            raise HTTPException(status_code=400, detail="keywords must be a list")
+        keywords = [str(word).strip() for word in raw if str(word).strip()]
+        manifest = broll.read_manifest(runner.broll_dir)
+        entry = dict(manifest.get(path.name) or {})
+        if keywords:
+            entry["keywords"] = keywords
+            manifest[path.name] = entry
+        else:
+            # No keywords means fall back to the filename, which is what an asset
+            # with no entry already does - so drop the entry, keeping any other
+            # setting it carries.
+            entry.pop("keywords", None)
+            if entry:
+                manifest[path.name] = entry
+            else:
+                manifest.pop(path.name, None)
+        broll.write_manifest(runner.broll_dir, manifest)
+        return {"ok": True, "keywords": keywords}
+
+    @app.delete("/api/broll/{name}", dependencies=[Depends(require_login)])
+    def delete_broll(name: str) -> dict:
+        path = broll_or_404(name)
+        path.unlink()
+        (runner.broll_dir / ".thumbs" / f"{path.name}.jpg").unlink(missing_ok=True)
+        manifest = broll.read_manifest(runner.broll_dir)
+        if manifest.pop(path.name, None) is not None:
+            broll.write_manifest(runner.broll_dir, manifest)
+        return {"deleted": True}
+
+    @app.get("/api/broll/{name}/thumb.jpg", dependencies=[Depends(require_login)])
+    def broll_thumb(name: str, request: Request) -> Response:
+        path = broll_or_404(name)
+        thumb = runner.broll_dir / ".thumbs" / f"{path.name}.jpg"
+        if not thumb.exists():                       # a library that predates thumbnails
+            broll.thumbnail(path, thumb)
+        if not thumb.exists():
+            raise HTTPException(status_code=404, detail="no picture for this one")
+        return ranged(thumb, request, "image/jpeg")
 
     @app.get("/api/jobs", dependencies=[Depends(require_login)])
     def list_jobs() -> list[dict]:
@@ -961,6 +1084,12 @@ input[type=color]{height:44px;padding:4px}
 .seg:last-child{border-bottom:0}
 .seg.off .txt{opacity:.4;text-decoration:line-through}
 .seg .txt{font-size:14px;word-break:break-word}
+.asset{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.asset:last-child{border-bottom:0}
+.asset img{width:58px;height:58px;object-fit:cover;border-radius:8px;background:#10101a;flex:none}
+.asset .no{width:58px;height:58px;border-radius:8px;background:#10101a;flex:none}
+.asset input[type=text]{margin-top:4px;padding:8px;font-size:15px}
+.asset .nm{font-size:12px;color:var(--dim);word-break:break-all}
 </style></head><body>
 
 <div id="login" hidden>
@@ -992,6 +1121,17 @@ input[type=color]{height:44px;padding:4px}
   <div class="card">
     <h2>Edits</h2>
     <div id="jobs" class="dim">none yet</div>
+  </div>
+
+  <div class="card">
+    <h2>B-roll library</h2>
+    <div class="dim">Your own clips and stills. When you say a word one of them is
+      tagged with, it is cut in over you. Give each one the words that should
+      bring it up — a clip with no words never appears.</div>
+    <input type="file" id="brollFiles" accept="video/*,image/*" multiple>
+    <button class="ghost" id="brollUpload">Add to the library</button>
+    <div id="brollMsg" class="dim"></div>
+    <div id="broll" style="margin-top:10px"></div>
   </div>
 
   <div id="detail"></div>
@@ -1059,7 +1199,67 @@ async function uploadFile(jobId, file, index, onProgress){
     onProgress(Math.min(offset+CHUNK, file.size)/file.size);
   }
 }
-function show(authed){ $('login').hidden=authed; $('app').hidden=!authed; if(authed){loadTemplates();refresh();} }
+function show(authed){ $('login').hidden=authed; $('app').hidden=!authed;
+  if(authed){loadTemplates();refresh();loadBroll();} }
+
+// -- the b-roll library ------------------------------------------------------
+async function loadBroll(){
+  let assets=[];
+  try{ assets=await api('/api/broll'); }catch(e){ return; }
+  $('broll').innerHTML = assets.length ? assets.map(a=>`
+    <div class="asset">
+      <img src="/api/broll/${encodeURIComponent(a.name)}/thumb.jpg" alt=""
+        onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'no'}))">
+      <span class="grow">
+        <span class="nm">${a.name}${a.from_filename?' · words taken from the filename':''}</span>
+        <input type="text" dir="auto" data-kw="${a.name}"
+          value="${(a.keywords||[]).join(', ').replace(/"/g,'&quot;')}"
+          placeholder="words that bring this up, separated by commas">
+      </span>
+      <span class="pill" data-rm="${a.name}" title="remove">✕</span>
+    </div>`).join('') : '<span class="dim">empty — nothing will be cut in yet</span>';
+
+  $('broll').querySelectorAll('[data-kw]').forEach(el=>{
+    el.onchange=async()=>{
+      el.disabled=true;
+      try{
+        await api('/api/broll/'+encodeURIComponent(el.dataset.kw),{method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({keywords:el.value})});
+        $('brollMsg').textContent='saved';
+      }catch(e){ $('brollMsg').textContent='error: '+e.message; }
+      el.disabled=false;
+    };
+  });
+  $('broll').querySelectorAll('[data-rm]').forEach(el=>{
+    el.onclick=async()=>{
+      await api('/api/broll/'+encodeURIComponent(el.dataset.rm),{method:'DELETE'}).catch(()=>{});
+      loadBroll();
+    };
+  });
+}
+
+$('brollUpload').onclick=async()=>{
+  const files=[...$('brollFiles').files];
+  if(!files.length){ $('brollMsg').textContent='choose a clip or a picture'; return; }
+  $('brollUpload').disabled=true;
+  try{
+    for(let i=0;i<files.length;i++){
+      const f=files[i];
+      for(let offset=0; offset<f.size; offset+=CHUNK){
+        const last = offset+CHUNK >= f.size;
+        await postChunk('/api/broll/chunk', f.slice(offset, Math.min(offset+CHUNK, f.size)),
+          {name:f.name, offset:String(offset), final:last?'true':'false'});
+        $('brollMsg').textContent=
+          `adding ${i+1} of ${files.length} — ${Math.round(100*Math.min(offset+CHUNK,f.size)/f.size)}%`;
+      }
+    }
+    $('brollFiles').value='';
+    $('brollMsg').textContent='added — now give each one its words';
+    loadBroll();
+  }catch(e){ $('brollMsg').textContent='error: '+e.message; }
+  finally{ $('brollUpload').disabled=false; }
+};
 
 $('loginBtn').onclick=async()=>{
   try{
