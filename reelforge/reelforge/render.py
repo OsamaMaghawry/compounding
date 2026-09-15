@@ -267,7 +267,7 @@ class Renderer:
         has_audio = info.has_audio
 
         # 1. Retime: keep only the surviving slices, then join them.
-        cuts = edl.cuts or []
+        cuts = edl.active_cuts()
         whole = (len(cuts) == 1 and cuts[0].src_start <= 0.02
                  and cuts[0].src_end >= info.duration - 0.05)
         if not cuts or whole:

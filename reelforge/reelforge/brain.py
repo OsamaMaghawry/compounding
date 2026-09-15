@@ -315,11 +315,27 @@ def plan_transitions(timeline: Timeline, analysis: Analysis, profile) -> list[Tr
 
 # ---------------------------------------------------------------------- build
 
+def label_cuts(cuts: list[Cut], transcript: Transcript) -> None:
+    """Write what is said into each segment, in source time.
+
+    Output time is no use here: a segment you have switched off has no output
+    time at all, and a list of unlabelled durations is no way to decide whether
+    you meant to cut it.
+    """
+    words = transcript.words
+    for cut in cuts:
+        said = [w.text for w in words
+                if w.start >= cut.src_start - 0.15 and w.end <= cut.src_end + 0.15]
+        text = " ".join(said).strip()
+        cut.text = text if len(text) <= 120 else text[:117].rstrip() + "..."
+
+
 def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
               *, library: BrollLibrary | None = None, scorer=None,
               weights: dict[str, float] | None = None) -> EDL:
     """Run the whole decision pass and return an inspectable edit."""
     cuts = plan_cuts(analysis, transcript, profile)
+    label_cuts(cuts, transcript)
     timeline = Timeline(cuts)
     out_duration = timeline.duration
 

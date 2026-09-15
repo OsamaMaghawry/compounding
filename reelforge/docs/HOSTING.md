@@ -43,6 +43,31 @@ says which. Each control is a real profile key, so anything the panel does is th
 as `--set captions.style=word` on the command line, and a look you settle on can be
 written into a template.
 
+## The Timeline
+
+Above the Look panel is a **Timeline** card: a bar drawn to scale, then one row
+per segment with the seconds it runs and the words spoken in it.
+
+A segment is a stretch of speech that survived the silence cutting. Untick any of
+them and press **Apply the trim** to cut it - a fluffed line, a retake, a throat
+clear the silence detector kept. Tick one back and it returns, words and all.
+
+Times shown are positions in your **original footage**, not in the finished video,
+and that is also how a trim is stored. It means a trim keeps pointing at the same
+moment of your recording however else you change the edit: pick another caption
+style, make the pacing more aggressive, restart the machine, and the piece you cut
+stays cut.
+
+What moves with a trim: every zoom, transition and caption after it, because all
+of them are positioned in finished-video time and would otherwise land on the
+wrong sentence. What does not survive: a zoom that lived inside the segment you
+removed, since its moment no longer exists. That is not recorded as you rejecting
+the zoom - cutting a weak take says nothing about the zoom that happened to sit
+in it, and the editor would otherwise learn to propose fewer of them.
+
+Trimming re-decides the edit, so it costs a preview render but not another
+transcription.
+
 ## Leaving and coming back
 
 Everything saves itself as you go, to whatever `--data` points at - `/workspaces/data`

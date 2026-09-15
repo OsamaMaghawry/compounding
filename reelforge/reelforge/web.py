@@ -121,6 +121,24 @@ LOOK_LABELS = {field["key"]: f"{field['group'].lower()}: {field['label'].lower()
                for field in LOOK_FIELDS}
 
 
+def apply_drops(edl: EDL, drops: list) -> None:
+    """Switch off the segments covering trimmed-away stretches of the source.
+
+    Matched by overlap rather than by segment id, so a trim holds even when a new
+    plan splits the footage differently - which it does the moment the pacing
+    settings change.
+    """
+    if not drops:
+        return
+    ranges = [(float(start), float(end)) for start, end in drops if float(end) > float(start)]
+    wanted = {}
+    for cut in edl.cuts:
+        middle = (cut.src_start + cut.src_end) / 2.0
+        wanted[cut.id] = not any(start <= middle <= end for start, end in ranges)
+    if any(wanted.values()):
+        edl.retime(wanted)
+
+
 def _differs(new: object, old: object) -> bool:
     """Whether a posted setting is actually a change from the template's value.
 
@@ -154,6 +172,11 @@ class Job:
     output_name: str = ""
     overrides: dict = field(default_factory=dict)   # look settings, changed after upload
     prepared: str = ""                              # the joined (or single) source
+    # Trimmed-away stretches, as (start, end) in SOURCE time. Source time because
+    # it is the one frame of reference that survives everything else: change the
+    # caption style, the pacing, the model, and 0:14 to 0:19 of your footage is
+    # still 0:14 to 0:19. Segment numbers are not - they renumber on every plan.
+    drops: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -383,6 +406,7 @@ class Runner:
     def _plan_into(self, job: Job, source: Path, editor: AutoEditor, note) -> None:
         """Decide the edit for `source` and render a preview into the job folder."""
         result = editor.plan(source)
+        apply_drops(result.edl, job.drops)
         self._remember(job.id, editor, result.edl)
         for warning in result.warnings:
             note(warning)
@@ -702,6 +726,17 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         if edl is None:
             raise HTTPException(status_code=409, detail="not planned yet")
 
+        # Segments first: dropping one moves everything that comes after it, so
+        # the per-effect flags below must be applied to the retimed edit.
+        cuts = body.get("cuts")
+        if cuts is not None:
+            wanted = {cut.id: bool(item.get("enabled", True))
+                      for cut, item in zip(edl.cuts, cuts)}
+            if not any(wanted.get(c.id, c.enabled) and c.duration > 0.01 for c in edl.cuts):
+                raise HTTPException(status_code=400,
+                                    detail="that would remove the whole video")
+            edl.retime(wanted)
+
         for index, item in enumerate(body.get("zooms", [])):
             if index < len(edl.zooms):
                 edl.zooms[index].enabled = bool(item.get("enabled", True))
@@ -723,6 +758,35 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
             runner.submit(job.id, "rerender")
         return {"ok": True, "queued": bool(body.get("rerender")),
                 "summary": edl.summary()}
+
+    @app.post("/api/jobs/{job_id}/segments", dependencies=[Depends(require_login)])
+    def update_segments(job_id: str, body: dict) -> dict:
+        """Trim the video: keep some segments, drop others, re-decide the rest."""
+        job = job_or_404(job_id)
+        if job.status in ("working", "queued", "exporting"):
+            raise HTTPException(status_code=409, detail="this edit is still busy")
+        edl = runner.edl_for(job)
+        if edl is None:
+            raise HTTPException(status_code=409, detail="not planned yet")
+
+        keep = body.get("keep")
+        if not isinstance(keep, dict):
+            raise HTTPException(status_code=400, detail="no segments were sent")
+        known = {cut.id: cut for cut in edl.cuts}
+        unknown = sorted(set(keep) - set(known))
+        if unknown:
+            raise HTTPException(status_code=400, detail=f"no segment called {unknown[0]}")
+        if not any(bool(keep.get(cut_id, cut.enabled)) for cut_id, cut in known.items()):
+            raise HTTPException(status_code=400, detail="that would remove the whole video")
+
+        # Stored as source ranges, not as the ids the browser sent, so the trim
+        # still means the same thing after the next plan renumbers the segments.
+        drops = [[cut.src_start, cut.src_end] for cut_id, cut in known.items()
+                 if not bool(keep.get(cut_id, cut.enabled))]
+        store.update(job, drops=drops, status="queued", stage="queued for the trim",
+                     error="")
+        runner.submit(job.id, "replan")
+        return {"ok": True, "queued": True, "dropped": len(drops)}
 
     @app.get("/api/jobs/{job_id}/settings", dependencies=[Depends(require_login)])
     def get_settings(job_id: str) -> dict:
@@ -890,6 +954,13 @@ input[type=color]{height:44px;padding:4px}
   font:inherit;font-size:13px;cursor:pointer;width:auto;margin:0;flex:none}
 .tab.on{background:var(--accent);color:#18181f;font-weight:650}
 .two{display:flex;gap:10px}.two>*{flex:1}
+.strip{display:flex;gap:2px;height:30px;margin-bottom:12px;border-radius:7px;overflow:hidden}
+.strip div{background:var(--accent);min-width:2px;transition:opacity .15s}
+.strip div.off{background:#39394a}
+.seg{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.seg:last-child{border-bottom:0}
+.seg.off .txt{opacity:.4;text-decoration:line-through}
+.seg .txt{font-size:14px;word-break:break-word}
 </style></head><body>
 
 <div id="login" hidden>
@@ -1111,7 +1182,7 @@ async function draw(job){
 
   if(job.status==='ready'||job.status==='done'){
     try{ edl=await api('/api/jobs/'+job.id+'/edl'); }catch(e){ edl=null; }
-    if(edl) renderControls(job);
+    if(edl){ renderSegments(job); renderControls(job); }
     renderLook(job);
     const rr=$('rerender'), ex=$('export');
     if(rr) rr.onclick=()=>send(job,true);
@@ -1120,6 +1191,61 @@ async function draw(job){
            drawn=''; listed=''; refresh(); }
       catch(e){ ex.textContent='error: '+e.message; ex.disabled=false; } };
   }
+}
+
+// The timeline. Each segment is a stretch of speech that survived the silence
+// cutting; the bar above is the same list drawn to scale, so the shape of the
+// video is visible before any of it is read.
+function renderSegments(job){
+  const cuts=edl.cuts||[];
+  if(!cuts.length) return;
+  const total=cuts.reduce((n,c)=>n+(c.src_end-c.src_start),0)||1;
+  const bar=cuts.map((c,i)=>
+    `<div class="${c.enabled?'':'off'}" data-bar="${i}"
+      style="flex:${((c.src_end-c.src_start)/total*100).toFixed(3)}"
+      title="${fmt(c.src_start)}"></div>`).join('');
+  const rows=cuts.map((c,i)=>{
+    const secs=(c.src_end-c.src_start).toFixed(1);
+    const text=(c.text||'').replace(/</g,'&lt;') || '<span class="dim">no speech here</span>';
+    return `<div class="seg ${c.enabled?'':'off'}" data-seg="${i}">
+      <input type="checkbox" data-cut="${c.id}" ${c.enabled?'checked':''}>
+      <span class="grow"><span class="t">${fmt(c.src_start)} · ${secs}s</span>
+        <div class="txt" dir="auto">${text}</div></span></div>`;
+  }).join('');
+  const dropped=cuts.filter(c=>!c.enabled).length;
+  $('detail').insertAdjacentHTML('beforeend',
+    `<div class="card"><h2>Timeline</h2>
+      <div class="strip">${bar}</div>
+      <div class="dim" style="font-size:12px;margin-bottom:6px">
+        Untick a segment to cut it. Times are in the original footage, so they
+        keep meaning the same thing however else you change the edit${dropped
+          ? ` — ${dropped} cut so far; tick one back to bring it and its words back`
+          : ''}.</div>
+      ${rows}
+      <button id="applyTrim">Apply the trim</button>
+      <div id="trimMsg" class="dim"></div>
+    </div>`);
+
+  document.querySelectorAll('[data-cut]').forEach(el=>el.onchange=()=>{
+    const row=el.closest('.seg'), index=row.dataset.seg;
+    row.classList.toggle('off', !el.checked);
+    const bar=document.querySelector(`[data-bar="${index}"]`);
+    if(bar) bar.classList.toggle('off', !el.checked);
+  });
+
+  $('applyTrim').onclick=async()=>{
+    const keep={};
+    document.querySelectorAll('[data-cut]').forEach(el=>keep[el.dataset.cut]=el.checked);
+    $('applyTrim').disabled=true; $('trimMsg').textContent='queued…';
+    try{
+      await api('/api/jobs/'+job.id+'/segments',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({keep})});
+      drawn=''; listed=''; refresh();
+    }catch(e){
+      $('trimMsg').textContent='error: '+e.message;
+      $('applyTrim').disabled=false;
+    }
+  };
 }
 
 function renderControls(job){

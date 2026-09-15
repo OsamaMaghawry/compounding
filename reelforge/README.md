@@ -222,7 +222,8 @@ reelforge auto clip.mp4 --font Almarai
 | Render | One ffmpeg pass: retime, reframe to 9:16, zoom curve, layers, captions, loudness normalisation to -14 LUFS. |
 
 Every decision lands in an **EDL** — plain JSON in `.reelforge/runs/` with a stable id and an
-`enabled` flag on each item. Read it, flip anything off, re-render. That file is also the
+`enabled` flag on each item - segments included. Read it, flip anything off,
+re-render: switching a segment off pulls everything after it back into place. That file is also the
 training signal: the difference between what was proposed and what you kept.
 
 ## How it gets better

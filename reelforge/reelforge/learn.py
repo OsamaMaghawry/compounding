@@ -236,8 +236,16 @@ class FeedbackStore:
         final_zooms = {z.id: z for z in final.zooms}
         final_overlays = {o.id: o for o in final.overlays}
 
+        # Trimming a segment takes its zooms and overlays with it. That is not a
+        # verdict on those effects - it says something about the footage - so they
+        # are left out of the diff entirely rather than counted as rejected, which
+        # would teach the editor to propose fewer of them.
+        survives = _survivor_test(proposed, final)
+
         with closing(self._connect()) as conn:
             for zoom in proposed.zooms:
+                if not survives(zoom.out_start):
+                    continue
                 match = final_zooms.get(zoom.id)
                 kept = 1 if (match is not None and match.enabled) else 0
                 learned["zooms_kept" if kept else "zooms_dropped"] += 1
@@ -248,6 +256,8 @@ class FeedbackStore:
                 )
 
             for overlay in proposed.overlays:
+                if not survives(overlay.out_start):
+                    continue
                 match = final_overlays.get(overlay.id)
                 kept = 1 if (match is not None and match.enabled) else 0
                 learned["overlays_kept" if kept else "overlays_dropped"] += 1
@@ -462,10 +472,55 @@ def _nest(dotted: str, value) -> dict:
     return node
 
 
+def _survivor_test(proposed: EDL, final: EDL):
+    """Did the moment at this output time survive into the final edit?
+
+    Output time shifts when a segment is trimmed, so the question can only be
+    answered in source time: where was this moment in the original file, and does
+    that moment still appear anywhere in the output?
+    """
+    before, after = proposed.timeline, final.timeline
+
+    def survives(out_t: float) -> bool:
+        src_t = before.to_src(out_t)
+        return src_t is not None and after.to_out(src_t, clamp=False) is not None
+
+    return survives
+
+
+def _pair_caption_lines(proposed: EDL, final: EDL) -> list[tuple]:
+    """Line pairs that are genuinely the same line, matched in source time.
+
+    Pairing by position breaks the moment a segment is trimmed: every line after
+    the gap lines up with its neighbour, and the diff below would then read two
+    unrelated sentences as a spelling correction and teach it as vocabulary.
+    """
+    before, after = proposed.timeline, final.timeline
+    final_by_source: dict[int, object] = {}
+    for line in final.captions:
+        src_t = after.to_src(line.start)
+        if src_t is not None:
+            final_by_source.setdefault(round(src_t, 2), line)
+
+    pairs = []
+    for line in proposed.captions:
+        src_t = before.to_src(line.start)
+        if src_t is None:
+            continue
+        key = round(src_t, 2)
+        # Whisper timings and the remap both round, so allow a frame either way.
+        match = next((final_by_source[k] for k in (key, round(key - 0.01, 2),
+                                                   round(key + 0.01, 2))
+                      if k in final_by_source), None)
+        if match is not None:
+            pairs.append((line, match))
+    return pairs
+
+
 def _diff_caption_words(proposed: EDL, final: EDL) -> list[tuple[str, str]]:
     """Word-level corrections between the proposed captions and the ones you kept."""
     pairs: list[tuple[str, str]] = []
-    for before, after in zip(proposed.captions, final.captions):
+    for before, after in _pair_caption_lines(proposed, final):
         old_words = [w.text for w in before.words]
         new_words = [w.text for w in after.words]
         if old_words == new_words:

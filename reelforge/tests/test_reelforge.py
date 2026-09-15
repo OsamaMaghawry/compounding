@@ -1837,6 +1837,133 @@ class JoinCacheTests(unittest.TestCase):
         self.assertTrue(any("joining" in m for m in messages), messages)
 
 
+class TrimTests(unittest.TestCase):
+    """Dropping a segment moves everything that came after it.
+
+    Effects and captions are stored in output time, so a trim that does not move
+    them puts a zoom on the wrong sentence and captions out of sync with the
+    voice - the two things this tool exists to get right.
+    """
+
+    def edl(self):
+        from reelforge.edl import EDL, Cut, Transition, Zoom
+        from reelforge.captions import CaptionLine
+        # Three 10s segments, cut from a source with gaps between them.
+        cuts = [Cut(0.0, 10.0, 0.0, 10.0, id="seg000"),
+                Cut(20.0, 30.0, 10.0, 20.0, id="seg001"),
+                Cut(40.0, 50.0, 20.0, 30.0, id="seg002")]
+        zooms = [Zoom(id="z0", out_start=1.0, out_end=2.0, start_factor=1.0, end_factor=1.2),
+                 Zoom(id="z1", out_start=11.0, out_end=12.0, start_factor=1.0, end_factor=1.2),
+                 Zoom(id="z2", out_start=21.0, out_end=22.0, start_factor=1.0, end_factor=1.2)]
+        transitions = [Transition(id="t0", out_time=10.0), Transition(id="t1", out_time=20.0)]
+        captions = [
+            CaptionLine(words=[Word("first", 1.0, 2.0)], start=1.0, end=2.0),
+            CaptionLine(words=[Word("second", 11.0, 12.0)], start=11.0, end=12.0),
+            CaptionLine(words=[Word("third", 21.0, 22.0)], start=21.0, end=22.0),
+        ]
+        return EDL(source="x.mp4", output={}, cuts=cuts, zooms=zooms,
+                   transitions=transitions, captions=captions)
+
+    def test_retiming_an_untouched_edit_changes_nothing(self):
+        edl = self.edl()
+        before = edl.to_dict()
+        edl.retime()
+        self.assertEqual(edl.to_dict(), before)
+
+    def test_dropping_the_middle_pulls_everything_after_it_back(self):
+        edl = self.edl()
+        edl.retime({"seg001": False})
+        self.assertEqual(edl.duration, 20.0)
+        # The third segment used to start at 20s out; with the middle gone it
+        # starts at 10s, and its zoom, transition and caption move with it.
+        self.assertEqual([c.out_start for c in edl.active_cuts()], [0.0, 10.0])
+        self.assertEqual([z.id for z in edl.zooms], ["z0", "z2"])
+        self.assertAlmostEqual(edl.zooms[1].out_start, 11.0, places=3)
+        self.assertEqual([line.text for line in edl.captions], ["first", "third"])
+        self.assertAlmostEqual(edl.captions[1].start, 11.0, places=3)
+        self.assertAlmostEqual(edl.captions[1].words[0].start, 11.0, places=3)
+
+    def test_what_was_in_the_dropped_segment_goes_with_it(self):
+        edl = self.edl()
+        edl.retime({"seg001": False})
+        self.assertNotIn("z1", [z.id for z in edl.zooms])
+        self.assertNotIn("second", [line.text for line in edl.captions])
+
+    def test_bringing_a_segment_back_restores_the_timing(self):
+        edl = self.edl()
+        edl.retime({"seg001": False})
+        edl.retime({"seg001": True})
+        self.assertEqual(edl.duration, 30.0)
+        self.assertEqual([c.out_start for c in edl.active_cuts()], [0.0, 10.0, 20.0])
+        # The third segment's own effects are back where they started. What sat
+        # in the dropped segment is not - it was removed, and only re-planning
+        # from the transcript can bring those words back.
+        self.assertAlmostEqual(edl.zooms[-1].out_start, 21.0, places=3)
+        self.assertEqual([line.text for line in edl.captions], ["first", "third"])
+
+    def test_a_dropped_segment_is_not_rendered(self):
+        edl = self.edl()
+        edl.retime({"seg000": False})
+        self.assertEqual([c.id for c in edl.active_cuts()], ["seg001", "seg002"])
+        self.assertEqual(edl.summary()["cuts"], 2)
+
+    def test_a_caption_keeps_only_the_words_that_survived(self):
+        from reelforge.edl import EDL, Cut
+        from reelforge.captions import CaptionLine
+        cuts = [Cut(0.0, 2.0, 0.0, 2.0, id="a"), Cut(5.0, 7.0, 2.0, 4.0, id="b")]
+        line = CaptionLine(words=[Word("one", 0.5, 1.0), Word("two", 1.2, 1.8),
+                                  Word("three", 2.2, 2.8)], start=0.5, end=2.8)
+        edl = EDL(source="x.mp4", output={}, cuts=cuts, captions=[line])
+        edl.retime({"a": False})
+        self.assertEqual([w.text for w in edl.captions[0].words], ["three"])
+        self.assertAlmostEqual(edl.captions[0].start, 0.2, places=3)
+
+    def test_trimming_is_not_read_as_rejecting_the_zooms_inside_it(self):
+        # Otherwise cutting a weak take teaches the editor to stop proposing
+        # zooms, which is the opposite of what happened.
+        import copy
+        from reelforge.learn import _survivor_test
+        proposed = self.edl()
+        final = copy.deepcopy(proposed)
+        final.retime({"seg001": False})
+        survives = _survivor_test(proposed, final)
+        self.assertTrue(survives(1.0), "a zoom in kept footage still counts")
+        self.assertFalse(survives(11.0), "a zoom in cut footage must not count as rejected")
+
+    def test_a_trim_does_not_teach_the_wrong_spelling(self):
+        # Pairing captions by position would read line 3 against line 2 and learn
+        # "second -> third" as a vocabulary correction.
+        import copy
+        from reelforge.learn import _diff_caption_words
+        proposed = self.edl()
+        final = copy.deepcopy(proposed)
+        final.retime({"seg001": False})
+        self.assertEqual(_diff_caption_words(proposed, final), [])
+
+    def test_a_real_correction_is_still_learned_after_a_trim(self):
+        import copy
+        from reelforge.learn import _diff_caption_words
+        proposed = self.edl()
+        final = copy.deepcopy(proposed)
+        final.retime({"seg001": False})
+        final.captions[1].words[0].text = "ثالث"
+        pairs = _diff_caption_words(proposed, final)
+        self.assertEqual([right for _wrong, right in pairs], ["ثالث"])
+
+    def test_segments_carry_what_is_said_in_them(self):
+        from reelforge.brain import label_cuts
+        from reelforge.edl import Cut
+        from reelforge.speech import Segment, Transcript
+        cuts = [Cut(0.0, 2.0, 0.0, 2.0, id="a"), Cut(5.0, 7.0, 2.0, 4.0, id="b")]
+        transcript = Transcript(language="ar", backend="stub", model="stub", segments=[
+            Segment(text="", start=0.0, end=7.0,
+                    words=[Word("أهلا", 0.2, 0.8), Word("بيك", 0.9, 1.5),
+                           Word("يلا", 5.2, 5.8), Word("بينا", 5.9, 6.5)])])
+        label_cuts(cuts, transcript)
+        self.assertEqual(cuts[0].text, "أهلا بيك")
+        self.assertEqual(cuts[1].text, "يلا بينا")
+
+
 try:
     import fastapi  # noqa: F401
     from fastapi.testclient import TestClient
@@ -2269,6 +2396,95 @@ class WebAppTests(unittest.TestCase):
         response = client.post(f"/api/jobs/{job.id}/settings",
                                json={"values": {"captions.max_words": 2}})
         self.assertEqual(response.status_code, 409)
+
+    # -- trimming --------------------------------------------------------
+    def test_trimming_a_segment_shortens_the_video(self):
+        client = self.client("trim")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertGreater(len(edl["cuts"]), 1, "need more than one segment to trim")
+        before = job["summary"]["output_duration"]
+
+        keep = {cut["id"]: True for cut in edl["cuts"]}
+        dropped = edl["cuts"][0]
+        keep[dropped["id"]] = False
+        response = client.post(f"/api/jobs/{job['id']}/segments", json={"keep": keep})
+        self.assertEqual(response.status_code, 200, response.text)
+
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        self.assertLess(job["summary"]["output_duration"], before)
+        after = client.get(f"/api/jobs/{job['id']}/edl").json()
+        gone = next(c for c in after["cuts"] if c["id"] == dropped["id"])
+        self.assertFalse(gone["enabled"])
+        self.assertEqual(after["cuts"][0]["out_start"], 0.0)
+
+    def test_a_trim_survives_a_look_change(self):
+        # Source time is the only frame of reference that does. Storing the
+        # segment numbers instead would move the trim onto different footage the
+        # moment a new plan renumbered them.
+        client = self.client("trimlook")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        keep = {cut["id"]: True for cut in edl["cuts"]}
+        keep[edl["cuts"][0]["id"]] = False
+        client.post(f"/api/jobs/{job['id']}/segments", json={"keep": keep})
+        trimmed = self.wait(client, job["id"])["summary"]["output_duration"]
+
+        client.post(f"/api/jobs/{job['id']}/settings",
+                    json={"values": {"captions.max_words": 2}})
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        self.assertAlmostEqual(job["summary"]["output_duration"], trimmed, places=1,
+                               msg="the trim was lost when the look changed")
+
+    def test_a_trim_comes_back_after_a_restart(self):
+        client = self.client("trimrestart")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        keep = {cut["id"]: True for cut in edl["cuts"]}
+        keep[edl["cuts"][0]["id"]] = False
+        client.post(f"/api/jobs/{job['id']}/segments", json={"keep": keep})
+        trimmed = self.wait(client, job["id"])["summary"]["output_duration"]
+
+        client = self.restart("trimrestart")
+        after = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertFalse(next(c for c in after["cuts"]
+                              if c["id"] == edl["cuts"][0]["id"])["enabled"])
+        self.assertAlmostEqual(client.get(f"/api/jobs/{job['id']}").json()
+                               ["summary"]["output_duration"], trimmed, places=1)
+
+    def test_removing_every_segment_is_refused(self):
+        client = self.client("trimall")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        keep = {cut["id"]: False for cut in edl["cuts"]}
+        response = client.post(f"/api/jobs/{job['id']}/segments", json={"keep": keep})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("whole video", response.json()["detail"])
+        self.assertEqual(self.app.state.store.get(job["id"]).drops, [])
+
+    def test_a_segment_that_does_not_exist_is_refused(self):
+        client = self.client("trimbad")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        response = client.post(f"/api/jobs/{job['id']}/segments",
+                               json={"keep": {"seg999": False}})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("seg999", response.json()["detail"])
+
+    def test_segments_arrive_with_their_words(self):
+        client = self.client("trimtext")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        cuts = client.get(f"/api/jobs/{job['id']}/edl").json()["cuts"]
+        self.assertTrue(any(cut["text"] for cut in cuts),
+                        "a segment with no words cannot be judged before cutting it")
 
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore

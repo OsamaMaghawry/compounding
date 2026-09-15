@@ -31,6 +31,9 @@ class Cut:
     out_start: float
     out_end: float
     kind: str = "speech"
+    id: str = ""
+    enabled: bool = True
+    text: str = ""          # what is said here, so a segment can be read before it is cut
 
     @property
     def duration(self) -> float:
@@ -39,7 +42,8 @@ class Cut:
     def to_dict(self) -> dict:
         return {"src_start": round(self.src_start, 3), "src_end": round(self.src_end, 3),
                 "out_start": round(self.out_start, 3), "out_end": round(self.out_end, 3),
-                "kind": self.kind}
+                "kind": self.kind, "id": self.id, "enabled": self.enabled,
+                "text": self.text}
 
 
 @dataclass
@@ -170,7 +174,10 @@ class EDL:
 
     @property
     def timeline(self) -> Timeline:
-        return Timeline(self.cuts)
+        return Timeline(self.active_cuts())
+
+    def active_cuts(self) -> list[Cut]:
+        return [c for c in self.cuts if c.enabled and c.duration > 0.01]
 
     @property
     def duration(self) -> float:
@@ -191,13 +198,100 @@ class EDL:
             "source_duration": round(src_duration, 2),
             "output_duration": round(self.duration, 2),
             "removed": round(max(0.0, src_duration - self.duration), 2),
-            "cuts": len(self.cuts),
+            "cuts": len(self.active_cuts()),
             "zooms": len(self.active_zooms()),
             "overlays": len(self.active_overlays()),
             "transitions": len(self.active_transitions()),
             "caption_lines": len(self.captions),
             "words": sum(len(line.words) for line in self.captions),
         }
+
+    def retime(self, enabled: dict[str, bool] | None = None) -> None:
+        """Switch segments on or off, and move every effect to match.
+
+        Effects and captions are stored in OUTPUT time, so dropping a segment
+        shifts all of them. Leaving them where they were would put a zoom on the
+        wrong sentence and captions out of sync with the voice - the two things
+        this tool exists to get right. So each one is converted back to source
+        time against the old timeline and forward again against the new one.
+
+        Anything whose moment was in the removed segment has nowhere to go and is
+        taken out. It is removed rather than switched off because switching off
+        means "I did not want this", which is a thing the editor learns from, and
+        trimming a segment says nothing about the zoom that happened to sit in it.
+        """
+        old = self.timeline
+
+        def source_of(out_t: float) -> float | None:
+            return old.to_src(out_t)
+
+        # Read every effect's position before anything moves.
+        zoom_src = [(z, source_of(z.out_start), source_of(z.out_end)) for z in self.zooms]
+        overlay_src = [(o, source_of(o.out_start), source_of(o.out_end)) for o in self.overlays]
+        transition_src = [(t, source_of(t.out_time)) for t in self.transitions]
+        caption_src = [
+            (line, [(w, source_of(w.start), source_of(w.end)) for w in line.words])
+            for line in self.captions
+        ]
+
+        if enabled is not None:
+            for cut in self.cuts:
+                if cut.id in enabled:
+                    cut.enabled = bool(enabled[cut.id])
+
+        # Rebuild output time. A dropped segment collapses to nothing rather than
+        # keeping a stale span that would quietly still map.
+        cursor = 0.0
+        for cut in sorted(self.cuts, key=lambda c: c.src_start):
+            if cut.enabled and cut.duration > 0.01:
+                cut.out_start, cut.out_end = cursor, cursor + cut.duration
+                cursor = cut.out_end
+            else:
+                cut.out_start = cut.out_end = cursor
+
+        new = self.timeline
+
+        def moved(src_t: float | None) -> float | None:
+            if src_t is None:
+                return None
+            return new.to_out(src_t, clamp=False)
+
+        def respan(items):
+            kept = []
+            for item, start, end in items:
+                out_start, out_end = moved(start), moved(end)
+                if out_start is None or out_end is None or out_end - out_start <= 0.01:
+                    continue
+                item.out_start, item.out_end = out_start, out_end
+                kept.append(item)
+            return kept
+
+        self.zooms = respan(zoom_src)
+        self.overlays = respan(overlay_src)
+
+        transitions = []
+        for transition, src_t in transition_src:
+            out_t = moved(src_t)
+            if out_t is not None:
+                transition.out_time = out_t
+                transitions.append(transition)
+        self.transitions = transitions
+
+        captions = []
+        for line, words in caption_src:
+            kept = []
+            for word, start, end in words:
+                out_start, out_end = moved(start), moved(end)
+                if out_start is None or out_end is None or out_end <= out_start:
+                    continue
+                word.start, word.end = out_start, out_end
+                kept.append(word)
+            if not kept:
+                continue
+            line.words = kept
+            line.start, line.end = kept[0].start, kept[-1].end
+            captions.append(line)
+        self.captions = captions
 
     def to_dict(self) -> dict:
         return {
@@ -248,11 +342,12 @@ def build_timeline(keep: list[tuple[float, float]]) -> list[Cut]:
     """Turn (src_start, src_end) keeps into cuts carrying output timestamps."""
     cuts: list[Cut] = []
     cursor = 0.0
-    for src_start, src_end in sorted(keep):
+    for index, (src_start, src_end) in enumerate(sorted(keep)):
         duration = max(0.0, src_end - src_start)
         if duration <= 0:
             continue
         cuts.append(Cut(src_start=src_start, src_end=src_end,
-                        out_start=cursor, out_end=cursor + duration))
+                        out_start=cursor, out_end=cursor + duration,
+                        id=f"seg{index:03d}"))
         cursor += duration
     return cuts
