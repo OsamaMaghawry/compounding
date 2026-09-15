@@ -370,6 +370,12 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
 
     @app.get("/api/jobs", dependencies=[Depends(require_login)])
     def list_jobs() -> list[dict]:
+        # An upload that failed leaves an empty edit behind. Clear the stale ones
+        # rather than letting them pile up looking like real work.
+        for job in store.list():
+            if (job.status == "uploading" and not job.sources
+                    and time.time() - job.created > 600):
+                store.delete(job.id)
         return [job.to_dict() for job in store.list()]
 
     @app.post("/api/jobs", dependencies=[Depends(require_login)])
@@ -381,30 +387,45 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         store.update(job, status="uploading", stage="waiting for clips")
         return job.to_dict()
 
-    @app.post("/api/jobs/{job_id}/files", dependencies=[Depends(require_login)])
-    async def add_file(job_id: str, file: UploadFile) -> dict:
-        """One clip per request: progress is visible and a failure retries cheaply."""
+    @app.post("/api/jobs/{job_id}/chunk", dependencies=[Depends(require_login)])
+    async def add_chunk(job_id: str, file: UploadFile, name: str = Form(...),
+                        index: int = Form(...), offset: int = Form(0),
+                        final: str = Form("false")) -> dict:
+        """A slice of one clip, written at its offset.
+
+        Phone video runs to hundreds of megabytes a take, and a single request
+        that large dies somewhere between the browser and here - a proxy limit, a
+        timeout, a dropped connection - with nothing useful to show for it.
+        Small pieces always get through, and each one that does is progress kept.
+        """
         job = job_or_404(job_id)
-        name = Path(file.filename or "clip.mp4").name
-        if Path(name).suffix.lower() not in VIDEO_SUFFIXES:
-            raise HTTPException(status_code=400, detail=f"{name} is not a video file")
+        safe = Path(name).name
+        if Path(safe).suffix.lower() not in VIDEO_SUFFIXES:
+            raise HTTPException(status_code=400, detail=f"{safe} is not a video file")
+        if offset < 0 or index < 0:
+            raise HTTPException(status_code=400, detail="bad chunk position")
 
         uploads = store.dir(job.id) / "uploads"
         uploads.mkdir(parents=True, exist_ok=True)
-        target = uploads / f"{len(job.sources):02d}-{name}"
+        target = uploads / f"{index:02d}-{safe}"
 
-        written = sum(Path(p).stat().st_size for p in job.sources if Path(p).exists())
-        with target.open("wb") as handle:
-            while chunk := await file.read(1 << 20):
-                written += len(chunk)
-                if written > MAX_UPLOAD_BYTES:
-                    target.unlink(missing_ok=True)
-                    raise HTTPException(status_code=413, detail="that is more than 4 GB in total")
-                handle.write(chunk)
+        payload = await file.read()
+        if offset + len(payload) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="that clip is larger than 4 GB")
 
-        store.update(job, sources=[*job.sources, str(target)],
-                     stage=f"{len(job.sources) + 1} clip(s) uploaded")
-        return {"ok": True, "uploaded": len(job.sources), "name": name}
+        # r+b keeps the earlier chunks; writing at the offset means a retried or
+        # out-of-order piece lands in the right place rather than corrupting it.
+        mode = "r+b" if target.exists() else "wb"
+        with target.open(mode) as handle:
+            handle.seek(offset)
+            handle.write(payload)
+
+        done = str(final).lower() == "true"
+        if done and str(target) not in job.sources:
+            store.update(job, sources=[*job.sources, str(target)],
+                         stage=f"{len(job.sources) + 1} clip(s) uploaded")
+        return {"ok": True, "received": len(payload), "size": target.stat().st_size,
+                "complete": done}
 
     @app.post("/api/jobs/{job_id}/start", dependencies=[Depends(require_login)])
     def start_job(job_id: str) -> dict:
@@ -599,24 +620,48 @@ async function api(path, opts={}){
   return r.headers.get('content-type')?.includes('json') ? r.json() : r;
 }
 
-function putFile(url, file, onProgress){
-  // XHR rather than fetch: it is the only way to report upload progress, and a
-  // large clip over a slow connection needs to show that it is moving.
+const CHUNK = 6 * 1024 * 1024;   // small enough to cross any proxy
+
+function postChunk(url, blob, fields){
   return new Promise((resolve, reject)=>{
     const xhr=new XMLHttpRequest();
     xhr.open('POST', url, true);
     xhr.withCredentials=true;
-    xhr.upload.onprogress=e=>{ if(e.lengthComputable) onProgress(e.loaded/e.total); };
+    xhr.timeout=180000;
     xhr.onload=()=>{
       if(xhr.status>=200 && xhr.status<300) return resolve();
       let detail=''; try{ detail=JSON.parse(xhr.responseText).detail||''; }catch(_){}
       reject(new Error(`${xhr.status} ${detail||xhr.statusText||'upload failed'}`));
     };
-    xhr.onerror=()=>reject(new Error('the connection dropped during upload'));
-    xhr.ontimeout=()=>reject(new Error('the upload timed out'));
-    const body=new FormData(); body.append('file', file);
+    xhr.onerror=()=>reject(new Error('the connection dropped'));
+    xhr.ontimeout=()=>reject(new Error('this piece timed out'));
+    const body=new FormData();
+    for(const [k,v] of Object.entries(fields)) body.append(k, v);
+    body.append('file', blob, fields.name);
     xhr.send(body);
   });
+}
+
+async function uploadFile(jobId, file, index, onProgress){
+  // Send the clip in pieces. One failed piece is retried on its own, instead of
+  // losing a 150 MB upload and starting again.
+  for(let offset=0; offset<file.size; offset+=CHUNK){
+    const slice=file.slice(offset, Math.min(offset+CHUNK, file.size));
+    const last = offset+CHUNK >= file.size;
+    let attempt=0;
+    for(;;){
+      try{
+        await postChunk(`/api/jobs/${jobId}/chunk`, slice,
+          {name:file.name, index:String(index), offset:String(offset),
+           final:last?'true':'false'});
+        break;
+      }catch(e){
+        if(++attempt>=3) throw new Error(`${file.name}: ${e.message}`);
+        await new Promise(r=>setTimeout(r, 1000*attempt));
+      }
+    }
+    onProgress(Math.min(offset+CHUNK, file.size)/file.size);
+  }
 }
 function show(authed){ $('login').hidden=authed; $('app').hidden=!authed; if(authed){loadTemplates();refresh();} }
 
@@ -640,14 +685,15 @@ $('upload').onclick=async()=>{
   if(!files.length){ $('msg').textContent='choose at least one video'; return; }
   const total=files.reduce((n,f)=>n+f.size,0);
   $('upload').disabled=true;
+  let job=null;
   try{
-    const job=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},
+    job=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({template:$('template').value, model:$('model').value,
                            title:files[0].name.replace(/\.[^.]+$/,'')})});
     let done=0;
     for(let i=0;i<files.length;i++){
       const f=files[i];
-      await putFile(`/api/jobs/${job.id}/files`, f, frac=>{
+      await uploadFile(job.id, f, i, frac=>{
         const pct=Math.round(100*(done+frac*f.size)/total);
         $('msg').textContent=`uploading ${i+1} of ${files.length} — ${f.name} — ${pct}%`;
       });
@@ -656,7 +702,11 @@ $('upload').onclick=async()=>{
     $('msg').textContent='uploaded — editing has started';
     await api(`/api/jobs/${job.id}/start`,{method:'POST'});
     $('files').value=''; current=job.id; refresh();
-  }catch(e){ $('msg').textContent='error: '+e.message; }
+  }catch(e){
+    $('msg').textContent='error: '+e.message;
+    // Do not leave a half-made edit sitting in the list.
+    if(job) { try{ await api('/api/jobs/'+job.id,{method:'DELETE'}); refresh(); }catch(_){} }
+  }
   finally{ $('upload').disabled=false; }
 };
 
@@ -667,9 +717,16 @@ async function refresh(){
     const cls = j.status==='ready'||j.status==='done' ? 'ready' : (j.status==='error'?'error':'working');
     return `<div class="job" data-id="${j.id}">
       <span class="grow"><b>${j.title}</b><br><span class="dim">${j.stage}</span></span>
-      <span class="pill ${cls}">${j.status}</span></div>`;
+      <span class="pill ${cls}">${j.status}</span>
+      <span class="pill" data-del="${j.id}" title="remove">✕</span></div>`;
   }).join('') : '<span class="dim">none yet</span>';
   $('jobs').querySelectorAll('.job').forEach(el=>el.onclick=()=>{current=el.dataset.id;draw();});
+  $('jobs').querySelectorAll('[data-del]').forEach(el=>el.onclick=async ev=>{
+    ev.stopPropagation();
+    await api('/api/jobs/'+el.dataset.del,{method:'DELETE'}).catch(()=>{});
+    if(current===el.dataset.del){ current=null; $('detail').innerHTML=''; }
+    refresh();
+  });
   if(current) draw(jobs.find(j=>j.id===current));
   const busy = jobs.some(j=>j.status==='working'||j.status==='queued'||j.status==='exporting');
   clearTimeout(poll); poll=setTimeout(refresh, busy?2500:15000);

@@ -1884,12 +1884,19 @@ class WebAppTests(unittest.TestCase):
         created = client.post("/api/jobs", json={"template": "", "model": "small", **data})
         self.assertEqual(created.status_code, 200, created.text)
         job_id = created.json()["id"]
-        for path in paths:
-            with open(path, "rb") as handle:
-                response = client.post(f"/api/jobs/{job_id}/files",
-                                       files={"file": (Path(path).name, handle, "video/mp4")})
-            if response.status_code != 200:
-                return response
+        chunk = 64 * 1024
+        for index, path in enumerate(paths):
+            data = Path(path).read_bytes()
+            for offset in range(0, max(len(data), 1), chunk):
+                piece = data[offset:offset + chunk]
+                last = offset + chunk >= len(data)
+                response = client.post(
+                    f"/api/jobs/{job_id}/chunk",
+                    data={"name": Path(path).name, "index": str(index),
+                          "offset": str(offset), "final": "true" if last else "false"},
+                    files={"file": (Path(path).name, piece, "video/mp4")})
+                if response.status_code != 200:
+                    return response
         return client.post(f"/api/jobs/{job_id}/start")
 
     def wait(self, client, job_id, limit=240):
@@ -1963,13 +1970,30 @@ class WebAppTests(unittest.TestCase):
         client = self.client("order")
         self.login(client)
         job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
-        for path in (self.clip_b, self.clip_a):
-            with open(path, "rb") as handle:
-                client.post(f"/api/jobs/{job_id}/files",
-                            files={"file": (Path(path).name, handle, "video/mp4")})
+        for index, path in enumerate((self.clip_b, self.clip_a)):
+            client.post(f"/api/jobs/{job_id}/chunk",
+                        data={"name": Path(path).name, "index": str(index),
+                              "offset": "0", "final": "true"},
+                        files={"file": (Path(path).name, Path(path).read_bytes(),
+                                        "video/mp4")})
         sources = self.app.state.store.get(job_id).sources
         self.assertEqual([Path(s).name.split("-", 1)[1] for s in sources],
                          [Path(self.clip_b).name, Path(self.clip_a).name])
+
+    def test_a_clip_arrives_intact_when_sent_in_pieces(self):
+        client = self.client("chunks")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        data = Path(self.clip_a).read_bytes()
+        piece = 8192
+        for offset in range(0, len(data), piece):
+            last = offset + piece >= len(data)
+            client.post(f"/api/jobs/{job_id}/chunk",
+                        data={"name": "a.mp4", "index": "0", "offset": str(offset),
+                              "final": "true" if last else "false"},
+                        files={"file": ("a.mp4", data[offset:offset + piece], "video/mp4")})
+        stored = Path(self.app.state.store.get(job_id).sources[0])
+        self.assertEqual(stored.read_bytes(), data, "reassembled clip differs from the original")
 
     def test_exporting_an_unloaded_edit_is_refused_clearly(self):
         # After a restart the plan is gone; say so rather than failing obscurely.
