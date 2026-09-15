@@ -2014,6 +2014,146 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(client.get("/api/jobs/nope").status_code, 404)
         self.assertEqual(client.get("/api/jobs/nope/edl").status_code, 404)
 
+    # -- the look panel --------------------------------------------------
+    def test_every_look_field_names_a_real_profile_key(self):
+        # A typo here would show a control that silently changes nothing.
+        from reelforge.profile import StyleProfile
+        from reelforge.web import LOOK_FIELDS
+        profile = StyleProfile()
+        for field in LOOK_FIELDS:
+            profile.get(field["key"])                      # raises on an unknown key
+
+    def test_the_panel_offers_every_caption_style(self):
+        from reelforge.captions import _style_spec
+        from reelforge.profile import StyleProfile
+        from reelforge.web import LOOK_FIELDS
+        field = next(f for f in LOOK_FIELDS if f["key"] == "captions.style")
+        offered = {value for value, _label in field["options"]}
+        for style in offered:
+            spec = _style_spec(StyleProfile().apply_overrides([f"captions.style={style}"]), 90)
+            self.assertEqual(spec["style"], style)
+        self.assertIn("word", offered, "one-word-at-a-time must be reachable")
+
+    def test_the_panel_describes_itself_with_current_values(self):
+        client = self.client("panel")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+
+        panel = client.get(f"/api/jobs/{job['id']}/settings")
+        self.assertEqual(panel.status_code, 200, panel.text)
+        fields = {f["key"]: f for f in panel.json()["fields"]}
+        self.assertEqual(fields["captions.style"]["value"], "karaoke")
+        self.assertEqual(fields["captions.max_words"]["value"], 4)
+        # The font list is the catalog, so a font can be picked before it is
+        # downloaded rather than only after someone finds the CLI.
+        families = {o["value"] for o in fields["captions.font"]["options"]}
+        self.assertIn("Cairo", families)
+        self.assertIn("Alexandria", families)
+
+    def test_changing_the_look_replans_and_keeps_only_real_changes(self):
+        client = self.client("look")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        before = client.get(f"/api/jobs/{job['id']}/edl").json()
+
+        # What the browser posts: every control, most of them untouched.
+        values = {f["key"]: f["value"] for f in
+                  client.get(f"/api/jobs/{job['id']}/settings").json()["fields"]}
+        values["captions.style"] = "word"
+        values["captions.max_words"] = 1
+        values["captions.highlight"] = "#ffd700"        # same colour, lower case
+        applied = client.post(f"/api/jobs/{job['id']}/settings", json={"values": values})
+        self.assertEqual(applied.status_code, 200, applied.text)
+
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        stored = self.app.state.store.get(job["id"]).overrides
+        self.assertEqual(set(stored), {"captions.style", "captions.max_words"},
+                         "untouched controls must not be pinned against the template")
+
+        after = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertTrue(all(len(line["words"]) == 1 for line in after["captions"]))
+        self.assertGreater(len(after["captions"]), len(before["captions"]))
+        self.assertIn("captions: words per line",
+                      client.get(f"/api/jobs/{job['id']}/settings").json()["changed"])
+
+    def test_resetting_the_look_returns_to_the_template(self):
+        client = self.client("reset")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        store = self.app.state.store
+        store.update(store.get(job["id"]), overrides={"captions.max_words": "1"})
+
+        applied = client.post(f"/api/jobs/{job['id']}/settings", json={"reset": True})
+        self.assertEqual(applied.status_code, 200, applied.text)
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        self.assertEqual(store.get(job["id"]).overrides, {})
+
+    def test_a_setting_outside_the_panel_is_refused(self):
+        # The profile drives ffmpeg expressions; 'whatever was posted' is not
+        # something to hand to a filtergraph.
+        client = self.client("guard")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        response = client.post(f"/api/jobs/{job['id']}/settings",
+                               json={"values": {"output.fps": "1"}})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("output.fps", response.json()["detail"])
+        self.assertEqual(self.app.state.store.get(job["id"]).overrides, {})
+
+    def test_the_no_transition_choice_survives_a_round_trip(self):
+        # 'none' becomes a real None inside the profile, which no <option> can
+        # match - so the panel would quietly show 'auto' again.
+        client = self.client("nokind")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        store = self.app.state.store
+        store.update(store.get(job["id"]), overrides={"transitions.kind": "none"})
+        fields = {f["key"]: f for f in
+                  client.get(f"/api/jobs/{job['id']}/settings").json()["fields"]}
+        self.assertEqual(fields["transitions.kind"]["value"], "none")
+
+    def test_typed_caption_words_survive_a_look_change(self):
+        # Re-planning rebuilds captions from the transcript. A name you just
+        # spelled correctly must not be thrown away by picking another font.
+        client = self.client("keep")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        first = edl["captions"][0]["words"][0]["text"]
+        fixed = "أسامة"
+        captions = [{"text": line["text"]} for line in edl["captions"]]
+        captions[0] = {"text": " ".join([fixed] + [w["text"] for w
+                                                   in edl["captions"][0]["words"][1:]])}
+        self.assertNotEqual(first, fixed)
+        client.post(f"/api/jobs/{job['id']}/edl", json={"rerender": False, "captions": captions,
+                                                        "zooms": [], "overlays": [],
+                                                        "transitions": []})
+
+        client.post(f"/api/jobs/{job['id']}/settings",
+                    json={"values": {"captions.font_size": 80}})
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        after = client.get(f"/api/jobs/{job['id']}/edl").json()
+        words = [w["text"] for line in after["captions"] for w in line["words"]]
+        self.assertIn(fixed, words, "the correction was lost when the look changed")
+        self.assertNotIn(first, words)
+
+    def test_the_look_cannot_be_changed_before_anything_is_edited(self):
+        client = self.client("early")
+        self.login(client)
+        store = self.app.state.store
+        job = store.create("clip", "", "small")
+        store.update(job, status="ready")
+        response = client.post(f"/api/jobs/{job.id}/settings",
+                               json={"values": {"captions.max_words": 2}})
+        self.assertEqual(response.status_code, 409)
+
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore
         root = Path(self.tmp) / "restart"

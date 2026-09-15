@@ -43,6 +43,100 @@ COOKIE = "reelforge_session"
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024      # 4 GB per job
 
 
+# ---------------------------------------------------------------- look panel
+#
+# The dials worth turning between takes, described once so the browser can build
+# the panel itself. Anything not listed here is deliberately out: the profile has
+# roughly ninety settings and a phone screen has room for the dozen that change
+# how the Reel actually feels.
+#
+# Every key is a real profile path, so a choice made here is the same thing as
+# `--set captions.style=word` on the command line.
+LOOK_FIELDS: list[dict] = [
+    {"group": "Captions", "key": "captions.style", "label": "Style", "type": "select",
+     "help": "How the word you are saying is marked.",
+     "options": [
+         ("karaoke", "Karaoke — the spoken word changes colour"),
+         ("box", "Box — the spoken word sits in a filled box (the CapCut look)"),
+         ("pop", "Pop — the whole line pulses on each word"),
+         ("word", "One word — a single big word at a time"),
+         ("plain", "Plain — no per-word marking"),
+     ]},
+    {"group": "Captions", "key": "captions.font", "label": "Font", "type": "font",
+     "help": "Arabic families only. One that is not downloaded yet is fetched when you apply."},
+    {"group": "Captions", "key": "captions.max_words", "label": "Words per line",
+     "type": "number", "min": 1, "max": 8, "step": 1,
+     "help": "Reels read best at three or four. Set 1 for one-word-at-a-time."},
+    {"group": "Captions", "key": "captions.font_size", "label": "Size", "type": "number",
+     "min": 40, "max": 170, "step": 2},
+    {"group": "Captions", "key": "captions.y_pct", "label": "Height on screen",
+     "type": "number", "min": 0.25, "max": 0.92, "step": 0.01,
+     "help": "0 is the top, 1 the bottom. 0.72 clears the Instagram buttons."},
+    {"group": "Captions", "key": "captions.line_gap", "label": "Pause between lines",
+     "type": "number", "min": 0.0, "max": 0.6, "step": 0.02,
+     "help": "Blank time between one line and the next, in seconds."},
+    {"group": "Captions", "key": "captions.highlight", "label": "Spoken-word colour",
+     "type": "color"},
+    {"group": "Captions", "key": "captions.primary", "label": "Text colour", "type": "color"},
+    {"group": "Captions", "key": "captions.emphasis", "label": "Mark important words",
+     "type": "bool", "help": "Keeps key words coloured even when you are past them."},
+    {"group": "Captions", "key": "captions.emphasis_color", "label": "Important-word colour",
+     "type": "color"},
+
+    {"group": "Motion", "key": "zoom.enabled", "label": "Punch in while speaking",
+     "type": "bool"},
+    {"group": "Motion", "key": "zoom.rate_per_min", "label": "Moves per minute",
+     "type": "number", "min": 0, "max": 40, "step": 1,
+     "help": "How often the camera pushes in or pulls out."},
+    {"group": "Motion", "key": "zoom.max_factor", "label": "Strongest punch",
+     "type": "number", "min": 1.0, "max": 1.6, "step": 0.01},
+    {"group": "Motion", "key": "transitions.kind", "label": "Transition", "type": "select",
+     "help": "What happens at a cut.",
+     "options": [
+         ("auto", "Auto — pick per cut"),
+         ("punch", "Punch — a fast scale kick"),
+         ("flash", "Flash — a brief brightness lift"),
+         ("blur", "Blur — a short smear"),
+         ("none", "None — hard cuts only"),
+     ]},
+    {"group": "Motion", "key": "transitions.duration", "label": "Transition length",
+     "type": "number", "min": 0.05, "max": 0.6, "step": 0.01,
+     "help": "Seconds. A transition you notice is too long."},
+    {"group": "Motion", "key": "transitions.strength", "label": "Transition strength",
+     "type": "number", "min": 0.0, "max": 1.0, "step": 0.05},
+    {"group": "Motion", "key": "transitions.max_per_min", "label": "Transitions per minute",
+     "type": "number", "min": 0, "max": 60, "step": 1},
+
+    {"group": "Pacing", "key": "cuts.enabled", "label": "Cut dead air", "type": "bool"},
+    {"group": "Pacing", "key": "cuts.min_silence", "label": "Shortest silence to cut",
+     "type": "number", "min": 0.15, "max": 1.5, "step": 0.05,
+     "help": "Seconds. Lower is more aggressive."},
+    {"group": "Pacing", "key": "cuts.max_gap_keep", "label": "Pause left behind",
+     "type": "number", "min": 0.05, "max": 1.0, "step": 0.01,
+     "help": "Seconds of breath kept where a silence was removed."},
+]
+
+LOOK_KEYS = {field["key"] for field in LOOK_FIELDS}
+LOOK_LABELS = {field["key"]: f"{field['group'].lower()}: {field['label'].lower()}"
+               for field in LOOK_FIELDS}
+
+
+def _differs(new: object, old: object) -> bool:
+    """Whether a posted setting is actually a change from the template's value.
+
+    The panel posts every control on every apply, so without this the first
+    Apply would pin all twenty settings and the template would stop meaning
+    anything. Colours come back from the browser lower-cased and numbers as
+    floats, neither of which is a change.
+    """
+    if isinstance(new, str) and isinstance(old, str):
+        return new.strip().lower() != old.strip().lower()
+    if (isinstance(new, (int, float)) and isinstance(old, (int, float))
+            and not isinstance(new, bool) and not isinstance(old, bool)):
+        return abs(float(new) - float(old)) > 1e-9
+    return new != old
+
+
 @dataclass
 class Job:
     id: str
@@ -58,6 +152,8 @@ class Job:
     run_id: int | None = None
     summary: dict = field(default_factory=dict)
     output_name: str = ""
+    overrides: dict = field(default_factory=dict)   # look settings, changed after upload
+    prepared: str = ""                              # the joined (or single) source
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -163,6 +259,8 @@ class Runner:
                     self._process(job)
                 elif task == "rerender":
                     self._rerender(job)
+                elif task == "replan":
+                    self._replan(job)
                 elif task == "export":
                     self._export(job)
             except Exception as exc:                      # a failed job must not kill the worker
@@ -177,16 +275,8 @@ class Runner:
             self.store.update(job, stage=message)
 
         self.store.update(job, status="working", stage="starting", error="")
-
-        profile = StyleProfile.resolve(job.template or None,
-                                       [PACKAGE_ROOT / "templates", PACKAGE_ROOT / "profiles"])
-        overrides = [f"asr.model={job.model}"]
-        # Lets a deployment pin the speech backend - and lets the tests run
-        # without downloading a model.
-        backend = os.environ.get("REELFORGE_ASR_BACKEND")
-        if backend:
-            overrides.append(f"asr.backend={backend}")
-        profile = profile.apply_overrides(overrides)
+        profile = self.profile_for(job)
+        self._ensure_font(profile, note)
         editor = AutoEditor(profile, project_dir=directory / "project",
                             fonts_dir=self.fonts_dir, on_status=note)
         clips = [Path(p) for p in job.sources]
@@ -199,13 +289,109 @@ class Runner:
         else:
             source = clips[0]
 
+        self.store.update(job, prepared=str(source))
+        self._plan_into(job, source, editor, note)
+
+    def profile_for(self, job: Job) -> StyleProfile:
+        """Template, then the model, then whatever look settings were chosen."""
+        profile = StyleProfile.resolve(job.template or None,
+                                       [PACKAGE_ROOT / "templates", PACKAGE_ROOT / "profiles"])
+        overrides = [f"asr.model={job.model}"]
+        backend = os.environ.get("REELFORGE_ASR_BACKEND")
+        if backend:
+            overrides.append(f"asr.backend={backend}")
+        overrides += [f"{key}={value}" for key, value in (job.overrides or {}).items()]
+        return profile.apply_overrides(overrides)
+
+    def _ensure_font(self, profile: StyleProfile, note) -> None:
+        """Fetch the caption font if picking it is the first time it is used.
+
+        Choosing a font in the browser and getting tofu boxes back would be a
+        baffling way to learn that fonts are downloaded on demand, so download it
+        here. A failure is only a warning - libass falls back, and a fallback
+        preview is more useful than no preview.
+        """
+        from . import fonts as font_catalog  # noqa: PLC0415
+        from .render import check_font       # noqa: PLC0415
+        if not profile.get("captions.enabled"):
+            return
+        if check_font(profile, self.fonts_dir) is None:
+            return
+        entry = font_catalog.resolve(profile.get("captions.font") or "")
+        if entry is None:
+            return
+        note(f"downloading {entry.family}")
+        _changed, message = font_catalog.download(entry, self.fonts_dir)
+        note(message)
+
+    def _plan_into(self, job: Job, source: Path, editor: AutoEditor, note) -> None:
+        """Decide the edit for `source` and render a preview into the job folder."""
         result = editor.plan(source)
         self._remember(job.id, editor, result.edl)
+        for warning in result.warnings:
+            note(warning)
         note("rendering preview")
-        editor.render(result.edl, directory / "preview.mp4", preview=True)
-
+        editor.render(result.edl, self.store.dir(job.id) / "preview.mp4", preview=True)
         self.store.update(job, status="ready", stage="ready to review",
                           run_id=result.run_id, summary=result.edl.summary())
+
+    def _replan(self, job: Job) -> None:
+        """Re-decide the edit with new look settings.
+
+        Fast, because the analysis and the transcript are cached against the
+        source: changing the caption style or the transitions never re-listens to
+        the audio. What it does cost is the preview render, and the enable
+        checkboxes - a different rate gives you different moves, so there is
+        nothing for the old ticks to attach to.
+        """
+        source = Path(job.prepared) if job.prepared else None
+        if not source or not source.exists():
+            raise RuntimeError("this edit is no longer loaded - upload it again")
+
+        def note(message: str) -> None:
+            job.progress.append(message)
+            self.store.update(job, stage=message)
+
+        fixes = self._typed_fixes(job)
+        self.store.update(job, status="working", stage="applying the new look", error="")
+        profile = self.profile_for(job)
+        self._ensure_font(profile, note)
+        editor = AutoEditor(profile, project_dir=self.store.dir(job.id) / "project",
+                            fonts_dir=self.fonts_dir, on_status=note)
+        self._plan_into(job, source, editor, note)
+        if fixes:
+            self._apply_fixes(job, fixes)
+            self.store.update(job, summary=self.edls[job.id].summary())
+
+    def _typed_fixes(self, job: Job) -> dict[str, str]:
+        """Word corrections typed into the current captions, as wrong -> right.
+
+        Re-planning rebuilds the captions from the transcript, which would quietly
+        throw away a name you just spelled correctly. Feeding them back through
+        the ASR would be the thorough fix, but that means transcribing again -
+        minutes, for a caption-style change. Replaying them over the new words
+        costs nothing and keeps what you typed.
+        """
+        from .learn import _diff_caption_words  # noqa: PLC0415
+        edl = self.edls.get(job.id)
+        editor = self.editors.get(job.id)
+        if edl is None or editor is None or not job.run_id:
+            return {}
+        proposed_path = editor.runs_dir / f"run-{job.run_id}.edl.json"
+        if not proposed_path.exists():
+            return {}
+        try:
+            proposed = EDL.load(proposed_path)
+        except Exception:
+            return {}
+        return dict(_diff_caption_words(proposed, edl))
+
+    def _apply_fixes(self, job: Job, fixes: dict[str, str]) -> None:
+        from .arabic import VocabCorrector  # noqa: PLC0415
+        corrector = VocabCorrector(fixes)
+        for line in self.edls[job.id].captions:
+            for word in line.words:
+                word.text = corrector.correct_word(word.text)
 
     def loaded(self, job_id: str) -> bool:
         return job_id in self.edls
@@ -482,6 +668,75 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         return {"ok": True, "queued": bool(body.get("rerender")),
                 "summary": edl.summary()}
 
+    @app.get("/api/jobs/{job_id}/settings", dependencies=[Depends(require_login)])
+    def get_settings(job_id: str) -> dict:
+        """The look panel: what can be changed, and where it stands right now."""
+        from . import fonts as font_catalog  # noqa: PLC0415
+        job = job_or_404(job_id)
+        profile = runner.profile_for(job)
+        have = font_catalog.installed(runner.fonts_dir)
+        fields = []
+        for field_def in LOOK_FIELDS:
+            entry = dict(field_def)
+            entry["value"] = profile.get(entry["key"], None)
+            if entry["type"] == "select":
+                entry["options"] = [{"value": v, "label": label}
+                                    for v, label in entry["options"]]
+                # 'none' round-trips through the profile as a real None, which no
+                # <option value> can match. Show it as the word again.
+                if entry["value"] is None:
+                    entry["value"] = "none"
+            elif entry["type"] == "font":
+                entry["type"] = "select"
+                entry["options"] = [
+                    {"value": f.family,
+                     "label": f"{f.family} — {f.note}" if f.family in have
+                              else f"{f.family} (downloads) — {f.note}"}
+                    for f in font_catalog.CATALOG
+                ]
+            fields.append(entry)
+        changed = sorted(LOOK_LABELS.get(key, key) for key in (job.overrides or {}))
+        return {"fields": fields, "changed": changed}
+
+    @app.post("/api/jobs/{job_id}/settings", dependencies=[Depends(require_login)])
+    def update_settings(job_id: str, body: dict) -> dict:
+        """Change the look and re-decide the edit.
+
+        Only keys the panel offers are accepted. The profile is a nest of numbers
+        that drive ffmpeg expressions, and 'whatever the browser posted' is not
+        something to hand to a filtergraph.
+        """
+        job = job_or_404(job_id)
+        if job.status in ("working", "queued", "exporting"):
+            raise HTTPException(status_code=409, detail="this edit is still busy")
+        if not job.prepared:
+            raise HTTPException(status_code=409, detail="nothing has been edited yet")
+
+        values = body.get("values")
+        if body.get("reset"):
+            overrides: dict = {}
+        else:
+            if not isinstance(values, dict):
+                raise HTTPException(status_code=400, detail="no settings were sent")
+            unknown = sorted(set(values) - LOOK_KEYS)
+            if unknown:
+                raise HTTPException(status_code=400,
+                                    detail=f"not a setting you can change here: {unknown[0]}")
+            posted = {key: str(value) for key, value in values.items()}
+            base = StyleProfile.resolve(job.template or None,
+                                        [PACKAGE_ROOT / "templates", PACKAGE_ROOT / "profiles"])
+            try:                                   # reject a bad number before it reaches ffmpeg
+                candidate = base.apply_overrides([f"{k}={v}" for k, v in posted.items()])
+            except (ValueError, KeyError) as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            overrides = {key: value for key, value in posted.items()
+                         if _differs(candidate.get(key, None), base.get(key, None))}
+
+        store.update(job, overrides=overrides, status="queued",
+                     stage="queued for the new look", error="")
+        runner.submit(job.id, "replan")
+        return {"ok": True, "queued": True}
+
     @app.post("/api/jobs/{job_id}/export", dependencies=[Depends(require_login)])
     def export_job(job_id: str) -> dict:
         job = job_or_404(job_id)
@@ -565,6 +820,20 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent);flex:none
   background:#10101a;border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap}
 #msg{margin-top:10px;font-size:13px;color:var(--dim);min-height:18px}
 a{color:var(--accent)}
+.set{padding:10px 0;border-bottom:1px solid var(--line)}
+.set:last-child{border-bottom:0}
+.set label{font-size:14px;display:block}
+.set .help{font-size:12px;color:var(--dim);margin-top:2px}
+.set input,.set select{margin-top:6px}
+.set.inline{display:flex;align-items:center;gap:10px}
+.set.inline label{flex:1}
+.set.inline input[type=checkbox]{margin-top:0}
+input[type=color]{height:44px;padding:4px}
+.tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.tab{background:#242433;color:var(--dim);border:0;border-radius:9px;padding:8px 13px;
+  font:inherit;font-size:13px;cursor:pointer;width:auto;margin:0;flex:none}
+.tab.on{background:var(--accent);color:#18181f;font-weight:650}
+.two{display:flex;gap:10px}.two>*{flex:1}
 </style></head><body>
 
 <div id="login" hidden>
@@ -775,6 +1044,7 @@ async function draw(job){
   if(job.status==='ready'||job.status==='done'){
     try{ edl=await api('/api/jobs/'+job.id+'/edl'); }catch(e){ edl=null; }
     if(edl) renderControls(job);
+    renderLook(job);
     const rr=$('rerender'), ex=$('export');
     if(rr) rr.onclick=()=>send(job,true);
     if(ex) ex.onclick=async()=>{ ex.disabled=true; ex.textContent='queued…';
@@ -798,6 +1068,78 @@ function renderControls(job){
     `<div class="card"><h2>Captions</h2>${cap||'<span class="dim">none</span>'}</div>
      <div class="card"><h2>Zoom moves</h2>${zoom||'<span class="dim">none</span>'}</div>
      <div class="card"><h2>Transitions</h2>${tr||'<span class="dim">none</span>'}</div>`);
+}
+
+// The look panel. Everything here is a real profile key, so a choice made on a
+// phone is the same change as `--set captions.style=word` on the command line.
+let look=null;
+
+function control(f){
+  const id=`s_${f.key.replace('.','_')}`;
+  const help=f.help?`<div class="help">${f.help}</div>`:'';
+  if(f.type==='bool')
+    return `<div class="set inline"><label for="${id}">${f.label}${help}</label>
+      <input type="checkbox" id="${id}" data-set="${f.key}" ${f.value?'checked':''}></div>`;
+  if(f.type==='select')
+    return `<div class="set"><label for="${id}">${f.label}</label>${help}
+      <select id="${id}" data-set="${f.key}">${f.options.map(o=>
+        `<option value="${o.value}" ${String(o.value)===String(f.value)?'selected':''}>${o.label}</option>`
+      ).join('')}</select></div>`;
+  if(f.type==='color')
+    return `<div class="set"><label for="${id}">${f.label}</label>${help}
+      <input type="color" id="${id}" data-set="${f.key}" value="${f.value||'#ffffff'}"></div>`;
+  return `<div class="set"><label for="${id}">${f.label}</label>${help}
+    <input type="number" id="${id}" data-set="${f.key}" value="${f.value}"
+      min="${f.min}" max="${f.max}" step="${f.step}"></div>`;
+}
+
+async function renderLook(job){
+  try{ look=await api('/api/jobs/'+job.id+'/settings'); }catch(e){ return; }
+  const groups=[...new Set(look.fields.map(f=>f.group))];
+  const tabs=groups.map((g,i)=>`<button class="tab ${i?'':'on'}" data-tab="${g}">${g}</button>`).join('');
+  const panes=groups.map((g,i)=>
+    `<div data-pane="${g}" ${i?'hidden':''}>${look.fields.filter(f=>f.group===g).map(control).join('')}</div>`
+  ).join('');
+  const changed=look.changed.length
+    ? `<div class="dim" style="margin-top:10px">changed from the template: ${look.changed.join(', ')}</div>` : '';
+  $('detail').insertAdjacentHTML('beforeend',
+    `<div class="card"><h2>Look</h2>
+      <div class="tabs">${tabs}</div>${panes}
+      <div class="dim" style="margin-top:10px;font-size:12px">
+        Applying re-decides the edit with the transcript already taken, so it is
+        the preview render you wait for, not the listening. Caption wording you
+        typed is kept; the zoom and transition ticks reset, because a new setting
+        gives you different moves.</div>
+      <button id="applyLook">Apply and re-render</button>
+      <button class="ghost" id="resetLook">Back to the template</button>
+      <div id="lookMsg" class="dim"></div>
+    </div>`);
+
+  document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{
+    document.querySelectorAll('[data-tab]').forEach(t=>t.classList.toggle('on', t===el));
+    document.querySelectorAll('[data-pane]').forEach(pane=>{
+      pane.hidden = pane.dataset.pane !== el.dataset.tab;
+    });
+  });
+  $('applyLook').onclick=()=>applyLook(job, false);
+  $('resetLook').onclick=()=>applyLook(job, true);
+}
+
+async function applyLook(job, reset){
+  const values={};
+  if(!reset) document.querySelectorAll('[data-set]').forEach(el=>{
+    values[el.dataset.set] = el.type==='checkbox' ? (el.checked?'true':'false') : el.value;
+  });
+  $('applyLook').disabled=$('resetLook').disabled=true;
+  $('lookMsg').textContent='queued…';
+  try{
+    await api('/api/jobs/'+job.id+'/settings',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({values, reset})});
+    drawn=''; listed=''; refresh();
+  }catch(e){
+    $('lookMsg').textContent='error: '+e.message;
+    $('applyLook').disabled=$('resetLook').disabled=false;
+  }
 }
 
 async function send(job, rerender){

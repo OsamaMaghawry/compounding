@@ -11,6 +11,38 @@ reelforge serve
 It prints an address and a password. That is the whole thing locally. The rest of this
 page is about putting it somewhere you can reach from anywhere.
 
+## The Look panel
+
+Under the preview there is a **Look** card, in three tabs.
+
+| Tab | What it changes |
+|---|---|
+| **Captions** | style, font, words per line, size, height on screen, pause between lines, colours |
+| **Motion** | punch-ins per minute and strength; the transition at a cut, its length and strength |
+| **Pacing** | whether dead air is cut, the shortest silence worth cutting, the breath left behind |
+
+**Caption styles.** *Karaoke* colours the word you are saying. *Box* puts it in a filled
+box - the CapCut look. *Pop* pulses the whole line on each word. *One word* shows a
+single large word at a time; set **words per line** to 1 with it. *Plain* marks nothing.
+
+**Apply and re-render** re-decides the edit and renders a new preview. It does not
+listen to your voice again - the transcript is already taken and cached against the
+clip - so trying four caption styles costs four preview renders, not four
+transcriptions. **Back to the template** undoes everything at once.
+
+Two things to know:
+
+- Wording you typed into a caption is carried over. Fix a name once and it survives
+  every look you try afterwards.
+- The zoom and transition tick boxes reset, because a different rate gives you
+  different moves - there is nothing for the old ticks to attach to. Choose the look
+  first, then untick the individual moves you do not want, then export.
+
+Picking a font that has not been downloaded fetches it during the run; the log line
+says which. Each control is a real profile key, so anything the panel does is the same
+as `--set captions.style=word` on the command line, and a look you settle on can be
+written into a template.
+
 ## The quickest route: GitHub Codespaces
 
 If you have a GitHub account, you already have a server. A Codespace is a Linux
