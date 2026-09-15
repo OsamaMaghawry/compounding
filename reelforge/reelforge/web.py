@@ -349,7 +349,10 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
 
     @app.get("/api/me")
     def me(request: Request) -> dict:
-        return {"authenticated": valid_token(secret, request.cookies.get(COOKIE))}
+        from . import __version__  # noqa: PLC0415
+        from .cli import _checkout_revision  # noqa: PLC0415
+        return {"authenticated": valid_token(secret, request.cookies.get(COOKIE)),
+                "version": f"{__version__} · {_checkout_revision()}"}
 
     # -- jobs -----------------------------------------------------------
     @app.get("/api/templates", dependencies=[Depends(require_login)])
@@ -556,6 +559,7 @@ a{color:var(--accent)}
 <div id="app" hidden>
   <div class="card">
     <h1>New edit</h1>
+    <div class="dim" id="ver" style="font-size:11px;margin-bottom:6px"></div>
     <div class="dim">Pick every take of one video. They are joined in the order chosen.</div>
     <input type="file" id="files" accept="video/*" multiple>
     <select id="template"></select>
@@ -731,6 +735,9 @@ async function send(job, rerender){
   return r;
 }
 
-api('/api/me').then(d=>show(d.authenticated)).catch(()=>show(false));
+api('/api/me').then(d=>{
+  show(d.authenticated);
+  if(d.version) $('ver').textContent=d.version;
+}).catch(()=>show(false));
 </script></body></html>
 """

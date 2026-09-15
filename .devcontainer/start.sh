@@ -3,11 +3,17 @@
 # forwarded port is a link you can just open - no commands to type.
 set -euo pipefail
 
+PIDFILE=/workspaces/.reelforge.pid
 cd "$(dirname "$0")/../reelforge"
 mkdir -p /workspaces/data /workspaces/models
 
-if pgrep -f "reelforge serve" >/dev/null 2>&1; then
-  echo "ReelForge is already running."
+running() {
+  [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+}
+
+if running; then
+  echo "ReelForge is already running (pid $(cat $PIDFILE))."
+  echo "To pick up new code after a git pull:  bash .devcontainer/restart.sh"
   exit 0
 fi
 
@@ -26,6 +32,7 @@ set -a; . "$KEYS"; set +a
 
 nohup reelforge serve --host 0.0.0.0 --port 8000 --data /workspaces/data \
   > /workspaces/reelforge.log 2>&1 &
+echo $! > "$PIDFILE"
 
 sleep 2
 echo
