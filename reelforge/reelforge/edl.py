@@ -223,7 +223,7 @@ class EDL:
             "words": sum(len(line.words) for line in self.captions),
         }
 
-    def retime(self, enabled: dict[str, bool] | None = None) -> None:
+    def retime(self, enabled: dict[str, bool] | None = None, adjust=None) -> None:
         """Switch segments on or off, and move every effect to match.
 
         Effects and captions are stored in OUTPUT time, so dropping a segment
@@ -236,6 +236,11 @@ class EDL:
         taken out. It is removed rather than switched off because switching off
         means "I did not want this", which is a thing the editor learns from, and
         trimming a segment says nothing about the zoom that happened to sit in it.
+
+        `adjust` may move the segment boundaries themselves - lengthening or
+        shortening the pause at a join. It runs here, between reading where
+        everything was and working out where it goes, because that is the only
+        moment at which both answers are available.
         """
         old = self.timeline
 
@@ -255,6 +260,8 @@ class EDL:
             for cut in self.cuts:
                 if cut.id in enabled:
                     cut.enabled = bool(enabled[cut.id])
+        if adjust is not None:
+            adjust(self.cuts)
 
         # Rebuild output time. A dropped segment collapses to nothing rather than
         # keeping a stale span that would quietly still map.

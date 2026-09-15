@@ -95,12 +95,50 @@ with sync_playwright() as pw:
     for key, value in shot.items():
         print(f"  {key:10}:", value)
 
-    # Change a caption style and confirm it takes effect with no render.
+    # The settings are icons under the video; one click opens that group there.
+    page.wait_for_selector(".iconbar [data-group='Captions']", timeout=15000)
+    print("setting groups   :", page.locator(".iconbar button").count())
+    print("pane starts shut :", page.inner_text("#lookPane") == "")
+    page.click(".iconbar [data-group='Captions']")
     page.wait_for_selector("[data-set='captions.style']", timeout=15000)
+    print("font is reachable:", page.locator("[data-set='captions.font']").count() == 1)
+
     page.select_option("[data-set='captions.style']", "box")
     page.wait_for_timeout(600)
     print("dirty banner     :", repr(page.inner_text("#dirty")[:60]))
     print("save enabled     :", page.is_enabled("#saveEdit"))
+
+    # Clicking the same icon closes it again, so the video comes back into view.
+    page.click(".iconbar [data-group='Captions']")
+    print("pane shuts again :", page.inner_text("#lookPane") == "")
+
+    # Pause mode: markers appear on the joins and can be dragged.
+    page.click("#pauseMode")
+    page.wait_for_timeout(300)
+    joins = page.locator("#track .join")
+    print("pause markers    :", joins.count())
+    if joins.count():
+        spot = joins.first.bounding_box()
+        drag = page.evaluate("""(box) => {
+            const el = document.querySelector('#track .join');
+            const send = (type, dx) => el.dispatchEvent(new PointerEvent(type, {
+                bubbles: true, cancelable: true, pointerId: 3, isPrimary: true,
+                clientX: box.x + box.width / 2 + dx, clientY: box.y + box.height / 2}));
+            send('pointerdown', 0); send('pointermove', 26); send('pointerup', 26);
+            return new Promise(done => requestAnimationFrame(() => done(
+                P.pauses.map(([m, d]) => [Math.round(m * 100) / 100,
+                                          Math.round(d * 100) / 100]))));
+        }""", spot)
+        print("pause after drag :", drag)
+    page.click("#pauseMode")
+
+    # Saving a default look, so the next upload arrives already set up.
+    page.click(".iconbar [data-group='__defaults']")
+    page.wait_for_selector("#saveDefaults", timeout=10000)
+    page.click("#saveDefaults")
+    page.wait_for_timeout(1200)
+    print("defaults saved   :", repr(page.inner_text("#defaultsMsg")[:70]))
+    page.click(".iconbar [data-group='__defaults']")
 
     # Drag a selection across the timeline.
     page.wait_for_timeout(1500)                    # let any pending redraw settle
@@ -119,7 +157,8 @@ with sync_playwright() as pw:
         send('pointermove', 0.45);
         send('pointermove', 0.60);
         send('pointerup', 0.60);
-        return {seen, sel: P.sel};
+        return new Promise(done => requestAnimationFrame(
+            () => done({seen, sel: P.sel})));
     })()""")
     print("events seen      :", fired)
     page.wait_for_timeout(400)

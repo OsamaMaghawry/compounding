@@ -2698,6 +2698,106 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("no longer here", response.json()["detail"])
 
+    def test_a_saved_default_shapes_the_next_upload(self):
+        # A look you settled on is not something to pick again on every video.
+        client = self.client("defaults")
+        self.login(client)
+        saved = client.post("/api/defaults",
+                            json={"values": {"captions.max_words": 2,
+                                             "captions.font_size": 92}})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        # Only what actually differs is remembered, so the default does not
+        # freeze every setting at today's value.
+        self.assertEqual(saved.json()["values"], {"captions.max_words": "2"})
+
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(self.app.state.store.get(job["id"]).overrides,
+                         {"captions.max_words": "2"})
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        self.assertTrue(all(len(line["words"]) <= 2 for line in edl["captions"]))
+
+        client.post("/api/defaults", json={"clear": True})
+        self.assertEqual(client.get("/api/defaults").json()["values"], {})
+
+    def test_a_pause_can_be_made_longer_or_shorter(self):
+        from reelforge.edl import EDL, Cut
+        from reelforge.web import apply_pauses
+        # Two pieces with a two-second gap of silence between them.
+        def fresh():
+            return EDL(source="x.mp4", output={},
+                       cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="a"),
+                             Cut(5.0, 8.0, 3.0, 6.0, id="b")])
+        plain = fresh()
+        self.assertEqual(plain.duration, 6.0)
+
+        longer = fresh()
+        apply_pauses(longer, [[4.0, 1.0]])          # keep one more second of it
+        self.assertAlmostEqual(longer.duration, 7.0, places=3)
+        self.assertAlmostEqual(longer.cuts[0].src_end, 3.5, places=3)
+        self.assertAlmostEqual(longer.cuts[1].src_start, 4.5, places=3)
+
+        shorter = fresh()
+        apply_pauses(shorter, [[4.0, -0.5]])
+        self.assertAlmostEqual(shorter.duration, 5.5, places=3)
+
+    def test_a_pause_cannot_eat_the_segment_it_borders(self):
+        from reelforge.edl import EDL, Cut
+        from reelforge.web import apply_pauses
+        edl = EDL(source="x.mp4", output={},
+                  cuts=[Cut(0.0, 0.5, 0.0, 0.5, id="a"),
+                        Cut(2.0, 2.5, 0.5, 1.0, id="b")])
+        apply_pauses(edl, [[1.25, -20.0]])          # absurd, on purpose
+        for cut in edl.cuts:
+            self.assertGreaterEqual(cut.duration, 0.11, "a segment was shaved away")
+
+    def test_a_pause_never_takes_more_gap_than_there_is(self):
+        from reelforge.edl import EDL, Cut
+        from reelforge.web import apply_pauses
+        edl = EDL(source="x.mp4", output={},
+                  cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="a"),
+                        Cut(4.0, 7.0, 3.0, 6.0, id="b")])
+        apply_pauses(edl, [[3.5, 9.0]])             # only 1s of gap exists
+        self.assertAlmostEqual(edl.duration, 7.0, places=3)
+        self.assertLessEqual(edl.cuts[0].src_end, edl.cuts[1].src_start + 1e-6)
+
+    def test_one_transition_can_be_longer_than_the_rest(self):
+        from reelforge.edl import EDL, Cut, Transition
+        from reelforge.web import apply_beats
+        edl = EDL(source="x.mp4", output={},
+                  cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="a"),
+                        Cut(5.0, 8.0, 3.0, 6.0, id="b")],
+                  transitions=[Transition(id="t0", out_time=3.0, duration=0.18)])
+        apply_beats(edl, [[3.0, 0.5]])
+        self.assertAlmostEqual(edl.transitions[0].duration, 0.5, places=3)
+        apply_beats(edl, [[3.0, 0.0]])
+        self.assertFalse(edl.transitions[0].enabled,
+                         "a transition of no length must not still be applied")
+
+    def test_pauses_and_transitions_survive_saving(self):
+        client = self.client("livepause")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        cuts = [c for c in edl["cuts"] if c["enabled"]]
+        self.assertGreater(len(cuts), 1, "need a join to adjust")
+        middle = (cuts[0]["src_end"] + cuts[1]["src_start"]) / 2
+
+        tried = client.post(f"/api/jobs/{job['id']}/preview-plan",
+                            json={"pauses": [[middle, 0.4]]})
+        self.assertEqual(tried.status_code, 200, tried.text)
+        self.assertGreater(tried.json()["summary"]["output_duration"],
+                           job["summary"]["output_duration"])
+        # Tried, not kept.
+        self.assertEqual(self.app.state.store.get(job["id"]).pauses, [])
+
+        client.post(f"/api/jobs/{job['id']}/save",
+                    json={"pauses": [[middle, 0.4]], "beats": [[middle, 0.5]]})
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        stored = self.app.state.store.get(job["id"])
+        self.assertTrue(stored.pauses)
+        self.assertTrue(stored.beats)
+
     def test_trying_a_setting_changes_nothing_on_disk(self):
         client = self.client("try")
         self.login(client)

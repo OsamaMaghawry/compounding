@@ -117,7 +117,9 @@ That starts a web app with uploads, a job queue, progress you can watch, review 
 download. The player draws the edit over your untouched footage rather than playing a
 rendered file, so caption styles, zooms and trims change **while the video plays** and
 nothing is written down until you press Save. The timeline under it scrubs, selects and
-trims by dragging. It prints a password. Edits save themselves as you go and come back
+trims by dragging, and pauses and transitions are adjusted by dragging a marker on the
+join rather than by cutting. Settings sit behind a row of icons under the video, and a
+look you settle on can be saved as the default for every new upload. It prints a password. Edits save themselves as you go and come back
 after the server stops, so an idle timeout costs you nothing. For a server, `docker compose up -d --build` and put
 HTTPS in front of it - see [docs/HOSTING.md](docs/HOSTING.md), which also explains why
 recording at 1080p instead of 4K matters more than the server you choose.

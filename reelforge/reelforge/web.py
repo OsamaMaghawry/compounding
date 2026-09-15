@@ -164,6 +164,70 @@ def _remaining(edl: EDL, drops: list) -> list[tuple[float, float]]:
     return kept
 
 
+MIN_PIECE = 0.12          # never shave a segment down to nothing
+
+
+def apply_pauses(edl: EDL, pauses: list) -> None:
+    """Lengthen or shorten the silence kept at a join.
+
+    The planner cuts a pause down to a default. Some pauses want to be longer
+    than that - a beat before the point lands - and some want to be gone. Rather
+    than a number in a settings panel that moves every pause in the video at
+    once, this moves the one you are looking at.
+
+    Positive seconds give back footage the cut removed, up to the whole gap;
+    negative take more away, eating into the padding either side but never into
+    the segment itself.
+    """
+    wanted = [(float(mid), float(delta)) for mid, delta in (pauses or [])
+              if abs(float(delta)) > 0.005]
+    if not wanted:
+        return
+
+    def shift(cuts: list[Cut]) -> None:
+        live = sorted([c for c in cuts if c.enabled and c.duration > 0.01],
+                      key=lambda c: c.src_start)
+        for before, after in zip(live, live[1:]):
+            middle = (before.src_end + after.src_start) / 2.0
+            gap = after.src_start - before.src_end
+            match = next((d for mid, d in wanted if abs(mid - middle) <= 0.35), None)
+            if match is None:
+                continue
+            if match > 0:
+                # Give the gap back from both sides until they meet.
+                give = min(match, gap) / 2.0
+                before.src_end += give
+                after.src_start -= give
+            else:
+                take = -match / 2.0
+                before.src_end = max(before.src_start + MIN_PIECE, before.src_end - take)
+                after.src_start = min(after.src_end - MIN_PIECE, after.src_start + take)
+
+    edl.retime(adjust=shift)
+
+
+def apply_beats(edl: EDL, beats: list) -> None:
+    """Set the length of the transition at a particular join.
+
+    The Look panel sets one length for the whole video, which is right until one
+    cut wants to land harder than the rest. Matched in source time so the tweak
+    survives the next plan.
+    """
+    wanted = [(float(mid), float(seconds)) for mid, seconds in (beats or [])]
+    if not wanted:
+        return
+    timeline = edl.timeline
+    for transition in edl.transitions:
+        where = timeline.to_src(transition.out_time)
+        if where is None:
+            continue
+        match = next((s for mid, s in wanted if abs(mid - where) <= 0.35), None)
+        if match is None:
+            continue
+        transition.duration = max(0.0, min(1.5, match))
+        transition.enabled = transition.duration > 0.01
+
+
 def apply_drops(edl: EDL, drops: list) -> None:
     """Take trimmed-away stretches of the original footage out of the edit.
 
@@ -243,6 +307,12 @@ class Job:
     # caption style, the pacing, the model, and 0:14 to 0:19 of your footage is
     # still 0:14 to 0:19. Segment numbers are not - they renumber on every plan.
     drops: list = field(default_factory=list)
+    # Pauses you lengthened or shortened by hand, as [midpoint, seconds] pairs.
+    # The midpoint is in source time for the same reason drops are: it still
+    # points at the same join after the next plan renumbers everything.
+    pauses: list = field(default_factory=list)
+    # Per-join transition lengths, [midpoint, seconds], keyed the same way.
+    beats: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -513,7 +583,9 @@ class Runner:
         than something you queue.
         """
         result = editor.plan(source)
+        apply_pauses(result.edl, job.pauses)
         apply_drops(result.edl, job.drops)
+        apply_beats(result.edl, job.beats)
         self._remember(job.id, editor, result.edl)
         for warning in result.warnings:
             note(warning)
@@ -524,7 +596,8 @@ class Runner:
         self.store.update(job, status="ready", stage="ready to review",
                           run_id=result.run_id, summary=result.edl.summary())
 
-    def plan_preview(self, job: Job, values: dict, drops: list) -> dict:
+    def plan_preview(self, job: Job, values: dict, drops: list,
+                     pauses: list | None = None, beats: list | None = None) -> dict:
         """What the edit would be with these settings - committing nothing.
 
         This is what makes the panel feel live: the answer comes back in about a
@@ -538,7 +611,9 @@ class Runner:
         editor = AutoEditor(profile, project_dir=self.store.dir(job.id) / "project",
                             fonts_dir=self.fonts_dir)
         result = editor.plan(source, record=False)
+        apply_pauses(result.edl, pauses if pauses is not None else job.pauses)
         apply_drops(result.edl, drops)
+        apply_beats(result.edl, beats if beats is not None else job.beats)
         return {"edl": result.edl.to_dict(), "summary": result.edl.summary(),
                 "look": profile.section("captions")}
 
@@ -747,6 +822,53 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                 "version": f"{__version__} · {_checkout_revision()}"}
 
     # -- jobs -----------------------------------------------------------
+    def defaults_path() -> Path:
+        return data_dir / "defaults.json"
+
+    def read_defaults() -> dict:
+        try:
+            raw = json.loads(defaults_path().read_text("utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return {k: str(v) for k, v in raw.items() if k in LOOK_KEYS} \
+            if isinstance(raw, dict) else {}
+
+    @app.get("/api/defaults", dependencies=[Depends(require_login)])
+    def get_defaults() -> dict:
+        saved = read_defaults()
+        return {"values": saved,
+                "labels": sorted(LOOK_LABELS.get(k, k) for k in saved)}
+
+    @app.post("/api/defaults", dependencies=[Depends(require_login)])
+    def set_defaults(body: dict) -> dict:
+        """Remember a look, so the next upload already arrives looking right.
+
+        A style you settled on is not something to re-pick on every video.
+        """
+        if body.get("clear"):
+            defaults_path().unlink(missing_ok=True)
+            return {"ok": True, "values": {}}
+        values = body.get("values")
+        if not isinstance(values, dict):
+            raise HTTPException(status_code=400, detail="no settings were sent")
+        unknown = sorted(set(values) - LOOK_KEYS)
+        if unknown:
+            raise HTTPException(status_code=400,
+                                detail=f"not a setting you can change here: {unknown[0]}")
+        base = StyleProfile()
+        keep = {key: str(value) for key, value in values.items()}
+        try:
+            candidate = base.apply_overrides([f"{k}={v}" for k, v in keep.items()])
+        except (ValueError, KeyError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        keep = {key: value for key, value in keep.items()
+                if _differs(candidate.get(key, None), base.get(key, None))}
+        defaults_path().parent.mkdir(parents=True, exist_ok=True)
+        defaults_path().write_text(json.dumps(keep, ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
+        return {"ok": True, "values": keep,
+                "labels": sorted(LOOK_LABELS.get(k, k) for k in keep)}
+
     @app.post("/api/update", dependencies=[Depends(require_login)])
     def update(background: BackgroundTasks) -> dict:
         """Fetch the newest version and restart, without opening a terminal.
@@ -916,7 +1038,10 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         job = store.create(title=str(body.get("title") or "reel"),
                            template=str(body.get("template") or ""),
                            model=str(body.get("model") or "small"))
-        store.update(job, status="uploading", stage="waiting for clips")
+        # Start from the look you settled on, so a new upload already arrives
+        # the way you like it rather than back at the factory settings.
+        store.update(job, status="uploading", stage="waiting for clips",
+                     overrides=read_defaults())
         return job.to_dict()
 
     @app.post("/api/jobs/{job_id}/chunk", dependencies=[Depends(require_login)])
@@ -1146,7 +1271,8 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                                 detail=f"not a setting you can change here: {unknown[0]}")
         try:
             return runner.plan_preview(job, {k: str(v) for k, v in values.items()},
-                                       body.get("drops") or job.drops)
+                                       body.get("drops") or job.drops,
+                                       body.get("pauses"), body.get("beats"))
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -1214,6 +1340,19 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
             if not isinstance(drops, list):
                 raise HTTPException(status_code=400, detail="drops must be a list")
             job.drops = [[float(a), float(b)] for a, b in drops if float(b) > float(a)]
+
+        pauses = body.get("pauses")
+        if pauses is not None:
+            if not isinstance(pauses, list):
+                raise HTTPException(status_code=400, detail="pauses must be a list")
+            job.pauses = [[float(mid), float(delta)] for mid, delta in pauses
+                          if abs(float(delta)) > 0.005]
+
+        beats = body.get("beats")
+        if beats is not None:
+            if not isinstance(beats, list):
+                raise HTTPException(status_code=400, detail="beats must be a list")
+            job.beats = [[float(mid), float(seconds)] for mid, seconds in beats]
 
         store.update(job, status="queued", stage="saving", error="")
         runner.submit(job.id, "replan" if body.get("render") else "replan_only")
@@ -1355,12 +1494,35 @@ input[type=color]{height:44px;padding:4px}
 .track .keep{position:absolute;top:0;bottom:0;background:#2b2b3d}
 .track .sel{position:absolute;top:0;bottom:0;background:rgba(255,210,74,.28);
   border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
-.track .grip{position:absolute;top:0;bottom:0;width:18px;margin-left:-9px;
-  cursor:ew-resize;touch-action:none}
-.track .grip::after{content:'';position:absolute;top:50%;left:7px;width:4px;height:20px;
-  margin-top:-10px;border-radius:2px;background:var(--accent)}
-.track .head{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
-.track .lbl{position:absolute;bottom:3px;left:6px;font:10px ui-monospace,monospace;color:var(--dim)}
+.track .keeps,.track .joins{position:absolute;inset:0}
+.track .grip{position:absolute;top:0;bottom:0;width:28px;margin-left:-14px;
+  cursor:ew-resize;touch-action:none;z-index:3}
+.track .grip::after{content:'';position:absolute;top:50%;left:12px;width:4px;height:24px;
+  margin-top:-12px;border-radius:2px;background:var(--accent)}
+.track .head{position:absolute;top:0;bottom:0;width:2px;background:#fff;z-index:4;
+  touch-action:none;cursor:grab}
+.track .head::before{content:'';position:absolute;top:0;bottom:0;left:-14px;right:-14px}
+.track .head::after{content:'';position:absolute;top:-1px;left:-5px;width:12px;height:12px;
+  border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
+.track .lbl{position:absolute;bottom:3px;left:6px;right:6px;font:10px ui-monospace,monospace;
+  color:var(--dim);pointer-events:none;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.track .join{position:absolute;top:0;bottom:0;width:30px;margin-left:-15px;display:none;
+  touch-action:none;cursor:ew-resize;z-index:2}
+.track.pauses .join{display:block}
+.track .join i{position:absolute;top:50%;left:13px;width:4px;height:26px;margin-top:-13px;
+  border-radius:2px;background:#6f6fa8}
+.track .join.on i{background:var(--accent);box-shadow:0 0 0 3px rgba(255,210,74,.2)}
+.tools button.on{background:var(--accent);color:#18181f}
+#joinInfo{background:#10101a;border-radius:10px;padding:10px;margin-top:8px;font-size:13px}
+#joinInfo .row{display:flex;align-items:center;gap:10px;padding:4px 0;border:0}
+#joinInfo input[type=range]{flex:1;accent-color:var(--accent);margin:0}
+#joinInfo b{font:12px ui-monospace,monospace;color:var(--accent);min-width:104px;text-align:right}
+.iconbar{display:flex;gap:6px;overflow-x:auto;margin:12px 0 0;padding-bottom:4px;
+  -webkit-overflow-scrolling:touch}
+.iconbar button{width:auto;margin:0;flex:none;background:#242433;color:var(--dim);
+  border-radius:11px;padding:9px 12px;font-size:11px;line-height:1.25;min-width:64px}
+.iconbar button b{display:block;font-size:19px;font-weight:400;margin-bottom:2px}
+.iconbar button.on{background:var(--accent);color:#18181f;font-weight:650}
 .tools{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .tools button{width:auto;margin:0;padding:9px 13px;font-size:13px;flex:none}
 .bar{display:flex;gap:8px;margin-top:12px}.bar>*{flex:1}
@@ -1649,6 +1811,7 @@ async function draw(job){
         <button id="playBtn">Play</button>
         <button class="ghost" id="markIn">Start here</button>
         <button class="ghost" id="markOut">End here</button>
+        <button class="ghost" id="speedBtn">1x</button>
         <span class="clock" id="clock">0:00</span>
       </div>
       <div class="track" id="track"></div>
@@ -1656,8 +1819,18 @@ async function draw(job){
         <button class="ghost" id="cutSel">Cut the selection</button>
         <button class="ghost" id="keepSel">Keep only this</button>
         <button class="ghost" id="clearSel">Clear selection</button>
-        <button class="ghost" id="undoTrims">Undo all trims</button>
+        <button class="ghost" id="pauseMode">Adjust pauses</button>
+        <button class="ghost" id="undoTrims">Undo all edits</button>
       </div>
+      <div id="joinInfo" hidden>
+        <div class="row"><span>Pause</span>
+          <span class="dim" style="flex:1;font-size:12px">drag the marker on the strip</span>
+          <b class="pauseVal">0.00s</b></div>
+        <div class="row"><span>Transition</span>
+          <input type="range" data-beat min="0" max="0.8" step="0.02">
+          <b class="beatVal">0.18s</b></div>
+      </div>
+      <div id="lookHost"></div>
       <div class="stats">
         <div class="stat"><b id="statOut">${s.output_duration??'-'}s</b><span>from ${s.source_duration??'-'}s</span></div>
         <div class="stat"><b id="statCut">${s.removed??'-'}s</b><span>cut away</span></div>
@@ -1715,14 +1888,16 @@ function mountPlayer(job){
   const video=$('pv'), track=$('track'), caps=$('caps');
   if(!video||!track) return;
 
-  P={job, video, track, caps, plan:edl, look:null,
-     values:{}, drops:(job.drops||[]).map(d=>[d[0],d[1]]),
-     savedDrops:(job.drops||[]).map(d=>[d[0],d[1]]),
-     sel:null, dirty:false, raf:0, pending:0};
+  const copy=list=>(list||[]).map(d=>[d[0],d[1]]);
+  P={job, video, track, caps, plan:edl, look:null, values:{},
+     drops:copy(job.drops), pauses:copy(job.pauses), beats:copy(job.beats),
+     saved:{drops:copy(job.drops), pauses:copy(job.pauses), beats:copy(job.beats)},
+     sel:null, activeJoin:null, pauseMode:false, dirty:false, raf:0, pending:0,
+     grabAt:0};
 
   P.duration = Math.max(...(P.plan.cuts||[]).map(c=>c.src_end), 1);
-  drawTrack(); wireTransport(); wireTrack(); tick();
-  video.addEventListener('loadedmetadata', drawTrack);
+  buildTrack(); wireTransport(); wireTrack(); tick();
+  video.addEventListener('loadedmetadata', layoutTrack);
 }
 
 function kept(){ return (P.plan.cuts||[]).filter(c=>c.enabled); }
@@ -1761,8 +1936,7 @@ function tick(){
 function paint(out, src){
   drawCaption(out);
   drawZoom(out);
-  const head=P.track.querySelector('.head');
-  if(head) head.style.left=(100*src/P.duration).toFixed(3)+'%';
+  if(P.els) P.els.head.style.left=(100*src/P.duration).toFixed(3)+'%';
   const total=kept().reduce((n,c)=>n+(c.src_end-c.src_start),0);
   $('clock').textContent=`${stamp(out)} / ${stamp(total)}`;
 }
@@ -1828,69 +2002,189 @@ function drawZoom(out){
 }
 
 // -- the track ---------------------------------------------------------------
-function drawTrack(){
-  const marks=[];
-  for(const c of (P.plan.cuts||[])){
-    if(!c.enabled) continue;
-    marks.push(`<div class="keep" style="left:${(100*c.src_start/P.duration).toFixed(3)}%;`
-      +`width:${(100*(c.src_end-c.src_start)/P.duration).toFixed(3)}%"></div>`);
+//
+// Built once, then moved by styles alone. The first version rebuilt the whole
+// strip on every pointermove, which is exactly what makes a drag feel like it is
+// catching on something: the element under your finger is destroyed and remade
+// sixty times a second. Nothing here touches innerHTML while you are dragging.
+
+function buildTrack(){
+  const t=P.track;
+  t.innerHTML='<div class="keeps"></div><div class="joins"></div>'
+    +'<div class="sel" hidden></div>'
+    +'<div class="grip" data-grip="0" hidden></div>'
+    +'<div class="grip" data-grip="1" hidden></div>'
+    +'<div class="head"></div><div class="lbl"></div>';
+  P.els={keeps:t.querySelector('.keeps'), joins:t.querySelector('.joins'),
+         sel:t.querySelector('.sel'), head:t.querySelector('.head'),
+         lbl:t.querySelector('.lbl'),
+         grips:[...t.querySelectorAll('[data-grip]')]};
+  layoutTrack();
+}
+
+const pct=v=>(100*v/P.duration).toFixed(4)+'%';
+
+function layoutTrack(){
+  const live=kept();
+  // Only rebuild the blocks when their number changes; otherwise move them.
+  if(P.els.keeps.children.length!==live.length)
+    P.els.keeps.innerHTML=live.map(()=>'<div class="keep"></div>').join('');
+  live.forEach((c,i)=>{
+    const el=P.els.keeps.children[i];
+    el.style.left=pct(c.src_start);
+    el.style.width=pct(c.src_end-c.src_start);
+  });
+
+  const joins=P.pauseMode?junctions():[];
+  if(P.els.joins.children.length!==joins.length)
+    P.els.joins.innerHTML=joins.map(()=>'<div class="join"><i></i></div>').join('');
+  joins.forEach((j,i)=>{
+    const el=P.els.joins.children[i];
+    el.style.left=pct(j.middle);
+    el.dataset.join=i;
+    el.classList.toggle('on', P.activeJoin===i);
+  });
+
+  const s=P.sel;
+  P.els.sel.hidden=!s;
+  P.els.grips.forEach((g,i)=>{ g.hidden=!s; if(s) g.style.left=pct(s[i]); });
+  if(s){ P.els.sel.style.left=pct(s[0]); P.els.sel.style.width=pct(s[1]-s[0]); }
+  P.els.lbl.textContent = s
+    ? `${stamp(s[0])} → ${stamp(s[1])} (${(s[1]-s[0]).toFixed(1)}s selected)`
+    : (P.pauseMode ? 'drag a pause marker — left shortens it, right lengthens it'
+                   : 'tap to jump · drag across to select');
+}
+
+// Every gap between two surviving pieces: the silence the cut took out.
+function junctions(){
+  const live=kept(), out=[];
+  for(let i=0;i<live.length-1;i++){
+    const before=live[i], after=live[i+1];
+    out.push({middle:(before.src_end+after.src_start)/2,
+              gap:Math.max(0, after.src_start-before.src_end), index:i});
   }
-  const sel=P.sel?`<div class="sel" style="left:${(100*P.sel[0]/P.duration).toFixed(3)}%;`
-    +`width:${(100*(P.sel[1]-P.sel[0])/P.duration).toFixed(3)}%"></div>`
-    +`<div class="grip" data-grip="0" style="left:${(100*P.sel[0]/P.duration).toFixed(3)}%"></div>`
-    +`<div class="grip" data-grip="1" style="left:${(100*P.sel[1]/P.duration).toFixed(3)}%"></div>`:'';
-  const label=P.sel?`<div class="lbl">${stamp(P.sel[0])} → ${stamp(P.sel[1])} `
-    +`(${(P.sel[1]-P.sel[0]).toFixed(1)}s selected)</div>`
-    :`<div class="lbl">drag across to select · dark areas are already cut</div>`;
-  P.track.innerHTML=marks.join('')+sel+label+'<div class="head"></div>';
-  wireGrips();
+  return out;
+}
+
+function pauseOf(i){
+  const stored=P.pauses.find(([mid])=>Math.abs(mid-junctions()[i].middle)<=0.35);
+  return stored?stored[1]:0;
+}
+function setPause(i, seconds){
+  const middle=junctions()[i].middle;
+  const at=P.pauses.findIndex(([mid])=>Math.abs(mid-middle)<=0.35);
+  if(at>=0) P.pauses[at]=[middle,seconds]; else P.pauses.push([middle,seconds]);
 }
 
 function atX(clientX){
   const box=P.track.getBoundingClientRect();
-  return clamp((clientX-box.left)/box.width,0,1)*P.duration;
+  return clamp((clientX-box.left)/Math.max(1,box.width),0,1)*P.duration;
 }
 
+// One handler for the whole strip. Pointer events cover mouse, pen and touch
+// with the same code, and capture means a finger that slides off the strip -
+// or off the screen - still finishes the drag it started.
 function wireTrack(){
-  let anchor=null, moved=false;
-  P.track.addEventListener('pointerdown', ev=>{
-    if(ev.target.dataset.grip!==undefined) return;     // a handle owns this one
-    anchor=atX(ev.clientX); moved=false;
-    P.track.setPointerCapture(ev.pointerId);
+  const t=P.track;
+  let mode=null, anchor=0, which=0, frame=0, pending=null;
+
+  const apply=()=>{
+    frame=0;
+    // Compared against null, not truthiness: the very start of the video is 0,
+    // and a drag to the first frame is a real drag, not an absent one.
+    if(pending===null) return;
+    const at=pending; pending=null;
+    if(mode==='scrub'){
+      seekTo(at);
+    } else if(mode==='select'){
+      P.sel=[Math.min(anchor,at),Math.max(anchor,at)];
+    } else if(mode==='grip'){
+      P.sel = which===0 ? [Math.min(at,P.sel[1]-0.05),P.sel[1]]
+                        : [P.sel[0],Math.max(at,P.sel[0]+0.05)];
+      seekTo(P.sel[which],{quiet:true});
+    } else if(mode==='join'){
+      const j=junctions()[which];
+      // Right of where you took hold lengthens the pause, left shortens it.
+      const delta=clamp(anchor+(at-P.grabAt), -1.5, j.gap);
+      setPause(which, delta);
+      showJoin(which, delta, j.gap);
+    }
+    layoutTrack();
+  };
+  const queue=at=>{ pending=at; if(!frame) frame=requestAnimationFrame(apply); };
+
+  t.addEventListener('pointerdown', ev=>{
+    const join=ev.target.closest('.join'), grip=ev.target.closest('[data-grip]');
+    const at=atX(ev.clientX);
+    if(ev.target.closest('.head')){
+      mode='scrub';
+      P.wasPlaying=!P.video.paused;
+      if(P.wasPlaying) P.video.pause();
+      seekTo(at);
+    }
+    else if(join){ mode='join'; which=Number(join.dataset.join); P.grabAt=at;
+              anchor=pauseOf(which); P.activeJoin=which; layoutTrack(); }
+    else if(grip){ mode='grip'; which=Number(grip.dataset.grip); }
+    else { mode='maybe'; anchor=at; }
+    // preventDefault first: if capture throws, a touch that was meant to drag
+    // must still not turn into the page scrolling away under the finger.
+    ev.preventDefault();
+    try{ t.setPointerCapture(ev.pointerId); }catch(_){}
   });
-  P.track.addEventListener('pointermove', ev=>{
-    if(anchor===null) return;
-    const now=atX(ev.clientX);
-    if(Math.abs(now-anchor) > P.duration*0.005) moved=true;
-    if(moved){ P.sel=[Math.min(anchor,now),Math.max(anchor,now)]; drawTrack(); }
+
+  t.addEventListener('pointermove', ev=>{
+    if(!mode) return;
+    const at=atX(ev.clientX);
+    // A tap only becomes a drag once it has travelled far enough that it cannot
+    // be a shaky finger. Below that, it stays a tap.
+    if(mode==='maybe'){
+      if(Math.abs(at-anchor) < P.duration*0.004) return;
+      mode='select';
+    }
+    queue(at);
   });
-  P.track.addEventListener('pointerup', ev=>{
-    if(anchor===null) return;
-    if(!moved) seekTo(atX(ev.clientX));               // a tap is a seek
-    anchor=null;
-  });
+
+  const finish=ev=>{
+    if(!mode) return;
+    if(mode==='maybe') seekTo(atX(ev.clientX));
+    // Flush the move still waiting on a frame. Releasing cancels that frame, so
+    // without this the last thing you did before letting go is thrown away -
+    // and a quick flick, which is over inside one frame, does nothing at all.
+    if(pending!==null) apply();
+    if(mode==='join'||mode==='grip'||mode==='select'){ markDirty(); }
+    if(mode==='scrub' && P.wasPlaying){ P.video.play(); P.wasPlaying=false; }
+    if(mode==='join') repaintPlan();
+    cancelAnimationFrame(frame); frame=0; pending=null;
+    mode=null;
+    try{ t.releasePointerCapture(ev.pointerId); }catch(_){}
+  };
+  t.addEventListener('pointerup', finish);
+  // A cancelled pointer (a phone deciding it was a scroll, a call arriving)
+  // must end the drag too, or the strip stays stuck to the finger.
+  t.addEventListener('pointercancel', finish);
 }
 
-function wireGrips(){
-  P.track.querySelectorAll('[data-grip]').forEach(grip=>{
-    grip.addEventListener('pointerdown', ev=>{
-      ev.stopPropagation();
-      const which=Number(grip.dataset.grip);
-      grip.setPointerCapture(ev.pointerId);
-      const move=e=>{
-        const at=atX(e.clientX);
-        P.sel=which===0?[Math.min(at,P.sel[1]-0.05),P.sel[1]]
-                       :[P.sel[0],Math.max(at,P.sel[0]+0.05)];
-        drawTrack();
-        // Scrub as the handle moves: you set an in-point by seeing the frame.
-        seekTo(which===0?P.sel[0]:P.sel[1], {quiet:true});
-      };
-      const done=()=>{ grip.removeEventListener('pointermove',move);
-                       grip.removeEventListener('pointerup',done); };
-      grip.addEventListener('pointermove',move);
-      grip.addEventListener('pointerup',done);
-    });
-  });
+function showJoin(i, delta, gap){
+  const box=$('joinInfo');
+  if(!box) return;
+  const beat=beatOf(i);
+  box.hidden=false;
+  box.querySelector('.pauseVal').textContent=
+    (delta>=0?'+':'')+delta.toFixed(2)+'s'+(gap?` (up to +${gap.toFixed(2)}s)`:'');
+  box.querySelector('input[data-beat]').value=beat;
+  box.querySelector('.beatVal').textContent=beat.toFixed(2)+'s';
+}
+function beatOf(i){
+  const middle=junctions()[i].middle;
+  const stored=P.beats.find(([mid])=>Math.abs(mid-middle)<=0.35);
+  if(stored) return stored[1];
+  const look=P.plan.transitions||[];
+  return look.length?look[0].duration:0.18;
+}
+function setBeat(i, seconds){
+  const middle=junctions()[i].middle;
+  const at=P.beats.findIndex(([mid])=>Math.abs(mid-middle)<=0.35);
+  if(at>=0) P.beats[at]=[middle,seconds]; else P.beats.push([middle,seconds]);
 }
 
 function seekTo(src, opts={}){
@@ -1902,22 +2196,43 @@ function wireTransport(){
   const v=P.video;
   $('playBtn').onclick=()=>{
     if(v.paused){ if(outAt(v.currentTime)===null){ const c=kept()[0]; if(c) v.currentTime=c.src_start; }
-      v.play(); $('playBtn').textContent='Pause'; }
-    else { v.pause(); $('playBtn').textContent='Play'; }
+      v.play(); } else v.pause();
   };
   v.addEventListener('pause',()=>$('playBtn').textContent='Play');
   v.addEventListener('play',()=>$('playBtn').textContent='Pause');
   $('markIn').onclick=()=>{ const t=v.currentTime;
-    P.sel=[t, Math.max(t+0.2, P.sel?P.sel[1]:t+1)]; drawTrack(); };
+    P.sel=[t, Math.max(t+0.2, P.sel?P.sel[1]:t+1)]; layoutTrack(); markDirty(); };
   $('markOut').onclick=()=>{ const t=v.currentTime;
-    P.sel=[Math.min(P.sel?P.sel[0]:Math.max(0,t-1), t-0.2), t]; drawTrack(); };
-  $('clearSel').onclick=()=>{ P.sel=null; drawTrack(); };
+    P.sel=[Math.min(P.sel?P.sel[0]:Math.max(0,t-1), t-0.2), t]; layoutTrack(); markDirty(); };
+  $('clearSel').onclick=()=>{ P.sel=null; layoutTrack(); };
+  const SPEEDS=[1,1.5,2,0.5];
+  $('speedBtn').onclick=()=>{
+    P.speed=SPEEDS[(SPEEDS.indexOf(P.speed||1)+1)%SPEEDS.length];
+    v.playbackRate=P.speed;
+    $('speedBtn').textContent=P.speed+'x';
+  };
   $('cutSel').onclick=()=>{ if(P.sel) applyTrim([P.sel]); };
   $('keepSel').onclick=()=>{ if(P.sel) applyTrim([[0,P.sel[0]],[P.sel[1],P.duration]]); };
-  $('undoTrims').onclick=()=>{ P.drops=[]; P.sel=null; markDirty(); repaintPlan(); };
+  $('undoTrims').onclick=()=>{ P.drops=[]; P.pauses=[]; P.beats=[]; P.sel=null;
+    P.activeJoin=null; markDirty(); repaintPlan(); };
+  $('pauseMode').onclick=()=>{
+    P.pauseMode=!P.pauseMode; P.sel=null; P.activeJoin=null;
+    $('pauseMode').classList.toggle('on', P.pauseMode);
+    $('joinInfo').hidden=true;
+    P.track.classList.toggle('pauses', P.pauseMode);
+    layoutTrack();
+  };
+  const beat=$('joinInfo')?.querySelector('input[data-beat]');
+  if(beat) beat.oninput=()=>{
+    if(P.activeJoin===null) return;
+    setBeat(P.activeJoin, Number(beat.value));
+    $('joinInfo').querySelector('.beatVal').textContent=Number(beat.value).toFixed(2)+'s';
+    markDirty(); repaintPlan();
+  };
   $('saveEdit').onclick=saveEdit;
-  $('discardEdit').onclick=()=>{ P.values={}; P.drops=P.savedDrops.map(d=>[d[0],d[1]]);
-    P.sel=null; markDirty(false); repaintPlan(); renderLook(P.job); };
+  $('discardEdit').onclick=()=>{ P.values={}; P.drops=P.saved.drops.map(d=>[...d]);
+    P.pauses=P.saved.pauses.map(d=>[...d]); P.beats=P.saved.beats.map(d=>[...d]);
+    P.sel=null; P.activeJoin=null; markDirty(false); repaintPlan(); renderLook(P.job); };
 }
 
 // A selection is made against the finished video, so hand back output time and
@@ -1948,12 +2263,13 @@ function repaintPlan(){
     try{
       const r=await api(`/api/jobs/${P.job.id}/preview-plan`,{method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({values:P.values, drops:P.drops})});
+        body:JSON.stringify({values:P.values, drops:P.drops,
+                             pauses:P.pauses, beats:P.beats})});
       P.plan=r.edl; P.look=r.look; edl=r.edl;
       $('statOut').textContent=(r.summary.output_duration??'-')+'s';
       $('statCut').textContent=(r.summary.removed??'-')+'s';
       $('statZoom').textContent=r.summary.zooms??0;
-      drawTrack();
+      layoutTrack();
     }catch(e){ $('dirty').textContent='error: '+e.message; }
   }, 260);
 }
@@ -1971,8 +2287,10 @@ async function saveEdit(){
   try{
     await api(`/api/jobs/${P.job.id}/save`,{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({values:P.values, drops:P.drops})});
-    P.savedDrops=P.drops.map(d=>[d[0],d[1]]);
+      body:JSON.stringify({values:P.values, drops:P.drops,
+                           pauses:P.pauses, beats:P.beats})});
+    P.saved={drops:P.drops.map(d=>[...d]), pauses:P.pauses.map(d=>[...d]),
+             beats:P.beats.map(d=>[...d])};
     markDirty(false);
     drawn=''; listed=''; refresh();
   }catch(e){ $('dirty').textContent='error: '+e.message; $('saveEdit').disabled=false; }
@@ -2017,32 +2335,23 @@ function control(f){
       min="${f.min}" max="${f.max}" step="${f.step}"></div>`;
 }
 
-async function renderLook(job){
-  try{ look=await api('/api/jobs/'+job.id+'/settings'); }catch(e){ return; }
-  const groups=[...new Set(look.fields.map(f=>f.group))];
-  const tabs=groups.map((g,i)=>`<button class="tab ${i?'':'on'}" data-tab="${g}">${g}</button>`).join('');
-  const panes=groups.map((g,i)=>
-    `<div data-pane="${g}" ${i?'hidden':''}>${look.fields.filter(f=>f.group===g).map(control).join('')}</div>`
-  ).join('');
-  const changed=look.changed.length
-    ? `<div class="dim" style="margin-top:10px">changed from the template: ${look.changed.join(', ')}</div>` : '';
-  $('detail').insertAdjacentHTML('beforeend',
-    `<div class="card"><h2>Look</h2>
-      <div class="tabs">${tabs}</div>${panes}
-      <div class="dim" style="margin-top:10px;font-size:12px">
-        Changes show on the video as you make them — keep it playing and watch.
-        Nothing is written down until you press Save, so try as many as you
-        like.${changed}</div>
-      <button class="ghost" id="resetLook">Back to the template</button>
-      <div id="lookMsg" class="dim"></div>
-    </div>`);
+// An icon per group, opening its controls right under the video. The panel used
+// to be one long list below everything else, which meant scrolling past the
+// whole edit to change a font and scrolling back to see what it did.
+const GROUP_ICONS={Captions:'💬', Motion:'🎬', 'B-roll':'🎞️', Pacing:'⏱️'};
 
-  document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{
-    document.querySelectorAll('[data-tab]').forEach(t=>t.classList.toggle('on', t===el));
-    document.querySelectorAll('[data-pane]').forEach(pane=>{
-      pane.hidden = pane.dataset.pane !== el.dataset.tab;
-    });
-  });
+async function renderLook(job){
+  let look;
+  try{ look=await api('/api/jobs/'+job.id+'/settings'); }catch(e){ return; }
+  const host=$('lookHost');
+  if(!host) return;
+  const groups=[...new Set(look.fields.map(f=>f.group))];
+
+  host.innerHTML=
+    `<div class="iconbar">${groups.map(g=>
+        `<button data-group="${g}"><b>${GROUP_ICONS[g]||'⚙️'}</b>${g}</button>`).join('')}
+      <button data-group="__defaults"><b>⭐</b>Default</button></div>
+     <div id="lookPane"></div>`;
 
   if(P){
     // Whatever the panel shows is the look the player should already be using,
@@ -2050,17 +2359,41 @@ async function renderLook(job){
     P.look={}; look.fields.forEach(f=>{
       if(f.key.startsWith('captions.')) P.look[f.key.slice(9)]=f.value;
     });
+    P.fields=look.fields;
     loadFont(P.look.font);
   }
 
-  const readPanel=()=>{
-    const values={};
-    document.querySelectorAll('[data-set]').forEach(el=>{
-      values[el.dataset.set]=el.type==='checkbox'?(el.checked?'true':'false'):el.value;
-    });
-    return values;
+  const openGroup=name=>{
+    host.querySelectorAll('[data-group]').forEach(b=>
+      b.classList.toggle('on', b.dataset.group===name && P.openGroup===name));
+    const pane=$('lookPane');
+    if(P.openGroup!==name){ pane.innerHTML=''; P.openGroup=null; return; }
+    pane.innerHTML = name==='__defaults' ? defaultsPane()
+      : look.fields.filter(f=>f.group===name).map(control).join('')
+        + `<div class="dim" style="font-size:12px;margin-top:8px">
+             Changes show on the video as you make them. Nothing is kept until
+             you press Save.</div>`;
+    if(name==='__defaults') wireDefaults(); else wireControls();
   };
 
+  host.querySelectorAll('[data-group]').forEach(el=>el.onclick=()=>{
+    P.openGroup = P.openGroup===el.dataset.group ? null : el.dataset.group;
+    openGroup(el.dataset.group);
+  });
+  if(P.openGroup) openGroup(P.openGroup);
+}
+
+function readPanel(){
+  const values={};
+  document.querySelectorAll('[data-set]').forEach(el=>{
+    values[el.dataset.set]=el.type==='checkbox'?(el.checked?'true':'false'):el.value;
+  });
+  // A control that is not on screen still counts: the panel shows one group at
+  // a time, and closing it must not quietly revert the others.
+  return Object.assign({}, P.values, values);
+}
+
+function wireControls(){
   document.querySelectorAll('[data-set]').forEach(el=>{
     const live=()=>{
       if(!P) return;
@@ -2081,14 +2414,53 @@ async function renderLook(job){
     el.addEventListener('input', live);
     el.addEventListener('change', live);
   });
+}
 
-  $('resetLook').onclick=()=>{
-    if(!P) return;
-    P.values={};
-    api('/api/jobs/'+job.id+'/settings',{method:'POST',
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({reset:true})})
-      .then(()=>{ drawn=''; listed=''; refresh(); })
-      .catch(e=>{ $('lookMsg').textContent='error: '+e.message; });
+function defaultsPane(){
+  return `<div class="dim" style="font-size:13px">
+      Keep the look you are using now for every new upload, so a style you
+      settled on is not something to pick again on each video.</div>
+    <button id="saveDefaults">Save this look as my default</button>
+    <button class="ghost" id="resetLook">Put this video back to the template</button>
+    <button class="ghost" id="clearDefaults">Forget my default</button>
+    <div id="defaultsMsg" class="dim" style="margin-top:8px"></div>`;
+}
+
+function wireDefaults(){
+  api('/api/defaults').then(d=>{
+    $('defaultsMsg').textContent = d.labels.length
+      ? 'your default sets: '+d.labels.join(', ')
+      : 'no default saved yet — new uploads use the template as-is';
+  }).catch(()=>{});
+
+  $('saveDefaults').onclick=async()=>{
+    const values=Object.assign({}, P.values);
+    // Everything the panel can set, not just what was touched this session.
+    (P.fields||[]).forEach(f=>{ if(!(f.key in values)) values[f.key]=String(f.value); });
+    try{
+      const r=await api('/api/defaults',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({values})});
+      $('defaultsMsg').textContent = r.labels.length
+        ? 'saved — new uploads will use: '+r.labels.join(', ')
+        : 'saved — that is the factory look, so nothing to remember';
+    }catch(e){ $('defaultsMsg').textContent='error: '+e.message; }
+  };
+  $('resetLook').onclick=async()=>{
+    // This one is about the open video, not the default: it throws away the
+    // look settings saved against this edit and goes back to its template.
+    try{
+      P.values={};
+      await api('/api/jobs/'+P.job.id+'/settings',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({reset:true})});
+      drawn=''; listed=''; refresh();
+    }catch(e){ $('defaultsMsg').textContent='error: '+e.message; }
+  };
+  $('clearDefaults').onclick=async()=>{
+    try{
+      await api('/api/defaults',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({clear:true})});
+      $('defaultsMsg').textContent='cleared — new uploads use the template as-is';
+    }catch(e){ $('defaultsMsg').textContent='error: '+e.message; }
   };
 }
 

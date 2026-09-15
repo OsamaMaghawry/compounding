@@ -58,18 +58,56 @@ re-decided on the server - about a second, and still no render.
 none; the banner tells you when you are looking at something unsaved, and
 **Discard** puts it back.
 
+### The settings, under the video
+
+A row of icons sits directly under the timeline: **Captions**, **Motion**,
+**B-roll**, **Pacing**, **Default**. Tap one and its controls open right there;
+tap it again and they close. That is the whole panel - no scrolling past the edit
+to reach a font and scrolling back to see what it did.
+
+**Default** keeps the look you are using now for every new upload, so a style you
+settled on is not something to pick again on each video. Only what actually
+differs from the template is remembered, so saving a default does not freeze
+every other setting at today's value.
+
 ### The timeline
 
 The strip under the video is your footage end to end. Lit areas are what survives;
 dark areas are already cut.
 
 - **Tap** it to jump there.
+- **Drag the white playhead** to scrub. Playback pauses while you drag and picks
+  up again when you let go.
 - **Drag across** it to select a stretch. Two handles appear; drag either to
   adjust, and the video scrubs as you drag so you set the point by seeing the
   frame.
 - **Start here** / **End here** set an edge from wherever the playhead is.
 - **Cut the selection** removes it. **Keep only this** throws away everything else.
-- **Undo all trims** puts it all back.
+- The **1x** button cycles the playback speed, for getting through a long take.
+- **Undo all edits** puts everything back.
+
+### Pauses and transitions, by dragging
+
+**Adjust pauses** puts a marker on every join between two surviving pieces. Drag
+one right to give back some of the silence the cut removed, left to take more
+away - the beat before a point lands, without cutting anything. A pause can never
+grow past the gap that is actually there, nor eat into the speech either side.
+
+Tapping a marker also opens a **Transition** slider for that one join, so a single
+cut can land harder than the rest while the others keep the length set in Motion.
+
+Both are stored against your original footage, like trims, so they survive a
+restyle, a re-plan and a restart.
+
+### Dragging, on a phone
+
+Everything on the strip is driven by pointer events, so a mouse, a pen and a
+finger take the same path through the code. A drag keeps following your finger
+after it slides off the strip, or off the screen; a gesture the phone cancels -
+deciding it was a scroll, or a call arriving - ends the drag rather than leaving
+it stuck. Updates are batched to one per frame and nothing is rebuilt while you
+drag, which is what made the first version feel like it was catching: the element
+under your finger was being destroyed and remade sixty times a second.
 
 Selections are made against the finished video, which is what you were watching,
 and stored as positions in the **original footage**. That is what lets a trim keep
