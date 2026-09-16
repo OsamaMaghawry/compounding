@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass, field
@@ -127,7 +128,11 @@ def transcribe_faster_whisper(audio: Path, profile, *, prompt: str | None,
         compute_type = auto_compute
 
     model_name = profile.get("asr.model")
-    model = WhisperModel(model_name, device=device, compute_type=compute_type)
+    # Every core, not the library's cautious default. On a small cloud machine
+    # with no GPU this is the only free speed there is.
+    threads = int(profile.get("asr.cpu_threads", 0)) or (os.cpu_count() or 4)
+    model = WhisperModel(model_name, device=device, compute_type=compute_type,
+                         cpu_threads=threads)
 
     temperature = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0] if profile.get("asr.temperature_fallback") else 0.0
     segments_iter, _info = model.transcribe(

@@ -338,6 +338,7 @@ class Job:
     percent: float = 0.0        # 0-100, so a long wait has a shape
     heartbeat: float = 0.0      # last sign of life, so a stuck job can be told apart
     started: float = 0.0        # when the current run began
+    patience: float = 90.0      # how long this step may go quiet before it is odd
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -484,7 +485,23 @@ class Runner:
             changes["percent"] = round(max(job.percent, min(99.0, percent)), 1)
         if stage is not None:
             changes["stage"] = stage
+            changes["patience"] = self._patience_for(job, stage)
         self.store.update(job, **changes)
+
+    def _patience_for(self, job: Job, message: str) -> float:
+        """How long this step may reasonably say nothing.
+
+        One number cannot cover it. Whisper on a machine with no graphics card
+        goes quiet for minutes at a time between chunks - that is the model
+        thinking, not a hang - while a stalled render is odd after one. Judging
+        both by the same stopwatch is how a working job gets called dead.
+        """
+        if message.startswith("transcribing"):
+            big = any(name in str(job.model) for name in ("large", "medium"))
+            return 900.0 if big else 300.0
+        if message.startswith("joining") or message.startswith("rendering"):
+            return 180.0
+        return 120.0
 
     def _phase_percent(self, message: str) -> float | None:
         for prefix, share in self.PHASES:
@@ -572,7 +589,12 @@ class Runner:
             source = join_clips(clips, editor.work_dir / "joined.mp4",
                                 max_height=int(profile.get("output.height")
                                                * float(profile.get("output.zoom_headroom"))),
-                                on_status=note)
+                                on_status=note,
+                                # Joining is the longest step on phone footage and
+                                # said nothing while it ran, so the page called it
+                                # stuck when it was working perfectly well.
+                                on_fraction=lambda f: self.beat(job, percent=2 + 8 * f),
+                                owner=self._owner(job))
         else:
             source = clips[0]
 
@@ -1745,10 +1767,11 @@ input[type=color]{height:44px;padding:4px}
     <input type="file" id="files" accept="video/*" multiple>
     <select id="template"></select>
     <select id="model">
-      <option value="small">small - faster, good Arabic</option>
-      <option value="large-v3">large-v3 - slower, best Arabic</option>
-      <option value="medium">medium - in between</option>
+      <option value="small">small — a few minutes, good Arabic</option>
+      <option value="medium">medium — slower, better Arabic</option>
+      <option value="large-v3">large-v3 — best Arabic, but very slow here</option>
     </select>
+    <div class="dim" id="modelNote" style="font-size:12px;margin-top:6px"></div>
     <button id="upload">Upload and edit</button>
     <div id="msg"></div>
   </div>
@@ -1953,6 +1976,14 @@ async function loadTemplates(){
     list.map(t=>`<option value="${t.name}">${t.name} — ${(t.description||'').slice(0,54)}</option>`).join('');
 }
 
+// Said before the choice, not discovered after ten minutes of staring at a bar.
+$('model').onchange=()=>{
+  const slow={'large-v3':'roughly 10-20 minutes per minute of talking on a machine '
+                        +'with no graphics card — it goes quiet for minutes at a time',
+              'medium':'roughly 4-8 minutes per minute of talking here'};
+  $('modelNote').textContent = slow[$('model').value] || '';
+};
+
 $('upload').onclick=async()=>{
   const files=[...$('files').files];
   if(!files.length){ $('msg').textContent='choose at least one video'; return; }
@@ -1996,11 +2027,15 @@ function updateProgress(job){
   $('pct').textContent=`${pct.toFixed(0)}% · running ${ago(running)}`;
   // Ninety seconds without a word is the difference between slow and stuck. It
   // is a long time on purpose: transcribing a long take goes quiet for a while.
-  const stuck=silent>90;
+  // How long quiet is normal depends on the step - the machine says so, because
+  // it is the one that knows which step it is on.
+  const patience=job.patience||90;
+  const stuck=silent>patience;
   bar.classList.toggle('stalled', stuck);
   $('alive').textContent = stuck
-    ? `no sign of life for ${ago(silent)} — it looks stuck`
-    : (silent>4 ? `last step ${ago(silent)} ago` : 'working');
+    ? `nothing for ${ago(silent)} — this looks stuck now`
+    : (silent>20 ? `thinking — quiet for ${ago(silent)}, which is normal here`
+                 : (silent>4 ? `last step ${ago(silent)} ago` : 'working'));
 }
 
 async function refresh(){

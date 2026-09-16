@@ -1891,7 +1891,62 @@ class JoinCacheTests(unittest.TestCase):
         os.utime(self.b, (1_000_000, 1_000_000))       # the clip was re-recorded
         messages = []
         join_clips([self.a, self.b], dest, on_status=messages.append)
-        self.assertTrue(any("joining" in m for m in messages), messages)
+        # It did the work again rather than handing back last time's file. Which
+        # route it took - a copy or a re-encode - is not the point here.
+        self.assertTrue(messages, "it said nothing at all")
+        self.assertFalse(any("reusing" in m for m in messages), messages)
+
+    def matched_takes(self, count=3, *, size="540x960", rate=30, ar=48000):
+        """Takes as one phone records them: same camera, same mode, same everything."""
+        made = []
+        for index in range(count):
+            path = Path(self.tmp) / f"same{size}{rate}{index}.mp4"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", f"testsrc2=size={size}:rate={rate}:d=3",
+                "-f", "lavfi", "-i", "sine=frequency=200:duration=3",
+                "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-ar", str(ar), "-ac", "2", "-shortest", str(path),
+            ], check=True, capture_output=True)
+            made.append(path)
+        return made
+
+    def test_matching_takes_are_joined_without_re_encoding(self):
+        # The common case - several takes off one phone - was minutes of
+        # re-encoding for a result identical to sticking them end to end.
+        from reelforge.ffmpeg import probe
+        from reelforge.join import can_be_stuck_together, join_clips, target_shape
+        takes = self.matched_takes()
+        infos = [probe(t) for t in takes]
+        shape = target_shape(infos, max_height=2592)
+        self.assertTrue(can_be_stuck_together(infos, *shape))
+
+        said = []
+        joined = join_clips(takes, Path(self.tmp) / "copied.mp4",
+                            max_height=2592, on_status=said.append)
+        self.assertAlmostEqual(probe(joined).duration, 9.0, delta=0.4)
+        self.assertTrue(any("without re-encoding" in m for m in said), said)
+
+    def test_a_take_that_differs_forces_the_slow_path(self):
+        from reelforge.ffmpeg import probe
+        from reelforge.join import can_be_stuck_together, target_shape
+        takes = self.matched_takes()
+        odd = self.matched_takes(1, size="720x1280", rate=25, ar=44100)
+        infos = [probe(t) for t in takes + odd]
+        self.assertFalse(can_be_stuck_together(infos, *target_shape(infos, max_height=2592)))
+
+    def test_joining_says_how_far_through_it_is(self):
+        # Joining phone footage is the longest step and used to say nothing, so
+        # the page called it stuck while it was working perfectly well.
+        from reelforge.ffmpeg import probe
+        from reelforge.join import join_clips
+        clips = self.matched_takes(2) + self.matched_takes(1, size="720x1280", rate=25)
+        seen = []
+        joined = join_clips(clips, Path(self.tmp) / "watched.mp4", max_height=2592,
+                            on_fraction=seen.append)
+        self.assertTrue(seen, "it ran silently, which is what caused the problem")
+        self.assertAlmostEqual(max(seen), 1.0, places=2)
+        self.assertAlmostEqual(probe(joined).duration, 9.0, delta=0.6)
 
     def test_a_different_order_is_a_different_join(self):
         from reelforge.join import join_clips
@@ -1899,7 +1954,8 @@ class JoinCacheTests(unittest.TestCase):
         join_clips([self.a, self.b], dest)
         messages = []
         join_clips([self.b, self.a], dest, on_status=messages.append)
-        self.assertTrue(any("joining" in m for m in messages), messages)
+        self.assertTrue(messages, "it said nothing at all")
+        self.assertFalse(any("reusing" in m for m in messages), messages)
 
 
 class TrimTests(unittest.TestCase):
@@ -3236,6 +3292,31 @@ class WebAppTests(unittest.TestCase):
             self.assertLessEqual(job.percent, 99.0, "it claimed to be finished early")
         finally:
             runner.store = real
+
+    def test_how_long_quiet_is_normal_depends_on_the_step(self):
+        """One stopwatch cannot judge every step.
+
+        Whisper on a machine with no graphics card goes quiet for minutes
+        between chunks - that is the model thinking. Judging it by the same
+        timer as a render is how a working job gets called dead, which is
+        exactly what happened.
+        """
+        self.client("patience")
+        runner = self.app.state.runner
+        store = self.app.state.store
+
+        big = store.create("clip", "", "large-v3")
+        small = store.create("clip", "", "small")
+        self.assertGreaterEqual(runner._patience_for(big, "transcribing with faster-whisper"),
+                                900.0)
+        self.assertLess(runner._patience_for(small, "transcribing with faster-whisper"),
+                        runner._patience_for(big, "transcribing with faster-whisper"))
+        # A render that has said nothing for three minutes really is odd.
+        self.assertLessEqual(runner._patience_for(big, "rendering preview"), 180.0)
+
+        runner.beat(big, stage="transcribing with faster-whisper (large-v3)")
+        self.assertGreaterEqual(big.patience, 900.0)
+        self.assertGreater(big.heartbeat, 0)
 
     def test_a_job_going_nowhere_can_be_stopped(self):
         client = self.client("stopjob")

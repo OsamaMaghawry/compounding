@@ -155,6 +155,12 @@ class MediaInfo:
     audio_rate: int
     rotation: int
     size_bytes: int
+    # Enough to tell whether two clips can simply be stuck end to end without
+    # being decoded and encoded again.
+    vcodec: str = ""
+    acodec: str = ""
+    pix_fmt: str = ""
+    channels: int = 0
 
     @property
     def is_vertical(self) -> bool:
@@ -225,6 +231,10 @@ def probe(path: str | Path) -> MediaInfo:
         audio_rate=int(audio.get("sample_rate") or 0) if audio else 0,
         rotation=rotation,
         size_bytes=int(fmt.get("size") or path.stat().st_size),
+        vcodec=str(video.get("codec_name") or ""),
+        acodec=str(audio.get("codec_name") or "") if audio else "",
+        pix_fmt=str(video.get("pix_fmt") or ""),
+        channels=int(audio.get("channels") or 0) if audio else 0,
     )
 
 

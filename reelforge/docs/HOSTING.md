@@ -190,10 +190,29 @@ did something. That last one is the useful one: "working" on its own cannot tell
 a job that is slow from a job that has died, and both look identical while you
 wait.
 
-Ninety seconds without a word and it says **it looks stuck** and turns the bar
-red. The number is deliberately generous - transcribing goes quiet for a while on
-a long take - but transcribing now reports how much audio it has been through, so
-even that keeps moving.
+How long quiet is normal depends on the step, and the machine says which it is
+on. Whisper without a graphics card goes quiet for **minutes** between chunks -
+that is the model thinking, not a hang - so transcribing is given fifteen minutes
+of silence before anything is said about it, and a render three. Judging both by
+the same stopwatch is how a working job gets called dead.
+
+While it is quiet but within that, it says **thinking — quiet for 2m, which is
+normal here** rather than crying wolf.
+
+## Choosing a model, and what it costs
+
+This matters more than anything else for how long a run takes:
+
+| Model | Arabic | On a cloud machine with no graphics card |
+|---|---|---|
+| **small** | good | a few minutes |
+| medium | better | roughly 4-8 minutes per minute of talking |
+| large-v3 | best | roughly 10-20 minutes per minute of talking |
+
+`large-v3` is not broken when it takes twenty minutes on a minute of speech - that
+is what it costs without a GPU. Start with **small**; move up only when its Arabic
+is not good enough for a particular video. The page says this next to the choice
+now, rather than leaving you to discover it by watching a bar.
 
 **Stop this** gives up on a job and kills whatever ffmpeg it had running, so a
 job that is going nowhere can be abandoned and tried again instead of waited out.
@@ -306,7 +325,11 @@ Worth knowing:
 
 ## Read this before you pay for anything
 
-**Record at 1080p, not 4K.** The output is 1080x1920 whatever you feed it, so 4K buys
+**Record at 1080p, not 4K.** Takes shot on one phone in one mode are now stuck
+end to end without being re-encoded at all, which takes about a second instead of
+minutes - but only when they match. Change camera mode between takes, or shoot 4K
+and force everything to be scaled down, and that shortcut is gone.
+ The output is 1080x1920 whatever you feed it, so 4K buys
 you nothing and costs you four times the pixels:
 
 | | 4K | 1080p |

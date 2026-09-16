@@ -147,6 +147,7 @@ DEFAULTS: dict[str, Any] = {
         "backend": "auto",         # auto | faster-whisper | whispercpp | stub
         "model": "large-v3",       # tiny|base|small|medium|large-v3 (or a local path)
         "device": "auto",          # auto | cpu | cuda
+        "cpu_threads": 0,          # 0 = every core the machine has
         "compute_type": "auto",    # auto | int8 | int8_float16 | float16 | float32
         "language": "ar",
         "beam_size": 5,
