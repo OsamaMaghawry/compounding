@@ -189,10 +189,26 @@ That address is a normal link. Bookmark it; it stays the same for that Codespace
 from any computer you sign in to GitHub, start the Codespace and open the bookmark.
 Forwarded ports are **private to your account** by default - nobody else can reach it.
 
-The app starts itself whenever the Codespace starts, and checks for a newer version
-while it does, so the normal way to get an update is simply to open it. There is
-also a **check for an update** link next to the version number on the page, which
-fetches and restarts without a terminal.
+## Getting updates
+
+The page checks on every load and says so at the top when a newer version is
+ready: **A newer version is ready — N changes since this one**, with an **Update
+now** button. That is the whole thing. Press it, wait a few seconds, and the page
+reloads into the new version.
+
+It also updates on its own whenever the machine starts - and if new code arrives
+while the app is already running, it restarts into it rather than pulling code
+nobody loads.
+
+One catch worth knowing, because it bites exactly once: a copy that predates this
+cannot update itself into it. There was no Update button in it to press. If the
+version on the page is older than 0.5.1, it needs one terminal visit:
+
+```bash
+cd /workspaces/compounding && git pull && bash .devcontainer/restart.sh
+```
+
+After that the button exists and the terminal is done with.
 
 Codespaces sleep after thirty idle minutes, and a sleeping machine cannot serve a
 link. So the address is not a thing you can hand to someone and expect to answer -

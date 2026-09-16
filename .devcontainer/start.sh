@@ -12,9 +12,13 @@ mkdir -p /workspaces/data /workspaces/models
 # update is simply to open it - no terminal, nothing to type, nothing to
 # remember. --ff-only so this can never invent a merge on its own; if the pull
 # cannot fast-forward, the old version keeps running and says so.
+moved=""
 if [ -z "${REELFORGE_NO_UPDATE:-}" ] && git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
   echo "checking for a newer version…"
+  was="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
   if git -C "$repo" pull --ff-only --quiet 2>/dev/null; then
+    now="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
+    [ "$was" != "$now" ] && moved="yes"
     pip install -e . --quiet --no-deps 2>/dev/null || true
   else
     echo "could not update automatically - carrying on with what is here."
@@ -26,8 +30,15 @@ running() {
 }
 
 if running; then
+  if [ -n "$moved" ]; then
+    # New code arrived and the old one is still serving it. Pulling without
+    # restarting is the same as not pulling at all, and telling someone to go
+    # and type a restart command is the thing this is here to avoid.
+    echo "a newer version arrived - restarting into it…"
+    REELFORGE_NO_UPDATE=1 exec bash "$repo/.devcontainer/restart.sh"
+  fi
   echo "ReelForge is already running (pid $(cat $PIDFILE))."
-  echo "To pick up new code after a git pull:  bash .devcontainer/restart.sh"
+  echo "It is up to date. To restart anyway:  bash .devcontainer/restart.sh"
   exit 0
 fi
 

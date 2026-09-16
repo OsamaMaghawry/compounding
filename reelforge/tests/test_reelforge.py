@@ -2032,6 +2032,21 @@ class WebAppTests(unittest.TestCase):
         # Updating restarts the server. It is not something a stranger may do.
         self.assertEqual(client.post("/api/update").status_code, 401)
 
+    def test_the_page_is_told_what_is_running(self):
+        client = self.client("version")
+        self.login(client)
+        response = client.get("/api/version")
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        from reelforge import __version__
+        self.assertEqual(body["version"], __version__)
+        self.assertIsInstance(body["behind"], int)
+        self.assertEqual(client.get("/api/version").status_code, 200)
+
+    def test_the_version_check_needs_a_password(self):
+        client = self.client("versionsec")
+        self.assertEqual(client.get("/api/version").status_code, 401)
+
     def test_a_copy_that_cannot_update_itself_says_so(self):
         # Installed from a zip rather than cloned: there is nothing to pull.
         client = self.client("noupdate")

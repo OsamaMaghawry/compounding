@@ -869,6 +869,41 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         return {"ok": True, "values": keep,
                 "labels": sorted(LOOK_LABELS.get(k, k) for k in keep)}
 
+    _version_seen: dict = {"at": 0.0, "behind": 0}
+
+    @app.get("/api/version", dependencies=[Depends(require_login)])
+    def version(check: int = 0) -> dict:
+        """What is running, and whether something newer is waiting.
+
+        Asked by the page itself on every load, so a new version announces
+        itself instead of waiting to be looked for.
+        """
+        import subprocess  # noqa: PLC0415
+        from . import __version__  # noqa: PLC0415
+        from .cli import _checkout_revision  # noqa: PLC0415
+        repo = PACKAGE_ROOT.parent
+        info = {"version": __version__, "revision": _checkout_revision(),
+                "behind": 0, "can_update": (repo / ".git").exists()}
+        if not info["can_update"]:
+            return info
+        # Asking the network costs a second, so the answer is kept briefly: a
+        # page reload should not mean another round trip to GitHub.
+        fresh = time.time() - _version_seen["at"] < 120
+        if fresh and not check:
+            info["behind"] = _version_seen["behind"]
+            return info
+        try:
+            subprocess.run(["git", "-C", str(repo), "fetch", "--quiet"],
+                           capture_output=True, timeout=25)
+            counted = subprocess.run(
+                ["git", "-C", str(repo), "rev-list", "--count", "HEAD..@{u}"],
+                capture_output=True, text=True, timeout=10)
+            info["behind"] = int((counted.stdout or "0").strip() or 0)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            info["behind"] = 0
+        _version_seen.update(at=time.time(), behind=info["behind"])
+        return info
+
     @app.post("/api/update", dependencies=[Depends(require_login)])
     def update(background: BackgroundTasks) -> dict:
         """Fetch the newest version and restart, without opening a terminal.
@@ -1546,6 +1581,11 @@ input[type=color]{height:44px;padding:4px}
       <span id="ver"></span>
       <a href="#" id="updateLink" style="margin-left:8px">check for an update</a>
       <span id="updateMsg"></span>
+    </div>
+    <div id="newVersion" hidden style="background:#2e2a12;color:var(--accent);
+      border-radius:10px;padding:10px;margin-bottom:10px;font-size:13px">
+      <span id="newVersionText"></span>
+      <button id="updateNow" style="margin-top:8px">Update now</button>
     </div>
     <div class="dim">Pick every take of one video. They are joined in the order chosen.</div>
     <input type="file" id="files" accept="video/*" multiple>
@@ -2492,24 +2532,50 @@ async function send(job, rerender){
   return r;
 }
 
-$('updateLink').onclick=async ev=>{
-  ev.preventDefault();
-  $('updateMsg').textContent=' · checking…';
+async function runUpdate(where){
+  where.textContent='updating…';
   try{
     const r=await api('/api/update',{method:'POST'});
-    $('updateMsg').textContent=' · '+r.message;
+    where.textContent=r.message;
     // The server is restarting under us; wait for it to answer again, then
     // reload, so the page you end up on is the new one.
     if(r.restarting) setTimeout(async function wait(){
       try{ await api('/api/me'); location.reload(); }
       catch(e){ setTimeout(wait, 1500); }
     }, 4000);
+  }catch(e){ where.textContent=e.message; }
+}
+
+$('updateLink').onclick=async ev=>{
+  ev.preventDefault();
+  $('updateMsg').textContent=' · checking…';
+  try{
+    const v=await api('/api/version?check=1');
+    if(!v.behind){ $('updateMsg').textContent=' · this is the newest version'; return; }
+    announce(v);
+    $('updateMsg').textContent='';
   }catch(e){ $('updateMsg').textContent=' · '+e.message; }
 };
+
+function announce(v){
+  if(!v.behind) return;
+  $('newVersion').hidden=false;
+  $('newVersionText').textContent =
+    `A newer version is ready — ${v.behind} change${v.behind>1?'s':''} since this one.`;
+}
+$('updateNow').onclick=()=>runUpdate($('newVersionText'));
+
+// Checked on every load, so a new version says so rather than waiting to be
+// found. A machine that has been left running for days is the case that matters:
+// nothing restarts it, so nothing else would ever mention it.
+function checkVersion(){
+  api('/api/version').then(announce).catch(()=>{});
+}
 
 api('/api/me').then(d=>{
   show(d.authenticated);
   if(d.version) $('ver').textContent=d.version;
+  if(d.authenticated) checkVersion();
 }).catch(()=>show(false));
 </script></body></html>
 """
