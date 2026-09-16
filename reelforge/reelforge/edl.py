@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 from bisect import bisect_right
 from dataclasses import dataclass, field
+from dataclasses import fields as dataclasses_fields
 from pathlib import Path, PurePath
 from typing import Any
 
@@ -183,6 +184,19 @@ class Timeline:
         return max(0.0, source_duration - self.duration)
 
 
+def _build(kind, data: dict):
+    """Rebuild one item, ignoring keys it has no field for.
+
+    An edit written by a slightly different version is a normal thing to meet -
+    it is on disk beside your footage and outlives any one release. Reading one
+    should never be the thing that breaks: an entry the browser was sent for
+    convenience, like an overlay's bare filename, must not make the file
+    unloadable months later.
+    """
+    fields = {f.name for f in dataclasses_fields(kind)}
+    return kind(**{k: v for k, v in data.items() if k in fields})
+
+
 @dataclass
 class EDL:
     source: str
@@ -348,10 +362,10 @@ class EDL:
         return cls(
             source=data["source"],
             output=data.get("output", {}),
-            cuts=[Cut(**c) for c in data.get("cuts", [])],
-            zooms=[Zoom(**z) for z in data.get("zooms", [])],
-            overlays=[Overlay(**o) for o in data.get("overlays", [])],
-            transitions=[Transition(**t) for t in data.get("transitions", [])],
+            cuts=[_build(Cut, c) for c in data.get("cuts", [])],
+            zooms=[_build(Zoom, z) for z in data.get("zooms", [])],
+            overlays=[_build(Overlay, o) for o in data.get("overlays", [])],
+            transitions=[_build(Transition, t) for t in data.get("transitions", [])],
             captions=[CaptionLine.from_dict(c) for c in data.get("captions", [])],
             audio=data.get("audio", {}),
             meta=data.get("meta", {}),

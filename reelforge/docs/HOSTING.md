@@ -165,7 +165,11 @@ that was already planned would change nothing until something else happened to
 re-plan it - which is exactly what it looked like when it was broken.
 
 B-roll also plays in the live preview, laid over you the way the render will do
-it, rather than only appearing after an export.
+it, rather than only appearing after an export. What the preview streams is a
+small copy of each clip, made once when you add it: the original is whatever came
+off a phone, and this goes down the wire every time the clip comes up on screen.
+A clip the browser cannot decode falls back to its still picture, so you still see
+that b-roll happens there.
 
 ## Leaving and coming back
 

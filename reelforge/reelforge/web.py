@@ -596,6 +596,21 @@ class Runner:
             except Exception:
                 return None
 
+    def broll_proxy(self, asset: Path) -> Path | None:
+        """The small copy of a library clip, built at most once.
+
+        Under the lock because a video element asks for several ranges at once:
+        without it, a clip with no proxy yet would start an encode per request,
+        and a handful of those is enough to bring the machine to its knees.
+        """
+        dest = self.broll_dir / ".proxies" / f"{asset.name}.mp4"
+        if dest.exists() and dest.stat().st_size > 0:
+            return dest
+        with self._proxy_lock:
+            if dest.exists() and dest.stat().st_size > 0:
+                return dest
+            return broll.make_proxy(asset, dest)
+
     def _plan_into(self, job: Job, source: Path, editor: AutoEditor, note,
                    *, render: bool = True) -> None:
         """Decide the edit for `source`, and render a preview only if asked.
@@ -1030,6 +1045,7 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         done = str(final).lower() == "true"
         if done:
             broll.thumbnail(target, runner.broll_dir / ".thumbs" / f"{safe}.jpg")
+            runner.broll_proxy(target)
         return {"ok": True, "complete": done, "size": target.stat().st_size}
 
     @app.post("/api/broll/{name}", dependencies=[Depends(require_login)])
@@ -1071,10 +1087,16 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
 
     @app.get("/api/broll/{name}/file", dependencies=[Depends(require_login)])
     def broll_file(name: str, request: Request) -> Response:
-        """The clip itself, so the player can lay it over you as it will appear."""
+        """The clip, for laying over you in the preview.
+
+        The small copy when there is one: this is streamed every time a clip
+        comes up on screen, and the original can be a hundred megabytes of
+        phone footage for a two-second cutaway.
+        """
         path = broll_or_404(name)
-        kind = "image/jpeg" if path.suffix.lower() in broll.IMAGE_EXT else "video/mp4"
-        return ranged(path, request, kind)
+        if path.suffix.lower() in broll.IMAGE_EXT:
+            return ranged(path, request, "image/jpeg")
+        return ranged(runner.broll_proxy(path) or path, request, "video/mp4")
 
     @app.get("/api/broll/{name}/thumb.jpg", dependencies=[Depends(require_login)])
     def broll_thumb(name: str, request: Request) -> Response:
@@ -1905,7 +1927,7 @@ async function draw(job){
   if(job.status==='ready'||job.status==='done'){
     html+=`<div class="stage"><video id="pv" playsinline preload="metadata"
              src="/api/jobs/${job.id}/proxy.mp4"></video>
-             <video id="bv" playsinline muted hidden></video>
+             <video id="bv" playsinline muted preload="metadata" hidden></video>
              <img id="bi" alt="" hidden><div id="caps"></div></div>
       <div class="transport">
         <button id="playBtn">Play</button>
@@ -1997,6 +2019,15 @@ function mountPlayer(job){
 
   P.duration = Math.max(...(P.plan.cuts||[]).map(c=>c.src_end), 1);
   buildTrack(); wireTransport(); wireTrack(); tick();
+  // A clip that will not play falls back to its still, so the preview shows
+  // that b-roll happens here even when the browser cannot decode it.
+  $('bv').addEventListener('error', ()=>{
+    const name=(P.shown||'').split('|')[1];
+    if(!name) return;
+    $('bv').hidden=true;
+    $('bi').src='/api/broll/'+encodeURIComponent(name)+'/thumb.jpg';
+    $('bi').className=$('bv').className; $('bi').hidden=false;
+  });
   video.addEventListener('loadedmetadata', layoutTrack);
 }
 
@@ -2088,30 +2119,43 @@ function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'
 function drawOverlay(out){
   const live=(P.plan.overlays||[]).find(o=>o.enabled && out>=o.out_start && out<=o.out_end);
   const video=$('bv'), image=$('bi');
+
   if(!live){
-    if(!video.hidden){ video.hidden=true; video.removeAttribute('src'); video.load(); }
-    image.hidden=true;
-    P.shown=null;
+    if(P.shown!==null){
+      // Hidden, not torn down. Removing the source and reloading would make
+      // coming back to the same clip fetch it all over again.
+      video.pause(); video.hidden=true; image.hidden=true;
+      P.shown=null;
+    }
     return;
   }
+
   const name=live.name||'';
-  const url='/api/broll/'+encodeURIComponent(name)+'/file';
   const still=/\.(jpe?g|png|webp)$/i.test(name);
-  const el=still?image:video, other=still?video:image;
-  other.hidden=true;
-  el.className=live.mode||'cover';
-  el.style.opacity=live.opacity ?? 1;
-  // Keyed on the clip as well as the overlay: ids are handed out fresh on every
-  // plan, so the same id can come back pointing at a different clip.
+  const el=still?image:video;
+  // Keyed on the clip as well as the overlay: ids are handed out fresh on
+  // every plan, so the same id can come back pointing at a different clip.
   const key=live.id+'|'+name;
+
   if(P.shown!==key){
     P.shown=key;
-    el.src=url;
-    if(!still){ video.currentTime=live.asset_start||0; video.play().catch(()=>{}); }
+    (still?video:image).hidden=true;
+    if(!still) video.pause();
+    el.src=(still?'/api/broll/':'/api/broll/')+encodeURIComponent(name)+'/file';
+    el.className=live.mode||'cover';
+    el.style.opacity=live.opacity ?? 1;
+    el.hidden=false;
+    if(!still){
+      // Seek and play once, when the clip is ready. Doing it every frame is
+      // what took the server down: an unloaded video answers a seek with a
+      // fresh range request, so sixty a second went out until nothing was
+      // left to serve the page itself.
+      const begin=()=>{ try{ video.currentTime=live.asset_start||0; }catch(_){}
+                        video.play().catch(()=>{}); };
+      if(video.readyState>=1) begin();
+      else video.addEventListener('loadedmetadata', begin, {once:true});
+    }
   }
-  if(!still && Math.abs(video.currentTime-((live.asset_start||0)+(out-live.out_start)))>0.4)
-    video.currentTime=(live.asset_start||0)+(out-live.out_start);
-  el.hidden=false;
 }
 
 // -- zooms and transitions ---------------------------------------------------

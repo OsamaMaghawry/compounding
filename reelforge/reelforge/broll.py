@@ -184,3 +184,21 @@ def thumbnail(asset: str | Path, dest: str | Path, *, width: int = 240) -> Path 
     except Exception:
         return None
     return dest if dest.exists() and dest.stat().st_size > 0 else None
+
+
+def make_proxy(asset: str | Path, dest: str | Path, *, height: int = 480) -> Path | None:
+    """A small copy of a library clip, for the preview to lay over you.
+
+    The original is whatever came off a phone. Streaming that every time a
+    two-second cutaway appears is a lot of bytes for a picture nobody keeps.
+    """
+    from .render import build_proxy  # noqa: PLC0415 - avoid a cycle at import time
+    asset, dest = Path(asset), Path(dest)
+    if asset.suffix.lower() not in VIDEO_EXT:
+        return None
+    if dest.exists() and dest.stat().st_size > 0:
+        return dest
+    try:
+        return build_proxy(asset, dest, height=height)
+    except Exception:
+        return None

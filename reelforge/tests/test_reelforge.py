@@ -2045,6 +2045,45 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0,
                          f"the page will not parse:\n{proc.stderr[:600]}")
 
+    def test_an_edit_with_broll_can_be_written_and_read_back(self):
+        """Every kind of item, through to_dict and back.
+
+        This is the gap that let a real breakage out: an overlay gained a `name`
+        for the browser's benefit, to_dict emitted it, and from_dict refused it -
+        so any edit with b-roll became unloadable the moment it was saved and
+        read again. Nothing caught it, because no test round-tripped an edit that
+        had b-roll in it.
+        """
+        from reelforge.captions import CaptionLine
+        from reelforge.edl import EDL, Cut, Overlay, Transition, Zoom
+        edl = EDL(
+            source="take.mp4", output={"width": 1080, "height": 1920},
+            cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="seg000", text="أهلا بيك")],
+            zooms=[Zoom(id="z0", out_start=0.5, out_end=1.2,
+                        start_factor=1.0, end_factor=1.2)],
+            overlays=[Overlay(id="o1", asset="/lib/فلوس.mp4",
+                              out_start=1.0, out_end=2.0, keyword="فلوس")],
+            transitions=[Transition(id="t0", out_time=1.5)],
+            captions=[CaptionLine(words=[Word("أهلا", 0.1, 0.5)], start=0.1, end=0.5)],
+        )
+        back = EDL.from_dict(edl.to_dict())
+        self.assertEqual(back.to_dict(), edl.to_dict())
+        self.assertEqual(back.overlays[0].asset, "/lib/فلوس.mp4")
+        self.assertEqual(back.cuts[0].text, "أهلا بيك")
+
+    def test_an_edit_written_by_another_version_still_opens(self):
+        # It lives on disk beside your footage and outlives any one release.
+        from reelforge.edl import EDL
+        edl = EDL.from_dict({
+            "source": "take.mp4", "output": {},
+            "cuts": [{"src_start": 0, "src_end": 1, "out_start": 0, "out_end": 1,
+                      "something_new": True}],
+            "overlays": [{"id": "o1", "asset": "a.mp4", "out_start": 0,
+                          "out_end": 1, "name": "a.mp4", "later_addition": 7}],
+        })
+        self.assertEqual(edl.overlays[0].id, "o1")
+        self.assertEqual(len(edl.cuts), 1)
+
     def test_an_overlay_tells_the_browser_its_filename(self):
         # So the page never parses a path: one separator per platform, and a
         # backslash away from exactly the bug above.
@@ -3012,6 +3051,55 @@ class WebAppTests(unittest.TestCase):
         response = client.get("/api/broll/clip.mp4/file", headers={"Range": "bytes=0-512"})
         self.assertEqual(response.status_code, 206)
         self.assertEqual(client.get("/api/broll/nope.mp4/file").status_code, 404)
+
+        # A small copy is what gets streamed: this goes down the wire every time
+        # the clip comes up, and the original is whatever came off a phone.
+        from reelforge.ffmpeg import probe
+        small = self.app.state.runner.broll_dir / ".proxies" / "clip.mp4.mp4"
+        self.assertTrue(small.exists(), "no small copy was made")
+        self.assertLessEqual(probe(small).height, min(480, probe(self.clip_a).height))
+
+    def test_the_small_copy_is_built_once_even_under_a_burst(self):
+        # A video element asks for several ranges at once. Without a lock each
+        # one starts its own encode, and a handful of those fells the machine.
+        client = self.client("brollburst")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        runner = self.app.state.runner
+        small = runner.broll_dir / ".proxies" / "clip.mp4.mp4"
+        small.unlink(missing_ok=True)
+
+        import threading
+        from reelforge import broll as broll_module
+        calls, guard = [], threading.Lock()
+        real = broll_module.make_proxy
+
+        def counted(asset, dest, **kwargs):
+            with guard:
+                calls.append(1)
+            return real(asset, dest, **kwargs)
+
+        broll_module.make_proxy = counted
+        try:
+            threads = [threading.Thread(
+                target=lambda: client.get("/api/broll/clip.mp4/file",
+                                          headers={"Range": "bytes=0-256"}))
+                for _ in range(6)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        finally:
+            broll_module.make_proxy = real
+        self.assertEqual(len(calls), 1, f"encoded {len(calls)} times for one clip")
+
+    def test_the_small_copy_is_not_offered_as_broll(self):
+        client = self.client("brollhidden")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        client.get("/api/broll/clip.mp4/file")
+        self.assertEqual([a["name"] for a in client.get("/api/broll").json()],
+                         ["clip.mp4"])
 
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore

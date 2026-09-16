@@ -132,6 +132,47 @@ with sync_playwright() as pw:
         print("pause after drag :", drag)
     page.click("#pauseMode")
 
+    # Put a clip in the library and tag it with something actually said, so
+    # there is an overlay to walk through.
+    page.set_input_files("#brollFiles", str(clip))
+    page.click("#brollUpload")
+    page.wait_for_selector("[data-kw]", timeout=120000)
+    spoken = page.evaluate("""() => {
+        const line = (P.plan.captions || []).find(l => l.start > 1.5);
+        return line ? line.text.split(/\s+/).find(w => w.length > 3) : null;
+    }""")
+    print("tagging with     :", spoken)
+    if spoken:
+        page.fill("[data-kw]", spoken)
+        page.dispatch_event("[data-kw]", "change")
+        page.wait_for_function("P && (P.plan.overlays||[]).length > 0", timeout=60000)
+        print("overlays now     :", page.evaluate("P.plan.overlays.length"))
+        print("library verdict  :", page.inner_text(".asset .nm")[-24:])
+
+    # B-roll: how many requests does one appearance cost? The first version
+    # re-seeked every frame, so an unloaded clip sent a range request per frame
+    # until the server had no thread left to serve the page itself.
+    page.evaluate("""() => { window.__hits = 0;
+        const real = window.fetch;
+        window.__reqs = [];
+    }""")
+    hits = []
+    page.on("request", lambda r: hits.append(r.url) if "/broll/" in r.url else None)
+    overlay = page.evaluate("""() => {
+        if (!P.plan.overlays || !P.plan.overlays.length) return null;
+        const o = P.plan.overlays[0];
+        // Walk the whole overlay as the player would, frame by frame.
+        for (let t = o.out_start; t <= o.out_end; t += 1 / 60) paint(t, 0);
+        return {id: o.id, name: o.name, span: +(o.out_end - o.out_start).toFixed(2)};
+    }""")
+    page.wait_for_timeout(1200)
+    print("overlay walked   :", overlay)
+    print("broll requests   :", len(hits), "(one appearance)")
+    if overlay:
+        frames = int(overlay["span"] * 60)
+        print("frames drawn     :", frames)
+        assert len(hits) <= 4, f"{len(hits)} requests for {frames} frames — flooding"
+
     # Saving a default look, so the next upload arrives already set up.
     page.click(".iconbar [data-group='__defaults']")
     page.wait_for_selector("#saveDefaults", timeout=10000)
