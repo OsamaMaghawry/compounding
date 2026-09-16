@@ -58,6 +58,17 @@ re-decided on the server - about a second, and still no render.
 none; the banner tells you when you are looking at something unsaved, and
 **Discard** puts it back.
 
+### The shape of the letters
+
+Under **Captions**, beyond size, three controls change the letters themselves:
+**width** and **height** as percentages, and **space between letters** in pixels.
+Width below 100 condenses the font; height above 100 gives the tall, narrow look.
+They are the same three settings the renderer has, so the live view and the
+export agree.
+
+Arabic letters join, so spacing pulls them apart and breaks the joins - use width
+and height for a condensed look, and keep spacing for Latin text.
+
 ### The settings, under the video
 
 A row of icons sits directly under the timeline: **Captions**, **Motion**,
@@ -168,11 +179,21 @@ The **B-roll** tab in the Look panel controls how often clips appear, how sure t
 word match has to be, and whether a clip covers the screen, sits in a corner, or
 runs as a band across the middle.
 
-Each clip also has a **how long** setting. The default, *short cutaway*, sizes it
-to the sentence that triggered it - a couple of seconds, which is what a cutaway
-wants. A ten-second clip added to illustrate a point is not a cutaway, so choose
-*play the whole clip* and it runs to its end before handing back to you. Or pick a
-fixed number of seconds. A still has no length of its own, so it gets one.
+Each clip has a **how long** setting, and says underneath exactly what it will do -
+*the whole clip, 12.3s* or *4s, from 2s in* - so the setting is never a guess.
+
+- **short cutaway** - sized to the sentence that triggered it, a couple of seconds,
+  which is what a cutaway wants. Never longer than the clip has.
+- **whole clip, to its end** - runs until the clip finishes, however long that is,
+  then hands back to you. No limit.
+- **a number of seconds** - type it.
+
+**start the clip at** skips into it, for a clip whose first seconds are not the
+point. A still has no length of its own, so it gets one.
+
+A clip's length is measured when it is added, and if it was added before that was
+done, when the library next loads. This matters: an unmeasured clip on *whole clip*
+used to fall back to a one-second cutaway without saying so.
 
 A clip told to play out is used **once** in an edit. It is a deliberate insert
 rather than decoration, and repeating it is how a long clip ends up covering most

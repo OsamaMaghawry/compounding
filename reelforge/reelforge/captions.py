@@ -232,6 +232,11 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
     primary_inline = _inline_color(profile.get("captions.primary"))
 
     spec = _style_spec(profile, int(profile.get("captions.font_size")))
+    # The letters' own shape: width and height as percentages, spacing in
+    # pixels. These are libass's ScaleX, ScaleY and Spacing style fields.
+    scale_x = max(20.0, min(400.0, float(profile.get("captions.scale_x", 100))))
+    scale_y = max(20.0, min(400.0, float(profile.get("captions.scale_y", 100))))
+    spacing = max(-20.0, min(100.0, float(profile.get("captions.spacing", 0))))
 
     use_emphasis = bool(profile.get("captions.emphasis"))
     extra_emphasis = emphasis_set(profile.get("captions.emphasis_words"))
@@ -266,7 +271,7 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
         f"Style: Reel,{font},{spec['font_size']},{primary},{primary},{spec['outline_color']},"
-        f"&H80000000,{bold},0,0,0,100,100,0,0,{spec['border_style']},"
+        f"&H80000000,{bold},0,0,0,{scale_x:g},{scale_y:g},{spacing:g},0,{spec['border_style']},"
         f"{spec['outline']:g},{spec['shadow']:g},2,{margin_x},{margin_x},{margin_v},1",
         "",
         "[Events]",

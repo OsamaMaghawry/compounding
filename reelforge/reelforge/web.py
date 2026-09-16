@@ -73,6 +73,16 @@ LOOK_FIELDS: list[dict] = [
      "help": "Reels read best at three or four. Set 1 for one-word-at-a-time."},
     {"group": "Captions", "key": "captions.font_size", "label": "Size", "type": "number",
      "min": 40, "max": 170, "step": 2},
+    {"group": "Captions", "key": "captions.scale_x", "label": "Width of the letters",
+     "type": "number", "min": 50, "max": 160, "step": 2,
+     "help": "Percent. Below 100 condenses the font; above stretches it."},
+    {"group": "Captions", "key": "captions.scale_y", "label": "Height of the letters",
+     "type": "number", "min": 50, "max": 180, "step": 2,
+     "help": "Percent. Above 100 makes a tall, narrow look."},
+    {"group": "Captions", "key": "captions.spacing", "label": "Space between letters",
+     "type": "number", "min": -6, "max": 30, "step": 1,
+     "help": "Pixels. Arabic letters join, so spacing pulls them apart - "
+             "use width and height for a condensed look instead."},
     {"group": "Captions", "key": "captions.y_pct", "label": "Height on screen",
      "type": "number", "min": 0.25, "max": 0.92, "step": 0.01,
      "help": "0 is the top, 1 the bottom. 0.72 clears the Instagram buttons."},
@@ -1240,8 +1250,12 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                 # normalised form strips the vowels and reads like a typo.
                 "keywords": list(entry.get("keywords") or asset.keywords),
                 "from_filename": not entry.get("keywords"),
-                "seconds": entry.get("duration"),
+                "seconds": entry.get("duration") or asset.duration,
                 "hold": entry.get("hold", "cutaway"),
+                "start": float(entry.get("start", 0.0) or 0.0),
+                # What it will actually do, in words, so the setting is never a
+                # guess: "the whole clip, 12.3s" or "4s, from 2s in".
+                "plays": broll.describe_hold(asset),
                 "size": asset.path.stat().st_size,
             })
         return out
@@ -1275,11 +1289,25 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         """The words that make this clip appear, and how long it stays."""
         path = broll_or_404(name)
 
+        if "start" in body:
+            try:
+                start = max(0.0, float(body.get("start") or 0.0))
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(status_code=400,
+                                    detail="start must be a number of seconds") from exc
+            manifest = broll.read_manifest(runner.broll_dir)
+            entry = dict(manifest.get(path.name) or {})
+            entry["start"] = round(start, 2)
+            manifest[path.name] = entry
+            broll.write_manifest(runner.broll_dir, manifest)
+            if "hold" not in body and "keywords" not in body:
+                return {"ok": True, "start": start}
+
         if "hold" in body:
             hold = body.get("hold")
             if hold not in ("cutaway", "full"):
                 try:
-                    hold = round(max(0.2, min(60.0, float(hold))), 2)
+                    hold = round(max(0.2, min(3600.0, float(hold))), 2)
                 except (TypeError, ValueError) as exc:
                     raise HTTPException(status_code=400,
                                         detail="how long must be a number, "
@@ -2059,30 +2087,51 @@ async function loadBroll(){
         <input type="text" dir="auto" data-kw="${a.name}"
           value="${(a.keywords||[]).join(', ').replace(/"/g,'&quot;')}"
           placeholder="words that bring this up, separated by commas">
-        <select data-hold="${a.name}">
-          <option value="cutaway" ${a.hold==='cutaway'?'selected':''}>
-            short cutaway — a couple of seconds</option>
-          ${a.kind==='video'?`<option value="full" ${a.hold==='full'?'selected':''}>
-            play the whole clip${a.seconds?` — ${a.seconds.toFixed(1)}s`:''}</option>`:''}
-          ${[2,3,5,8,12].map(n=>`<option value="${n}" ${Number(a.hold)===n?'selected':''}>
-            hold for ${n}s</option>`).join('')}
-        </select>
+        <div class="two" style="margin-top:6px">
+          <select data-hold="${a.name}">
+            <option value="cutaway" ${a.hold==='cutaway'?'selected':''}>short cutaway</option>
+            ${a.kind==='video'?`<option value="full" ${a.hold==='full'?'selected':''}>whole clip, to its end</option>`:''}
+            <option value="custom" ${(a.hold!=='cutaway'&&a.hold!=='full')?'selected':''}>a number of seconds</option>
+          </select>
+          <input type="number" min="0.2" max="3600" step="0.5" data-secs="${a.name}"
+            placeholder="seconds" value="${(a.hold!=='cutaway'&&a.hold!=='full')?a.hold:''}"
+            ${(a.hold!=='cutaway'&&a.hold!=='full')?'':'hidden'}>
+        </div>
+        ${a.kind==='video'?`<div class="two" style="margin-top:6px">
+          <span class="dim" style="font-size:12px;align-self:center">start the clip at</span>
+          <input type="number" min="0" step="0.5" data-start="${a.name}"
+            value="${a.start||0}" style="margin-top:0"> </div>`:''}
+        <div class="dim" style="font-size:12px;margin-top:4px">will play: ${a.plays||''}</div>
       </span>
       <span class="pill" data-rm="${a.name}" title="remove">✕</span>
     </div>`).join('') : '<span class="dim">empty — nothing will be cut in yet</span>';
 
-  $('broll').querySelectorAll('[data-hold]').forEach(el=>{
-    el.onchange=async()=>{
-      el.disabled=true;
-      try{
-        await api('/api/broll/'+encodeURIComponent(el.dataset.hold),{method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({hold:el.value})});
-        $('brollMsg').textContent='saved';
-      }catch(e){ $('brollMsg').textContent='error: '+e.message; }
-      el.disabled=false;
+  const post=async(name, body)=>{
+    try{
+      await api('/api/broll/'+encodeURIComponent(name),{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      $('brollMsg').textContent='saved';
       refreshBroll();
+    }catch(e){ $('brollMsg').textContent='error: '+e.message; }
+  };
+  $('broll').querySelectorAll('[data-hold]').forEach(el=>{
+    el.onchange=()=>{
+      const secs=$('broll').querySelector(`[data-secs="${CSS.escape(el.dataset.hold)}"]`);
+      if(el.value==='custom'){
+        // A number is wanted: show the box and wait for it rather than saving
+        // a mode with no length attached.
+        if(secs){ secs.hidden=false; secs.focus(); }
+        return;
+      }
+      if(secs) secs.hidden=true;
+      post(el.dataset.hold, {hold:el.value});
     };
+  });
+  $('broll').querySelectorAll('[data-secs]').forEach(el=>{
+    el.onchange=()=>{ const n=Number(el.value); if(n>0) post(el.dataset.secs, {hold:n}); };
+  });
+  $('broll').querySelectorAll('[data-start]').forEach(el=>{
+    el.onchange=()=>post(el.dataset.start, {start:Number(el.value)||0});
   });
   $('broll').querySelectorAll('[data-kw]').forEach(el=>{
     el.onchange=async()=>{
@@ -2497,6 +2546,11 @@ function drawCaption(out){
   caps.style.fontSize=size.toFixed(1)+'px';
   caps.style.fontWeight=(look.bold===false)?'600':'800';
   caps.style.color=primary;
+  // The same three knobs libass has: ScaleX, ScaleY, Spacing.
+  const sx=(look.scale_x??100)/100, sy=(look.scale_y??100)/100;
+  caps.style.transform=(sx!==1||sy!==1)?`scale(${sx},${sy})`:'';
+  caps.style.transformOrigin='center bottom';
+  caps.style.letterSpacing=((look.spacing||0)*scale).toFixed(2)+'px';
   const edge=Math.max(1,(look.outline||7)*scale);
   caps.style.textShadow=[`0 0 ${edge}px ${look.outline_color||'#101010'}`,
     `${edge*0.5}px ${edge*0.5}px ${edge}px rgba(0,0,0,.85)`].join(',');

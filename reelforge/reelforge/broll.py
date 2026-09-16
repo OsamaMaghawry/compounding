@@ -95,6 +95,7 @@ class BrollLibrary:
             break
 
         assets: list[BrollAsset] = []
+        measured: dict[str, float] = {}
         for path in sorted(directory.rglob("*")):
             if not path.is_file():
                 continue
@@ -110,10 +111,27 @@ class BrollLibrary:
             config = overrides.get(relative) or overrides.get(path.name) or {}
             keywords = [normalize_for_match(k) for k in config.get("keywords", [])]
             keywords = [k for k in keywords if k] or _keywords_from_filename(path)
+            duration = config.get("duration")
+            if duration is None and suffix in VIDEO_EXT:
+                # Unknown length made "play the whole clip" fall back to a
+                # one-second cutaway without a word. Measure it here, once.
+                duration = _length_of(path)
+                if duration:
+                    measured[relative] = duration
             assets.append(BrollAsset(path=path, keywords=keywords,
                                      start=float(config.get("start", 0.0)),
-                                     duration=config.get("duration"),
+                                     duration=duration,
                                      hold=config.get("hold", "cutaway")))
+        if measured:
+            manifest = read_manifest(directory)
+            for name, seconds in measured.items():
+                entry = dict(manifest.get(name) or {})
+                entry["duration"] = round(seconds, 3)
+                manifest[name] = entry
+            try:
+                write_manifest(directory, manifest)
+            except OSError:
+                pass
         return cls(assets)
 
     def match(self, text: str, *, weights: dict[str, float] | None = None,
@@ -165,6 +183,45 @@ def write_manifest(directory: str | Path, data: dict) -> Path:
     return path
 
 
+def describe_hold(asset: "BrollAsset") -> str:
+    """What a clip's length setting will actually do, in words."""
+    wanted = asset.hold
+    if isinstance(wanted, str):
+        wanted = wanted.strip().lower()
+    have = None
+    if asset.duration:
+        have = max(0.0, float(asset.duration) - float(asset.start))
+    tail = f", from {asset.start:g}s in" if asset.start else ""
+    if asset.is_image:
+        seconds = None
+        try:
+            seconds = float(wanted)
+        except (TypeError, ValueError):
+            pass
+        return f"{seconds:g}s" if seconds else "the photo, for the set time"
+    if wanted == "full":
+        return (f"the whole clip, {have:.1f}s{tail}" if have
+                else "the whole clip, to its end")
+    try:
+        seconds = float(wanted)
+    except (TypeError, ValueError):
+        seconds = None
+    if seconds and seconds > 0.05:
+        shown = min(seconds, have) if have else seconds
+        return f"{shown:g}s{tail}"
+    return ("a short cutaway sized to the sentence" +
+            (f", never past its {have:.1f}s" if have else ""))
+
+
+def _length_of(asset: Path) -> float | None:
+    from .ffmpeg import probe  # noqa: PLC0415 - avoid a cycle at import time
+    try:
+        seconds = float(probe(asset).duration)
+    except Exception:
+        return None
+    return seconds if seconds > 0 else None
+
+
 def hold_seconds(asset: "BrollAsset", *, cutaway: float, photo: float) -> float | None:
     """How long this asset should be on screen, or None to size it to the line.
 
@@ -179,7 +236,11 @@ def hold_seconds(asset: "BrollAsset", *, cutaway: float, photo: float) -> float 
     if isinstance(wanted, str):
         wanted = wanted.strip().lower()
     if wanted == "full":
-        return available or None
+        if available:
+            return available
+        # Length unknown even after trying: play it long rather than short. The
+        # renderer stops at the clip's real end either way; the preview does too.
+        return 3600.0
     try:
         seconds = float(wanted)
     except (TypeError, ValueError):

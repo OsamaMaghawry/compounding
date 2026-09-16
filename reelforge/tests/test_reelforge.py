@@ -818,6 +818,53 @@ class FontAndTemplateTests(unittest.TestCase):
                              "b-roll covered the whole video")
         self.assertTrue(placed, "it went too far the other way and dropped them all")
 
+    def test_a_clip_with_no_recorded_length_is_measured_when_the_library_loads(self):
+        # "Play the whole clip" on a clip of unknown length fell back to a
+        # one-second cutaway, silently. The length is measured on load now.
+        import json as _json
+        from reelforge.broll import BrollLibrary, read_manifest
+        folder = Path(tempfile.mkdtemp(prefix="reelforge-lib-")) / "lib-measure"
+        folder.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(shutil.rmtree, folder.parent, ignore_errors=True)
+        make_clip(folder / "long.mp4", duration=6)
+        (folder / "library.json").write_text(
+            _json.dumps({"long.mp4": {"keywords": ["x"], "hold": "full"}}), encoding="utf-8")
+        library = BrollLibrary.load(folder)
+        self.assertAlmostEqual(library.assets[0].duration, 6.0, delta=0.5)
+        self.assertAlmostEqual(read_manifest(folder)["long.mp4"]["duration"], 6.0, delta=0.5)
+
+    def test_the_whole_clip_never_quietly_becomes_a_cutaway(self):
+        from reelforge.broll import BrollAsset, hold_seconds
+        unknown = BrollAsset(path=Path("a.mp4"), duration=None, hold="full")
+        self.assertGreater(hold_seconds(unknown, cutaway=2.6, photo=2.0), 60.0)
+
+    def test_a_clip_says_what_it_will_do(self):
+        from reelforge.broll import BrollAsset, describe_hold
+        ten = BrollAsset(path=Path("a.mp4"), duration=10.0)
+        self.assertIn("cutaway", describe_hold(ten))
+        ten.hold = "full"
+        self.assertIn("10.0s", describe_hold(ten))
+        ten.hold = 4
+        self.assertEqual(describe_hold(ten), "4s")
+        ten.start = 2.0
+        self.assertIn("from 2s in", describe_hold(ten))
+        self.assertIn("the whole clip", describe_hold(
+            BrollAsset(path=Path("b.mp4"), duration=None, hold="full")))
+
+    def test_the_letters_can_be_condensed_stretched_and_spaced(self):
+        # Beyond size: libass's ScaleX, ScaleY and Spacing, straight through.
+        from reelforge.captions import build_ass, group_words
+        words = [Word("كلمة", 0.0, 0.4), Word("ثانية", 0.4, 0.8)]
+        profile = StyleProfile().apply_overrides(
+            ["captions.scale_x=80", "captions.scale_y=130", "captions.spacing=3"])
+        ass = build_ass(group_words(words, profile), profile)
+        style = next(l for l in ass.splitlines() if l.startswith("Style: Reel,"))
+        fields = style.split(",")
+        # Format: ...Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing...
+        self.assertEqual(fields[11:14], ["80", "130", "3"])
+        plain = build_ass(group_words(words, StyleProfile()), StyleProfile())
+        self.assertIn(",100,100,0,", next(l for l in plain.splitlines() if l.startswith("Style: Reel,")))
+
     def test_catalog_entries_are_well_formed(self):
         from reelforge.fonts import CATALOG, resolve
         self.assertGreaterEqual(len(CATALOG), 10)
@@ -3262,6 +3309,19 @@ class WebAppTests(unittest.TestCase):
         self.assertTrue(full)
         played = full[0]["out_end"] - full[0]["out_start"]
         self.assertGreater(played, short, "asking for the whole clip changed nothing")
+
+    def test_a_clip_can_start_part_way_in_and_play_a_set_number_of_seconds(self):
+        client = self.client("brollstart")
+        self.login(client)
+        self.add_broll(client, self.clip_b, "clip.mp4")
+        self.assertEqual(client.post("/api/broll/clip.mp4",
+                                     json={"start": 1.5, "hold": 2.0}).status_code, 200)
+        listed = client.get("/api/broll").json()[0]
+        self.assertEqual(listed["start"], 1.5)
+        self.assertEqual(listed["hold"], 2.0)
+        self.assertIn("from 1.5s in", listed["plays"])
+        self.assertEqual(client.post("/api/broll/clip.mp4",
+                                     json={"start": "later"}).status_code, 400)
 
     def test_a_nonsense_length_is_refused(self):
         client = self.client("brollholdbad")

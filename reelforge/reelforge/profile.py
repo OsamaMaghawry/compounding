@@ -86,6 +86,13 @@ DEFAULTS: dict[str, Any] = {
         "font": "Cairo",
         "font_size": 92,
         "bold": True,
+        # How the letters themselves are shaped, beyond size. ScaleX below 100
+        # condenses, ScaleY above 100 makes a tall look, Spacing spreads the
+        # letters. Arabic letters join, so spacing pulls them apart; condense
+        # with scale_x instead.
+        "scale_x": 100,
+        "scale_y": 100,
+        "spacing": 0,
         # How the spoken word is marked while you talk:
         #   karaoke - active word changes colour (default)
         #   box     - active word sits in a filled box (the CapCut look)
