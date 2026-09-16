@@ -130,6 +130,19 @@ sentence. What goes: a zoom that lived inside what you cut, since its moment no
 longer exists. That is not recorded as you rejecting the zoom - cutting a weak
 take says nothing about the zoom that happened to sit in it.
 
+### Fixing a word
+
+The caption list under the player is editable. Type in a box and the word changes
+on the video as you type; Save keeps it, Discard puts it back. The zoom and
+transition tick boxes work the same way.
+
+What is saved is *what changed*, never a line number: a word that became another
+word, a line that now reads differently, a move at a moment in the footage that
+was switched off. That is what lets a fix survive the edit being decided again -
+a settings change regroups the lines, and a fix pinned to line 4 would land on the
+wrong sentence the moment there were five. A word you fix in one line is fixed
+wherever else it was misheard, which is also what the editor learns from.
+
 ### What the live view is not
 
 It is the browser laying out text; the export is libass. They are close, not

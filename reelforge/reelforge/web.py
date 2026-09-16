@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import broll
+from .captions import CaptionLine
 from .edl import EDL, Cut
 from .fonts import resolve as font_catalog_resolve
 from .pipeline import PACKAGE_ROOT, AutoEditor
@@ -228,6 +229,129 @@ def apply_pauses(edl: EDL, pauses: list) -> None:
     edl.retime(adjust=shift)
 
 
+def apply_offs(edl: EDL, offs: list) -> None:
+    """Re-apply the moves you switched off, after the edit was decided again."""
+    wanted = []
+    for entry in offs or []:
+        try:
+            wanted.append((str(entry[0]), float(entry[1])))
+        except (TypeError, IndexError, ValueError):
+            continue
+    if not wanted:
+        return
+    timeline = edl.timeline
+    for zoom in edl.zooms:
+        where = timeline.to_src(zoom.out_start)
+        if where is not None and any(k == "zoom" and abs(t - where) <= 0.35
+                                     for k, t in wanted):
+            zoom.enabled = False
+    for transition in edl.transitions:
+        # A transition sits exactly on a cut, so its moment in the footage is
+        # two moments: the end of one piece and the start of the next. Either
+        # is a match, so a pause dragged on one side cannot lose the tick.
+        sides = [timeline.to_src(transition.out_time),
+                 timeline.to_src(transition.out_time + 0.001)]
+        if any(s is not None and k == "transition" and abs(t - s) <= 0.35
+               for s in sides for k, t in wanted):
+            transition.enabled = False
+
+
+def apply_wording(edl: EDL, wording: list) -> None:
+    """Put fixed wording back onto a freshly decided edit.
+
+    Three ways a fix can land, tried in order. A line that still reads exactly
+    as it did is replaced whole. A word that became another word is swapped
+    wherever it appears. And a line rewritten to a different number of words -
+    which no word map can express - is placed by the stretch of footage it
+    covered: whatever is now said between those two moments reads as you wrote.
+    """
+    from .arabic import normalize_for_match  # noqa: PLC0415
+    entries = []
+    for entry in wording or []:
+        try:
+            was, now = str(entry[0]).strip(), str(entry[1]).strip()
+        except (TypeError, IndexError):
+            continue
+        if not was or not now or was == now:
+            continue
+        span = None
+        if len(entry) >= 4:
+            try:
+                span = (float(entry[2]), float(entry[3]))
+            except (TypeError, ValueError):
+                span = None
+        entries.append((was, now, span))
+    if not entries:
+        return
+
+    words: dict[str, str] = {}
+    for was, now, _span in entries:
+        before, after = was.split(), now.split()
+        if len(before) == len(after):
+            for old, new in zip(before, after):
+                if old != new:
+                    words[normalize_for_match(old)] = new
+
+    placed: set[int] = set()
+    for was, now, _span in entries:
+        for index, line in enumerate(edl.captions):
+            if line.text == was:
+                _rewrite_line(line, now)
+                placed.add(index)
+
+    for index, line in enumerate(edl.captions):
+        if index in placed:
+            continue
+        for word in line.words:
+            key = normalize_for_match(word.text)
+            if key in words and word.text != words[key]:
+                word.text = words[key]
+
+    # Lines that could not be found and have no word map: place them by span.
+    timeline = edl.timeline
+    for was, now, span in entries:
+        if span is None or any(line.text == now for line in edl.captions):
+            continue
+        if len(was.split()) == len(now.split()):
+            continue                          # the word map above handled it
+        low, high = min(span), max(span)
+        covered = [i for i, line in enumerate(edl.captions)
+                   if _overlaps(timeline, line, low, high)]
+        if not covered:
+            continue
+        first, last = edl.captions[covered[0]], edl.captions[covered[-1]]
+        merged = CaptionLine(words=[], start=first.start, end=last.end)
+        _rewrite_line(merged, now)
+        edl.captions = ([line for i, line in enumerate(edl.captions) if i < covered[0]]
+                        + [merged]
+                        + [line for i, line in enumerate(edl.captions) if i > covered[-1]])
+
+
+def _overlaps(timeline, line, low: float, high: float) -> bool:
+    """Whether most of a caption line falls inside a stretch of footage."""
+    start = timeline.to_src(line.start)
+    end = timeline.to_src(line.end)
+    if start is None or end is None or end <= start:
+        return False
+    inside = max(0.0, min(end, high) - max(start, low))
+    return inside >= 0.5 * (end - start)
+
+
+def _rewrite_line(line, text: str) -> None:
+    """Replace a line's words, keeping timing when the count matches."""
+    from .speech import Word  # noqa: PLC0415
+    new_words = text.split()
+    if len(new_words) == len(line.words) and line.words:
+        for word, replacement in zip(line.words, new_words):
+            word.text = replacement
+        return
+    span = max(0.2, line.end - line.start)
+    each = span / max(1, len(new_words))
+    line.words = [Word(text=w, start=line.start + i * each,
+                       end=line.start + (i + 1) * each - 0.02, prob=1.0)
+                  for i, w in enumerate(new_words)]
+
+
 def apply_beats(edl: EDL, beats: list) -> None:
     """Set the length of the transition at a particular join.
 
@@ -339,6 +463,15 @@ class Job:
     heartbeat: float = 0.0      # last sign of life, so a stuck job can be told apart
     started: float = 0.0        # when the current run began
     patience: float = 90.0      # how long this step may go quiet before it is odd
+    # Wording you fixed, as [what it said, what it should say] - whole lines or
+    # single words. Kept on the job, not on a line number: a settings change
+    # regroups the lines, and a fix pinned to line 4 would land on the wrong
+    # sentence the moment there were five.
+    wording: list = field(default_factory=list)
+    # Moves you switched off, as [kind, source time]. Same reasoning: a new plan
+    # hands out new ids, so "zoom 3" means nothing afterwards, but the moment in
+    # the footage still does.
+    offs: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -689,6 +822,8 @@ class Runner:
         apply_pauses(result.edl, job.pauses)
         apply_drops(result.edl, job.drops)
         apply_beats(result.edl, job.beats)
+        apply_wording(result.edl, job.wording)
+        apply_offs(result.edl, job.offs)
         self._remember(job.id, editor, result.edl)
         for warning in result.warnings:
             note(warning)
@@ -703,7 +838,8 @@ class Runner:
                           percent=100.0, heartbeat=time.time())
 
     def plan_preview(self, job: Job, values: dict, drops: list,
-                     pauses: list | None = None, beats: list | None = None) -> dict:
+                     pauses: list | None = None, beats: list | None = None,
+                     wording: list | None = None, offs: list | None = None) -> dict:
         """What the edit would be with these settings - committing nothing.
 
         This is what makes the panel feel live: the answer comes back in about a
@@ -720,6 +856,8 @@ class Runner:
         apply_pauses(result.edl, pauses if pauses is not None else job.pauses)
         apply_drops(result.edl, drops)
         apply_beats(result.edl, beats if beats is not None else job.beats)
+        apply_wording(result.edl, wording if wording is not None else job.wording)
+        apply_offs(result.edl, offs if offs is not None else job.offs)
         return {"edl": result.edl.to_dict(), "summary": result.edl.summary(),
                 "look": profile.section("captions")}
 
@@ -1468,7 +1606,8 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         try:
             return runner.plan_preview(job, {k: str(v) for k, v in values.items()},
                                        body.get("drops") or job.drops,
-                                       body.get("pauses"), body.get("beats"))
+                                       body.get("pauses"), body.get("beats"),
+                                       body.get("wording"), body.get("offs"))
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -1550,6 +1689,36 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
             if not isinstance(beats, list):
                 raise HTTPException(status_code=400, detail="beats must be a list")
             job.beats = [[float(mid), float(seconds)] for mid, seconds in beats]
+
+        wording = body.get("wording")
+        if wording is not None:
+            if not isinstance(wording, list):
+                raise HTTPException(status_code=400, detail="wording must be a list")
+            fresh = []
+            for w in wording:
+                if not isinstance(w, (list, tuple)) or len(w) < 2:
+                    continue
+                was, now = str(w[0]).strip(), str(w[1]).strip()
+                if not was or not now:
+                    continue
+                entry = [was, now]
+                if len(w) >= 4 and w[2] is not None and w[3] is not None:
+                    try:
+                        entry += [float(w[2]), float(w[3])]
+                    except (TypeError, ValueError):
+                        pass
+                fresh.append(entry)
+            # Newer fixes to the same line win; the rest are kept.
+            kept = [pair for pair in job.wording if pair[0] not in {f[0] for f in fresh}]
+            job.wording = kept + fresh
+
+        offs = body.get("offs")
+        if offs is not None:
+            if not isinstance(offs, list):
+                raise HTTPException(status_code=400, detail="offs must be a list")
+            job.offs = [[str(o[0]), float(o[1])] for o in offs
+                        if isinstance(o, (list, tuple)) and len(o) == 2
+                        and str(o[0]) in ("zoom", "transition")]
 
         store.update(job, status="queued", stage="saving", error="")
         runner.submit(job.id, "replan" if body.get("render") else "replan_only")
@@ -2020,6 +2189,9 @@ $('upload').onclick=async()=>{
 };
 
 const ago=s=>s<60?`${Math.round(s)}s`:`${Math.floor(s/60)}m ${Math.round(s%60)}s`;
+// The status line lives inside a panel that is rebuilt when a job changes state,
+// so it is not always there to be written to.
+const say=t=>{ const el=$('dirty'); if(el) el.textContent=t; };
 
 function updateProgress(job){
   const bar=$('bar');
@@ -2221,7 +2393,9 @@ function mountPlayer(job){
   const copy=list=>(list||[]).map(d=>[d[0],d[1]]);
   P={job, video, track, caps, plan:edl, look:null, values:{},
      drops:copy(job.drops), pauses:copy(job.pauses), beats:copy(job.beats),
-     saved:{drops:copy(job.drops), pauses:copy(job.pauses), beats:copy(job.beats)},
+     offs:copy(job.offs), captionEdits:[],
+     saved:{drops:copy(job.drops), pauses:copy(job.pauses), beats:copy(job.beats),
+            offs:copy(job.offs)},
      sel:null, activeJoin:null, pauseMode:false, dirty:false, raf:0, pending:0,
      grabAt:0};
 
@@ -2249,6 +2423,13 @@ function kept(){ return (P.plan.cuts||[]).filter(c=>c.enabled); }
 function outAt(src){
   for(const c of kept()) if(src>=c.src_start && src<=c.src_end)
     return c.out_start + (src - c.src_start);
+  return null;
+}
+// The footage moment behind a point in the finished video - what the server
+// keys everything on, because it is the only thing that survives a re-plan.
+function srcAt(out){
+  for(const c of kept()) if(out>=c.out_start && out<=c.out_end)
+    return c.src_start + (out - c.out_start);
   return null;
 }
 function nextKeptAfter(src){
@@ -2283,7 +2464,7 @@ function tick(){
       // Said once, not sixty times a second, and never silently: a preview that
       // quietly stops matching the edit is worse than one that admits it.
       if(!P.complained){ P.complained=true;
-        $('dirty').textContent='the preview hit a problem: '+(err&&err.message||err);
+        say('the preview hit a problem: '+(err&&err.message||err));
         console.error(err); }
     }
   };
@@ -2650,8 +2831,8 @@ function wireTransport(){
   };
   $('cutSel').onclick=()=>{ if(P.sel) applyTrim([P.sel]); };
   $('keepSel').onclick=()=>{ if(P.sel) applyTrim([[0,P.sel[0]],[P.sel[1],P.duration]]); };
-  $('undoTrims').onclick=()=>{ P.drops=[]; P.pauses=[]; P.beats=[]; P.sel=null;
-    P.activeJoin=null; markDirty(); repaintPlan(); };
+  $('undoTrims').onclick=()=>{ P.drops=[]; P.pauses=[]; P.beats=[]; P.offs=[];
+    P.captionEdits=[]; P.sel=null; P.activeJoin=null; markDirty(); repaintPlan(); };
   $('pauseMode').onclick=()=>{
     P.pauseMode=!P.pauseMode; P.sel=null; P.activeJoin=null;
     $('pauseMode').classList.toggle('on', P.pauseMode);
@@ -2669,7 +2850,11 @@ function wireTransport(){
   $('saveEdit').onclick=saveEdit;
   $('discardEdit').onclick=()=>{ P.values={}; P.drops=P.saved.drops.map(d=>[...d]);
     P.pauses=P.saved.pauses.map(d=>[...d]); P.beats=P.saved.beats.map(d=>[...d]);
-    P.sel=null; P.activeJoin=null; markDirty(false); repaintPlan(); renderLook(P.job); };
+    P.offs=P.saved.offs.map(d=>[...d]);
+    P.captionEdits=[]; P.sel=null; P.activeJoin=null; markDirty(false);
+    // Nothing unsaved is left to protect, so rebuild the whole panel from the
+    // saved edit - that puts the caption boxes and the ticks back too.
+    drawn=''; refresh(); };
 }
 
 // A selection is made against the finished video, so hand back output time and
@@ -2677,12 +2862,12 @@ function wireTransport(){
 function applyTrim(ranges){
   const out=ranges.map(([a,b])=>[outAt(a)??nearestOut(a),outAt(b)??nearestOut(b)])
                   .filter(([a,b])=>b>a);
-  if(!out.length){ $('dirty').textContent='that selection is already cut'; return; }
+  if(!out.length){ say('that selection is already cut'); return; }
   api(`/api/jobs/${P.job.id}/trim`,{method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ranges:out})})
     .then(r=>{ P.drops=r.drops; P.sel=null; markDirty(); repaintPlan(); })
-    .catch(e=>{ $('dirty').textContent='error: '+e.message; });
+    .catch(e=>{ say('error: '+e.message); });
 }
 function nearestOut(src){
   let best=0;
@@ -2701,52 +2886,157 @@ function repaintPlan(){
       const r=await api(`/api/jobs/${P.job.id}/preview-plan`,{method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({values:P.values, drops:P.drops,
-                             pauses:P.pauses, beats:P.beats})});
+                             pauses:P.pauses, beats:P.beats, offs:P.offs,
+                             wording:(P.captionEdits||[]).map(e=>[e.was,e.now,e.s0,e.s1])})});
+      applyCaptionEdits(r.edl);
       P.plan=r.edl; P.look=r.look; edl=r.edl;
+      renderLists();
       $('statOut').textContent=(r.summary.output_duration??'-')+'s';
       $('statCut').textContent=(r.summary.removed??'-')+'s';
       $('statZoom').textContent=r.summary.zooms??0;
       layoutTrack();
-    }catch(e){ $('dirty').textContent='error: '+e.message; }
+    }catch(e){ say('error: '+e.message); }
   }, 260);
 }
 
 function markDirty(on=true){
   P.dirty=on;
-  $('saveEdit').disabled=!on; $('discardEdit').disabled=!on;
-  $('dirty').textContent=on
+  const s=$('saveEdit'), d=$('discardEdit');
+  if(s) s.disabled=!on; if(d) d.disabled=!on;
+  say(on
     ? 'not saved yet — what you are watching is a try-out'
-    : '';
+    : '');
 }
 
 async function saveEdit(){
-  $('saveEdit').disabled=true; $('dirty').textContent='saving…';
+  $('saveEdit').disabled=true; say('saving…');
   try{
+    // Everything is sent as what changed in the footage - a word that became
+    // another, a move at a moment that was switched off - never as "line 4" or
+    // "zoom 3", because the save re-decides the edit and those numbers are
+    // handed out fresh.
     await api(`/api/jobs/${P.job.id}/save`,{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({values:P.values, drops:P.drops,
-                           pauses:P.pauses, beats:P.beats})});
+                           pauses:P.pauses, beats:P.beats, offs:P.offs,
+                           wording:(P.captionEdits||[]).map(e=>[e.was,e.now,e.s0,e.s1])})});
     P.saved={drops:P.drops.map(d=>[...d]), pauses:P.pauses.map(d=>[...d]),
-             beats:P.beats.map(d=>[...d])};
+             beats:P.beats.map(d=>[...d]), offs:P.offs.map(d=>[...d])};
+    P.captionEdits=[];
     markDirty(false);
     drawn=''; listed=''; refresh();
-  }catch(e){ $('dirty').textContent='error: '+e.message; $('saveEdit').disabled=false; }
+  }catch(e){ say('error: '+e.message); const s=$('saveEdit'); if(s) s.disabled=false; }
 }
 
+const attr=s=>String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
 function renderControls(job){
-  const cap=(edl.captions||[]).map((c,i)=>
-    `<div class="row"><span class="t">${fmt(c.start)}</span>
-     <span class="grow"><input type="text" dir="auto" data-cap="${i}" value="${(c.text||'').replace(/"/g,'&quot;')}"></span></div>`).join('');
-  const zoom=(edl.zooms||[]).map((z,i)=>
-    `<div class="row"><input type="checkbox" data-zoom="${i}" ${z.enabled?'checked':''}>
-     <span class="t">${fmt(z.out_start)}</span><span class="grow dim">${z.kind.replace('_',' ')} → ${z.end_factor.toFixed(2)}x</span></div>`).join('');
-  const tr=(edl.transitions||[]).map((t,i)=>
-    `<div class="row"><input type="checkbox" data-tr="${i}" ${t.enabled?'checked':''}>
-     <span class="t">${fmt(t.out_time)}</span><span class="grow dim">${t.kind}</span></div>`).join('');
   $('detail').insertAdjacentHTML('beforeend',
-    `<div class="card"><h2>Captions</h2>${cap||'<span class="dim">none</span>'}</div>
-     <div class="card"><h2>Zoom moves</h2>${zoom||'<span class="dim">none</span>'}</div>
-     <div class="card"><h2>Transitions</h2>${tr||'<span class="dim">none</span>'}</div>`);
+    `<div class="card"><h2>Captions</h2><div id="capList"></div></div>
+     <div class="card"><h2>Zoom moves</h2><div id="zoomList"></div></div>
+     <div class="card"><h2>Transitions</h2><div id="trList"></div></div>`);
+  renderLists();
+}
+
+// Rebuilt from the current plan whenever the plan changes, so what is listed is
+// what is playing. A caption box being typed in is left alone.
+function renderLists(){
+  const plan=(P&&P.plan)||edl||{};
+  const capList=$('capList'), zoomList=$('zoomList'), trList=$('trList');
+  if(!capList) return;
+  if(document.activeElement && document.activeElement.dataset &&
+     document.activeElement.dataset.cap!==undefined){
+    // mid-edit: only the effect lists refresh
+  } else {
+    capList.innerHTML=(plan.captions||[]).map((c,i)=>
+      `<div class="row"><span class="t">${fmt(c.start)}</span>
+       <span class="grow"><input type="text" dir="auto" data-cap="${i}"
+         data-was="${attr(c.text)}" value="${attr(c.text)}"></span></div>`).join('')
+      || '<span class="dim">none</span>';
+    capList.querySelectorAll('[data-cap]').forEach(el=>{
+      el.addEventListener('input', ()=>editCaption(el));
+    });
+  }
+  zoomList.innerHTML=(plan.zooms||[]).map((z,i)=>
+    `<div class="row"><input type="checkbox" data-zoom="${i}" ${z.enabled?'checked':''}>
+     <span class="t">${fmt(z.out_start)}</span><span class="grow dim">${z.kind.replace('_',' ')} → ${z.end_factor.toFixed(2)}x</span></div>`).join('')
+    || '<span class="dim">none</span>';
+  trList.innerHTML=(plan.transitions||[]).map((t,i)=>
+    `<div class="row"><input type="checkbox" data-tr="${i}" ${t.enabled?'checked':''}>
+     <span class="t">${fmt(t.out_time)}</span><span class="grow dim">${t.kind}</span></div>`).join('')
+    || '<span class="dim">none</span>';
+  // Ticks take effect on the next frame, like everything else on this page.
+  const toggle=(kind, item, at, on)=>{
+    item.enabled=on;
+    const src=srcAt(at);
+    if(src===null) return;
+    P.offs=P.offs.filter(([k,t])=>!(k===kind && Math.abs(t-src)<=0.35));
+    if(!on) P.offs.push([kind, src]);
+    markDirty();
+  };
+  zoomList.querySelectorAll('[data-zoom]').forEach(el=>el.onchange=()=>{
+    const z=(P.plan.zooms||[])[Number(el.dataset.zoom)];
+    if(z) toggle('zoom', z, z.out_start, el.checked);
+  });
+  trList.querySelectorAll('[data-tr]').forEach(el=>el.onchange=()=>{
+    const t=(P.plan.transitions||[])[Number(el.dataset.tr)];
+    if(t) toggle('transition', t, t.out_time, el.checked);
+  });
+}
+
+// A word you fix shows on the video as you type it. The words keep their
+// timing when the count matches; otherwise the line's span is shared out.
+function editCaption(el){
+  if(!P) return;
+  const line=(P.plan.captions||[])[Number(el.dataset.cap)];
+  if(!line) return;
+  const text=el.value.trim();
+  if(!text) return;
+  const was=el.dataset.was||line.text;
+  P.captionEdits=P.captionEdits||[];
+  const at=P.captionEdits.findIndex(e=>e.was===was);
+  // The stretch of footage the line covered, so a rewrite to a different number
+  // of words can still be placed after the lines have been regrouped.
+  const s0=srcAt(line.start), s1=srcAt(line.end);
+  const entry={was, now:text, s0, s1};
+  if(at>=0) P.captionEdits[at]=entry; else P.captionEdits.push(entry);
+  rewriteLine(line, text);
+  markDirty();
+}
+
+function rewriteLine(line, text){
+  const words=text.split(/\s+/).filter(Boolean);
+  const old=line.words||[];
+  if(words.length===old.length && old.length){
+    old.forEach((w,i)=>{ w.text=words[i]; });
+  } else {
+    const span=Math.max(0.2, line.end-line.start), each=span/Math.max(1,words.length);
+    line.words=words.map((w,i)=>({text:w, start:line.start+i*each,
+                                   end:line.start+(i+1)*each-0.02, prob:1}));
+  }
+  line.text=words.join(' ');
+}
+
+// After the server hands back a fresh plan, put your wording back on it. Lines
+// that still read the same are replaced whole; otherwise each word you changed
+// is swapped wherever it appears, which is also what the machine learns from.
+function applyCaptionEdits(plan){
+  const edits=(P&&P.captionEdits)||[];
+  if(!edits.length) return;
+  const wordMap=new Map();
+  for(const e of edits){
+    const a=e.was.split(/\s+/), b=e.now.split(/\s+/);
+    if(a.length===b.length) a.forEach((w,i)=>{ if(w!==b[i]) wordMap.set(w,b[i]); });
+  }
+  for(const line of (plan.captions||[])){
+    const whole=edits.find(e=>e.was===line.text);
+    if(whole){ rewriteLine(line, whole.now); continue; }
+    let touched=false;
+    for(const w of (line.words||[])){
+      if(wordMap.has(w.text)){ w.text=wordMap.get(w.text); touched=true; }
+    }
+    if(touched) line.text=(line.words||[]).map(w=>w.text).join(' ');
+  }
 }
 
 // The look panel. Everything here is a real profile key, so a choice made on a

@@ -3282,6 +3282,90 @@ class WebAppTests(unittest.TestCase):
                          ["clip.mp4"])
 
     # -- knowing what it is doing -----------------------------------------
+    def test_fixed_wording_survives_the_edit_being_decided_again(self):
+        """A word you fix is sent as what it became, never as a line number.
+
+        A settings change regroups the lines, so a fix pinned to line 4 lands
+        on the wrong sentence the moment there are five. This is what the
+        first version did, and it lost the word on Save.
+        """
+        from reelforge.captions import CaptionLine
+        from reelforge.edl import EDL, Cut
+        from reelforge.web import apply_wording
+        edl = EDL(source="x.mp4", output={}, cuts=[Cut(0, 6, 0, 6, id="a")], captions=[
+            CaptionLine(words=[Word("انا", 0.1, 0.4), Word("اسامه", 0.5, 0.9)],
+                        start=0.1, end=0.9),
+            CaptionLine(words=[Word("و", 1.0, 1.2), Word("اسامه", 1.3, 1.8),
+                               Word("كمان", 1.9, 2.3)], start=1.0, end=2.3),
+        ])
+        # Fixed on line 1 as a whole line; the same word on line 2 was never
+        # touched by hand, and is fixed too, because it is the same mistake.
+        apply_wording(edl, [["انا اسامه", "انا أسامة"]])
+        self.assertEqual(edl.captions[0].text, "انا أسامة")
+        self.assertEqual(edl.captions[1].words[1].text, "أسامة")
+        # Timing is untouched when the word count is.
+        self.assertAlmostEqual(edl.captions[0].words[1].start, 0.5, places=3)
+
+    def test_rewording_a_line_to_a_different_length_shares_out_the_time(self):
+        from reelforge.captions import CaptionLine
+        from reelforge.edl import EDL, Cut
+        from reelforge.web import apply_wording
+        edl = EDL(source="x.mp4", output={}, cuts=[Cut(0, 6, 0, 6, id="a")], captions=[
+            CaptionLine(words=[Word("كلمه", 1.0, 2.0)], start=1.0, end=2.0)])
+        apply_wording(edl, [["كلمه", "ثلاث كلمات هنا"]])
+        self.assertEqual([w.text for w in edl.captions[0].words], ["ثلاث", "كلمات", "هنا"])
+        self.assertAlmostEqual(edl.captions[0].words[0].start, 1.0, places=2)
+        self.assertLessEqual(edl.captions[0].words[-1].end, 2.0 + 1e-6)
+
+    def test_a_switched_off_move_stays_off_after_a_replan(self):
+        from reelforge.edl import EDL, Cut, Transition, Zoom
+        from reelforge.web import apply_offs
+        edl = EDL(source="x.mp4", output={},
+                  cuts=[Cut(0, 5, 0, 5, id="a"), Cut(10, 15, 5, 10, id="b")],
+                  zooms=[Zoom(id="z9", out_start=1.0, out_end=2.0, start_factor=1, end_factor=1.2),
+                         Zoom(id="z8", out_start=7.0, out_end=8.0, start_factor=1, end_factor=1.2)],
+                  transitions=[Transition(id="t3", out_time=5.0)])
+        # Switched off at 12s of footage (7s of output), and at the cut. The cut
+        # is two moments in the footage - 5s ends one piece, 10s starts the next
+        # - and either must count, or a pause dragged on one side loses the tick.
+        apply_offs(edl, [["zoom", 12.0], ["transition", 10.0]])
+        self.assertTrue(edl.zooms[0].enabled)
+        self.assertFalse(edl.zooms[1].enabled)
+        self.assertFalse(edl.transitions[0].enabled)
+        edl.transitions[0].enabled = True
+        apply_offs(edl, [["transition", 5.0]])
+        self.assertFalse(edl.transitions[0].enabled)
+
+    def test_saving_wording_keeps_it_through_the_next_plan(self):
+        client = self.client("wordsave")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        first = edl["captions"][0]
+        was, now = first["text"], "كلام مصحح تماما"
+
+        # The line is rewritten to a different number of words AND the lines are
+        # regrouped by the save - so neither its text nor a word map can find it.
+        # What can is the stretch of footage it covered.
+        def src_of(out):
+            for c in edl["cuts"]:
+                if c["enabled"] and c["out_start"] <= out <= c["out_end"]:
+                    return c["src_start"] + (out - c["out_start"])
+            return None
+        span = [src_of(first["start"]), src_of(first["end"])]
+        self.assertTrue(all(v is not None for v in span))
+
+        response = client.post(f"/api/jobs/{job['id']}/save",
+                               json={"wording": [[was, now, *span]],
+                                     "values": {"captions.max_words": 2}})
+        self.assertEqual(response.status_code, 200, response.text)
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        texts = " ".join(l["text"] for l in client.get(f"/api/jobs/{job['id']}/edl").json()["captions"])
+        self.assertIn("مصحح", texts, "the fixed wording did not survive the re-plan")
+        stored = self.app.state.store.get(job["id"]).wording
+        self.assertEqual(stored[0][:2], [was, now])
+
     def test_a_job_reports_how_far_along_it_is(self):
         client = self.client("progress")
         self.login(client)

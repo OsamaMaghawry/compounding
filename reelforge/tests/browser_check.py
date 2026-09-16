@@ -187,6 +187,49 @@ with sync_playwright() as pw:
         print("frames drawn     :", frames)
         assert len(hits) <= 4, f"{len(hits)} requests for {frames} frames — flooding"
 
+    # A word fixed in a caption box shows on the video as it is typed, enables
+    # Save, survives a settings change, and is what gets saved.
+    page.wait_for_selector("[data-cap='0']", timeout=15000)
+    original = page.get_attribute("[data-cap='0']", "value")
+    words = original.split()
+    words[0] = "مُصَحَّح"
+    fixed = " ".join(words)
+    page.fill("[data-cap='0']", fixed)
+    page.dispatch_event("[data-cap='0']", "input")
+    shown = page.evaluate("""(want) => {
+        const line = P.plan.captions[0];
+        paint(line.start + 0.05, 0);
+        return {planText: line.text === want,
+                onVideo: document.getElementById('caps').innerText.includes(want.split(' ')[0]),
+                saveEnabled: !document.getElementById('saveEdit').disabled};
+    }""", fixed)
+    print("caption edit live:", shown)
+    assert shown["planText"] and shown["onVideo"] and shown["saveEnabled"], shown
+
+    # A settings change re-plans on the server; the wording must come back.
+    page.click(".iconbar [data-group='Captions']")
+    page.wait_for_selector("[data-set='captions.max_words']", timeout=10000)
+    page.fill("[data-set='captions.max_words']", "3")
+    page.dispatch_event("[data-set='captions.max_words']", "change")
+    page.wait_for_timeout(2500)
+    kept = page.evaluate("""(w) => (P.plan.captions||[]).some(l => l.text.includes(w))""",
+                         "مُصَحَّح")
+    print("survives replan  :", kept)
+    assert kept, "the typed word was lost when settings changed"
+    page.click(".iconbar [data-group='Captions']")
+
+    job_id = page.evaluate("P.job.id")
+    page.click("#saveEdit")
+    # Saving re-decides the edit on the machine; wait for that, not the panel,
+    # which is rebuilt in the meantime.
+    page.wait_for_function("""(id) => fetch('/api/jobs/'+id).then(r=>r.json())
+        .then(j => j.status === 'ready')""", arg=job_id, timeout=90000)
+    page.wait_for_timeout(800)
+    saved = page.evaluate("""([id, w]) => fetch('/api/jobs/'+id+'/edl').then(r=>r.json())
+        .then(e => e.captions.some(l => l.text.includes(w)))""", [job_id, "مُصَحَّح"])
+    print("saved on server  :", saved)
+    assert saved, "Save did not keep the typed word"
+
     # Saving a default look, so the next upload arrives already set up.
     page.click(".iconbar [data-group='__defaults']")
     page.wait_for_selector("#saveDefaults", timeout=10000)
