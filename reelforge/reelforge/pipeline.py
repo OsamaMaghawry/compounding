@@ -35,7 +35,8 @@ class AutoEditor:
     """Analyse -> decide -> render, with every decision recorded for learning."""
 
     def __init__(self, profile: StyleProfile, *, project_dir: str | Path | None = None,
-                 fonts_dir: str | Path | None = None, on_status=None):
+                 fonts_dir: str | Path | None = None, on_status=None,
+                 on_progress=None):
         self.profile = profile
         self.project_dir = Path(project_dir or Path.cwd() / ".reelforge")
         self.project_dir.mkdir(parents=True, exist_ok=True)
@@ -48,6 +49,10 @@ class AutoEditor:
         self.fonts_dir = Path(fonts_dir) if fonts_dir else PACKAGE_ROOT / "assets" / "fonts"
         self.store = FeedbackStore(self.project_dir)
         self.on_status = on_status or (lambda message: None)
+        # How far through the slow parts we are, separately from what they are
+        # called: a stage name that has not changed for ten minutes tells you
+        # nothing about whether anything is happening.
+        self.on_progress = on_progress or (lambda fraction: None)
 
     # -- helpers ---------------------------------------------------------
     def _status(self, message: str) -> None:
@@ -107,6 +112,7 @@ class AutoEditor:
                 wav, profile, analysis=analysis, corrector=corrector,
                 cache_dir=self.cache_dir, cache_key=content_key(source),
                 refresh=refresh, on_status=self._status,
+                on_progress=self.on_progress,
             )
             if transcript.backend == "stub":
                 warnings.append(
@@ -144,11 +150,13 @@ class AutoEditor:
 
     # -- render ----------------------------------------------------------
     def render(self, edl: EDL, output: str | Path, *, preview: bool = False,
-               burn_captions: bool = True) -> Path:
+               burn_captions: bool = True, on_fraction=None,
+               owner: int | None = None) -> Path:
         profile = self.effective_profile()
         renderer = Renderer(profile, work_dir=self.work_dir, fonts_dir=self.fonts_dir)
         return renderer.render(edl, output, preview=preview, burn_captions=burn_captions,
-                               on_status=self._status)
+                               on_status=self._status, on_fraction=on_fraction,
+                               owner=owner)
 
     def export_captions(self, edl: EDL, out_dir: str | Path, stem: str) -> dict[str, Path]:
         profile = self.effective_profile()

@@ -374,6 +374,7 @@ class Renderer:
 
     # -- run -------------------------------------------------------------
     def render(self, edl: EDL, output: str | Path, *, preview: bool = False,
+               on_fraction=None, owner: int | None = None,
                burn_captions: bool = True, on_status=None) -> Path:
         # Absolute, because ffmpeg runs with the work directory as its cwd.
         output = Path(output).expanduser().resolve()
@@ -389,7 +390,8 @@ class Renderer:
         # Inputs first, then the filtergraph, then mapping/encoding args.
         split = plan.args.index("-map")
         run_filtergraph(plan.args[:split], plan.filtergraph, script, plan.args[split:],
-                        cwd=self.work_dir)
+                        cwd=self.work_dir, total=edl.duration,
+                        on_fraction=on_fraction, owner=owner)
         if not output.exists() or output.stat().st_size == 0:
             raise FFmpegError(f"render produced no output at {output}")
         return output

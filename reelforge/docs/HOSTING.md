@@ -183,6 +183,36 @@ off a phone, and this goes down the wire every time the clip comes up on screen.
 A clip the browser cannot decode falls back to its still picture, so you still see
 that b-roll happens there.
 
+## Watching it work
+
+A job shows a bar, a percentage, how long it has been running, and when it last
+did something. That last one is the useful one: "working" on its own cannot tell
+a job that is slow from a job that has died, and both look identical while you
+wait.
+
+Ninety seconds without a word and it says **it looks stuck** and turns the bar
+red. The number is deliberately generous - transcribing goes quiet for a while on
+a long take - but transcribing now reports how much audio it has been through, so
+even that keeps moving.
+
+**Stop this** gives up on a job and kills whatever ffmpeg it had running, so a
+job that is going nowhere can be abandoned and tried again instead of waited out.
+
+If the page cannot reach the machine it says so and keeps trying, backing off as
+it goes. It used to give up silently on the first failed request and sit there
+showing whatever it last saw - usually the word "working" - for a job that had
+long since finished or died.
+
+## Does closing the page stop the work?
+
+No. The work runs on the machine, off a queue. The page only asks how it is
+going. Refresh it, close the tab, shut the laptop, run out of battery - the job
+carries on and is where you left it when you come back.
+
+The one exception is **uploading**: those bytes come from the browser, so closing
+the tab mid-upload does stop that. Once the clips are up and the edit has started,
+the browser has no part in it.
+
 ## Leaving and coming back
 
 Everything saves itself as you go, to whatever `--data` points at - `/workspaces/data`

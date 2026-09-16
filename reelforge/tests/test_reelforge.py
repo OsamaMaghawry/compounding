@@ -3210,6 +3210,89 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual([a["name"] for a in client.get("/api/broll").json()],
                          ["clip.mp4"])
 
+    # -- knowing what it is doing -----------------------------------------
+    def test_a_job_reports_how_far_along_it_is(self):
+        client = self.client("progress")
+        self.login(client)
+        job = self.wait(client, self.upload(client, [self.clip_a]).json()["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        self.assertEqual(job["percent"], 100.0)
+        self.assertGreater(job["heartbeat"], 0, "nothing ever said it was alive")
+        self.assertGreater(job["started"], 0)
+
+    def test_the_bar_never_goes_backwards(self):
+        # A bar that retreats reads as a fault even when nothing is wrong.
+        from reelforge.web import JobStore
+        self.client("barstate")
+        store = JobStore(Path(self.tmp) / "bar")
+        runner = self.app.state.runner
+        job = store.create("clip", "", "small")
+        real, runner.store = runner.store, store
+        try:
+            runner.beat(job, percent=60)
+            runner.beat(job, percent=20)
+            self.assertEqual(job.percent, 60.0)
+            runner.beat(job, percent=140)
+            self.assertLessEqual(job.percent, 99.0, "it claimed to be finished early")
+        finally:
+            runner.store = real
+
+    def test_a_job_going_nowhere_can_be_stopped(self):
+        client = self.client("stopjob")
+        self.login(client)
+        store = self.app.state.store
+        job = store.create("clip", "", "small")
+        store.update(job, status="working", stage="transcribing",
+                     heartbeat=time.time() - 900)
+
+        response = client.post(f"/api/jobs/{job.id}/stop")
+        self.assertEqual(response.status_code, 200, response.text)
+        after = client.get(f"/api/jobs/{job.id}").json()
+        self.assertEqual(after["status"], "error")
+        self.assertIn("stopped", after["error"])
+
+        # Nothing to stop twice.
+        self.assertEqual(client.post(f"/api/jobs/{job.id}/stop").status_code, 409)
+
+    def test_a_silent_job_is_distinguishable_from_a_busy_one(self):
+        # The whole point of the heartbeat: "working" on its own is not an answer.
+        client = self.client("silent")
+        self.login(client)
+        store = self.app.state.store
+        busy = store.create("busy", "", "small")
+        store.update(busy, status="working", heartbeat=time.time())
+        stuck = store.create("stuck", "", "small")
+        store.update(stuck, status="working", heartbeat=time.time() - 600)
+
+        jobs = {j["title"]: j for j in client.get("/api/jobs").json()}
+        now = time.time()
+        self.assertLess(now - jobs["busy"]["heartbeat"], 30)
+        self.assertGreater(now - jobs["stuck"]["heartbeat"], 300)
+
+    def test_closing_the_page_does_not_stop_the_work(self):
+        """The question that matters: is the browser driving any of this?
+
+        It is not. The work runs on the machine, off a queue, and the page only
+        asks how it is going - so a refresh, a closed tab or a dead phone makes
+        no difference to it.
+        """
+        client = self.client("detached")
+        self.login(client)
+        started = self.upload(client, [self.clip_a, self.clip_b])
+        job_id = started.json()["id"]
+
+        # Throw the browser away entirely, mid-run, and come back as a new one.
+        # A new client against the SAME server: opening a second server on the
+        # same folder is a restart, which is a different question.
+        from fastapi.testclient import TestClient
+        del client
+        fresh = TestClient(self.app)
+        self.login(fresh)
+        job = self.wait(fresh, job_id)
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        self.assertEqual(job["percent"], 100.0)
+        self.assertEqual(fresh.get(f"/api/jobs/{job_id}/edl").status_code, 200)
+
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore
         root = Path(self.tmp) / "restart"

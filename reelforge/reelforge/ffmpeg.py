@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -69,6 +70,78 @@ def run_ffmpeg(args: list[str], *, quiet: bool = True,
         base += ["-stats"]
         return run(base + args, capture=False)
     return run(base + args)
+
+
+# Every ffmpeg we start, so a job that is going nowhere can be stopped rather
+# than waited out. A hung encode is otherwise indistinguishable from a slow one.
+RUNNING: dict[int, subprocess.Popen] = {}
+_RUNNING_LOCK = threading.Lock()
+
+
+def stop_all(owner: int) -> int:
+    """Kill whatever this job has running. Returns how many were stopped."""
+    with _RUNNING_LOCK:
+        proc = RUNNING.get(owner)
+    if proc is None or proc.poll() is not None:
+        return 0
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    except OSError:
+        return 0
+    return 1
+
+
+def run_watched(args: list[str], *, total: float | None = None, on_fraction=None,
+                cwd: str | Path | None = None, owner: int | None = None,
+                check: bool = True) -> subprocess.CompletedProcess:
+    """Run ffmpeg and report how far through it is.
+
+    ffmpeg will tell you where it has got to if asked; without that, a long
+    encode and a hung one look exactly alike from outside, which is a miserable
+    thing to sit in front of.
+    """
+    full = args + ["-progress", "pipe:1", "-nostats"]
+    proc = subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, errors="replace",
+                            cwd=str(cwd) if cwd else None)
+    if owner is not None:
+        with _RUNNING_LOCK:
+            RUNNING[owner] = proc
+    try:
+        for line in proc.stdout or []:
+            if not on_fraction:
+                continue
+            key, _, value = line.strip().partition("=")
+            if key == "out_time_us" and total and total > 0:
+                try:
+                    done = int(value) / 1_000_000.0
+                except ValueError:
+                    continue
+                on_fraction(max(0.0, min(1.0, done / total)))
+            elif key == "progress" and value == "end":
+                on_fraction(1.0)
+        stderr = (proc.stderr.read() if proc.stderr else "") or ""
+        code = proc.wait()
+    finally:
+        # Closed by hand: this runs once per render on a machine that stays up
+        # for days, and leaked pipes are a slow way to run out of file handles.
+        for pipe in (proc.stdout, proc.stderr):
+            try:
+                if pipe:
+                    pipe.close()
+            except OSError:
+                pass
+        if owner is not None:
+            with _RUNNING_LOCK:
+                RUNNING.pop(owner, None)
+    if check and code != 0:
+        tail = "\n".join(stderr.strip().splitlines()[-15:])
+        raise FFmpegError(f"command failed ({code}): {' '.join(args[:6])} ...\n{tail}")
+    return subprocess.CompletedProcess(full, code, "", stderr)
 
 
 @dataclass
@@ -216,7 +289,9 @@ def _filter_args(mode: str, script: Path, graph: str) -> list[str]:
 
 def run_filtergraph(before: list[str], graph: str, script: Path,
                     after: list[str], *,
-                    cwd: str | Path | None = None) -> subprocess.CompletedProcess:
+                    cwd: str | Path | None = None, total: float | None = None,
+                    on_fraction=None, owner: int | None = None
+                    ) -> subprocess.CompletedProcess:
     """Run ffmpeg with a filtergraph, using whichever mechanism this build accepts."""
     global _FILTER_MODE
     script.parent.mkdir(parents=True, exist_ok=True)
@@ -228,7 +303,8 @@ def run_filtergraph(before: list[str], graph: str, script: Path,
         args = ([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error"]
                 + before + _filter_args(mode, script, graph) + after)
         try:
-            result = run(args, cwd=cwd)
+            result = run_watched(args, cwd=cwd, total=total,
+                                 on_fraction=on_fraction, owner=owner)
         except FFmpegError as exc:
             message = str(exc)
             if "Unrecognized option" in message or "Option not found" in message:

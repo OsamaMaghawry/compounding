@@ -335,6 +335,9 @@ class Job:
     pauses: list = field(default_factory=list)
     # Per-join transition lengths, [midpoint, seconds], keyed the same way.
     beats: list = field(default_factory=list)
+    percent: float = 0.0        # 0-100, so a long wait has a shape
+    heartbeat: float = 0.0      # last sign of life, so a stuck job can be told apart
+    started: float = 0.0        # when the current run began
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -420,6 +423,18 @@ class Runner:
         thread = threading.Thread(target=self._loop, daemon=True)
         thread.start()
 
+    def _owner(self, job: Job) -> int:
+        """A stable handle for whatever this job is running, so it can be stopped."""
+        return abs(hash(job.id)) % (2 ** 31)
+
+    def stop(self, job: Job) -> bool:
+        """Give up on a job. Kills its ffmpeg if one is running."""
+        from .ffmpeg import stop_all  # noqa: PLC0415
+        killed = stop_all(self._owner(job))
+        self.store.update(job, status="error", stage="stopped",
+                          error="you stopped this one", percent=0.0)
+        return bool(killed)
+
     def submit(self, job_id: str, task: str = "plan") -> None:
         """Queue work. Rendering can take minutes, which is far too long to hold
         an HTTP request open - every proxy in between would give up first."""
@@ -449,6 +464,33 @@ class Runner:
     # Beside, not instead of: `project/runs/run-N.edl.json` is what the editor
     # proposed and must stay untouched, because the difference between that and
     # what you kept is the whole training signal.
+
+    # Roughly what each phase costs, so the bar moves for the right reasons.
+    # Transcribing dominates; rendering is the next longest thing.
+    PHASES = (("joining the clips", 0.06), ("analysing audio and shots", 0.10),
+              ("transcribing", 0.55), ("planning the edit", 0.60),
+              ("rendering", 0.98))
+
+    def beat(self, job: Job, *, percent: float | None = None,
+             stage: str | None = None) -> None:
+        """Say we are still here, and how far along.
+
+        Without this a job that has died and a job that is merely slow look the
+        same from the page: both say "working" and neither moves.
+        """
+        changes = {"heartbeat": time.time()}
+        if percent is not None:
+            # Never goes backwards: a bar that retreats reads as a fault.
+            changes["percent"] = round(max(job.percent, min(99.0, percent)), 1)
+        if stage is not None:
+            changes["stage"] = stage
+        self.store.update(job, **changes)
+
+    def _phase_percent(self, message: str) -> float | None:
+        for prefix, share in self.PHASES:
+            if message.startswith(prefix[:12]):
+                return share * 100.0
+        return None
 
     def _working_path(self, job_id: str) -> Path:
         return self.store.dir(job_id) / "edl.json"
@@ -515,13 +557,15 @@ class Runner:
 
         def note(message: str) -> None:
             job.progress.append(message)
-            self.store.update(job, stage=message)
+            self.beat(job, stage=message, percent=self._phase_percent(message))
 
-        self.store.update(job, status="working", stage="starting", error="")
+        self.store.update(job, status="working", stage="starting", error="",
+                          percent=0.0, heartbeat=time.time(), started=time.time())
         profile = self.profile_for(job)
         self._ensure_font(profile, note)
         editor = AutoEditor(profile, project_dir=directory / "project",
-                            fonts_dir=self.fonts_dir, on_status=note)
+                            fonts_dir=self.fonts_dir, on_status=note,
+                            on_progress=lambda f: self.beat(job, percent=10 + 45 * f))
         clips = [Path(p) for p in job.sources]
         if len(clips) > 1:
             from .join import join_clips  # noqa: PLC0415
@@ -629,9 +673,12 @@ class Runner:
         self.keep(job.id)
         if render:
             note("rendering preview")
-            editor.render(result.edl, self.store.dir(job.id) / "preview.mp4", preview=True)
+            editor.render(result.edl, self.store.dir(job.id) / "preview.mp4", preview=True,
+                          on_fraction=lambda f: self.beat(job, percent=75 + 24 * f),
+                          owner=self._owner(job))
         self.store.update(job, status="ready", stage="ready to review",
-                          run_id=result.run_id, summary=result.edl.summary())
+                          run_id=result.run_id, summary=result.edl.summary(),
+                          percent=100.0, heartbeat=time.time())
 
     def plan_preview(self, job: Job, values: dict, drops: list,
                      pauses: list | None = None, beats: list | None = None) -> dict:
@@ -669,14 +716,15 @@ class Runner:
 
         def note(message: str) -> None:
             job.progress.append(message)
-            self.store.update(job, stage=message)
+            self.beat(job, stage=message, percent=self._phase_percent(message))
 
         fixes = self._typed_fixes(job)
         self.store.update(job, status="working", stage="applying the new look", error="")
         profile = self.profile_for(job)
         self._ensure_font(profile, note)
         editor = AutoEditor(profile, project_dir=self.store.dir(job.id) / "project",
-                            fonts_dir=self.fonts_dir, on_status=note)
+                            fonts_dir=self.fonts_dir, on_status=note,
+                            on_progress=lambda f: self.beat(job, percent=10 + 45 * f))
         self._plan_into(job, source, editor, note, render=render)
         if fixes:
             self._apply_fixes(job, fixes)
@@ -717,8 +765,11 @@ class Runner:
         if edl is None:
             raise RuntimeError("this edit is no longer loaded - upload it again")
         editor = self.editors[job.id]
-        self.store.update(job, status="working", stage="re-rendering the preview")
-        editor.render(edl, self.store.dir(job.id) / "preview.mp4", preview=True)
+        self.store.update(job, status="working", stage="re-rendering the preview",
+                          percent=0.0, heartbeat=time.time(), started=time.time())
+        editor.render(edl, self.store.dir(job.id) / "preview.mp4", preview=True,
+                      on_fraction=lambda f: self.beat(job, percent=100 * f),
+                      owner=self._owner(job))
         self.store.update(job, status="ready", stage="ready to review",
                           summary=edl.summary())
 
@@ -727,9 +778,12 @@ class Runner:
         if edl is None:
             raise RuntimeError("this edit is no longer loaded - upload it again")
         editor = self.editors[job.id]
-        self.store.update(job, status="exporting", stage="rendering the final video")
+        self.store.update(job, status="exporting", stage="rendering the final video",
+                          percent=0.0, heartbeat=time.time(), started=time.time())
         name = f"{Path(job.title).stem or 'reel'}-reel.mp4"
-        editor.render(edl, self.store.dir(job.id) / name, preview=False)
+        editor.render(edl, self.store.dir(job.id) / name, preview=False,
+                      on_fraction=lambda f: self.beat(job, percent=100 * f),
+                      owner=self._owner(job))
         if job.run_id:
             try:
                 editor.accept(job.run_id, edl)
@@ -1206,6 +1260,14 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         runner.submit(job.id)
         return job.to_dict()
 
+    @app.post("/api/jobs/{job_id}/stop", dependencies=[Depends(require_login)])
+    def stop_job(job_id: str) -> dict:
+        """Give up on a job that is going nowhere, so it can be tried again."""
+        job = job_or_404(job_id)
+        if job.status not in ("working", "queued", "exporting"):
+            raise HTTPException(status_code=409, detail="that one is not running")
+        return {"ok": True, "killed": runner.stop(job)}
+
     @app.get("/api/jobs/{job_id}", dependencies=[Depends(require_login)])
     def get_job(job_id: str) -> dict:
         return job_or_404(job_id).to_dict()
@@ -1647,6 +1709,12 @@ input[type=color]{height:44px;padding:4px}
 .tools button{width:auto;margin:0;padding:9px 13px;font-size:13px;flex:none}
 .bar{display:flex;gap:8px;margin-top:12px}.bar>*{flex:1}
 .unsaved{color:var(--accent);font-size:13px;margin-top:8px;min-height:18px}
+.bar-outer{height:8px;background:#10101a;border-radius:6px;overflow:hidden;margin:10px 0 6px}
+.bar-inner{height:100%;background:var(--accent);width:0;transition:width .4s ease}
+.bar-inner.stalled{background:var(--bad)}
+.meta{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+#offline{background:#2f1620;color:var(--bad);border-radius:10px;padding:10px;
+  margin-bottom:10px;font-size:13px}
 </style></head><body>
 
 <div id="login" hidden>
@@ -1660,6 +1728,7 @@ input[type=color]{height:44px;padding:4px}
 </div>
 
 <div id="app" hidden>
+  <div id="offline" hidden></div>
   <div class="card">
     <h1>New edit</h1>
     <div class="dim" style="font-size:11px;margin-bottom:6px">
@@ -1705,7 +1774,7 @@ input[type=color]{height:44px;padding:4px}
 
 <script>
 const $=id=>document.getElementById(id);
-let current=null, edl=null, poll=null, drawn='', listed='';
+let current=null, edl=null, poll=null, drawn='', listed='', misses=0;
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 
 async function api(path, opts={}){
@@ -1914,19 +1983,55 @@ $('upload').onclick=async()=>{
   finally{ $('upload').disabled=false; }
 };
 
+const ago=s=>s<60?`${Math.round(s)}s`:`${Math.floor(s/60)}m ${Math.round(s%60)}s`;
+
+function updateProgress(job){
+  const bar=$('bar');
+  if(!bar) return;
+  const pct=Math.max(0, Math.min(100, job.percent||0));
+  bar.style.width=pct.toFixed(1)+'%';
+  const now=Date.now()/1000;
+  const silent=job.heartbeat ? now-job.heartbeat : 0;
+  const running=job.started ? now-job.started : 0;
+  $('pct').textContent=`${pct.toFixed(0)}% · running ${ago(running)}`;
+  // Ninety seconds without a word is the difference between slow and stuck. It
+  // is a long time on purpose: transcribing a long take goes quiet for a while.
+  const stuck=silent>90;
+  bar.classList.toggle('stalled', stuck);
+  $('alive').textContent = stuck
+    ? `no sign of life for ${ago(silent)} — it looks stuck`
+    : (silent>4 ? `last step ${ago(silent)} ago` : 'working');
+}
+
 async function refresh(){
-  let jobs=[];
-  try{ jobs=await api('/api/jobs'); }catch(e){ return; }
+  let jobs=null;
+  try{ jobs=await api('/api/jobs'); }
+  catch(e){
+    // Losing the server used to end the polling for good, so the page sat on
+    // whatever it last saw - usually the word "working" - and never moved
+    // again, for a job that had long since finished or died. Say so, and keep
+    // trying.
+    misses++;
+    $('offline').hidden = misses < 2;
+    $('offline').textContent =
+      `Cannot reach the machine (${misses} tries). It may be restarting or asleep — `
+      + `this page will pick up again by itself.`;
+    clearTimeout(poll);
+    poll=setTimeout(refresh, Math.min(15000, 2000*misses));
+    return;
+  }
+  misses=0; $('offline').hidden=true;
+
   const listSig = jobs.map(j=>j.id+j.status+j.stage).join('|');
   if(listSig!==listed){ listed=listSig; renderJobs(jobs); }
   const job = current ? jobs.find(j=>j.id===current) : null;
-  if(job) draw(job);
-  // Only keep polling while something is actually happening. Re-rendering an
-  // idle page rebuilds the video element, which restarts whatever you were
-  // watching - so once everything is finished, stop.
+  if(job){ draw(job); updateProgress(job); }
+  // Keep polling while something is happening. Re-rendering an idle page
+  // rebuilds the video element, which restarts whatever you were watching - so
+  // once everything is finished, stop.
   const busy = jobs.some(j=>['working','queued','exporting','uploading'].includes(j.status));
   clearTimeout(poll);
-  if(busy) poll=setTimeout(refresh, 2500);
+  if(busy) poll=setTimeout(refresh, 2000);
 }
 
 function renderJobs(jobs){
@@ -1969,7 +2074,11 @@ async function draw(job){
     if((job.sources||[]).length) html+=`<button id="retry">Try again</button>`;
   }
   if(job.status==='working'||job.status==='queued'||job.status==='exporting'){
-    html+=`<div class="dim">${job.stage}…</div><div class="log">${(job.progress||[]).join('\\n')}</div>`;
+    html+=`<div class="dim">${job.stage}…</div>
+      <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+      <div class="meta"><span id="pct"></span><span id="alive"></span></div>
+      <button class="ghost" id="stopJob">Stop this</button>
+      <div class="log">${(job.progress||[]).join('\\n')}</div>`;
   }
   if(job.status==='ready'||job.status==='done'){
     html+=`<div class="stage"><video id="pv" playsinline preload="metadata"
@@ -2016,6 +2125,18 @@ async function draw(job){
   }
   html+='</div>';
   $('detail').innerHTML=html;
+
+  // Kept out of the signature check above so the bar can move without the
+  // whole panel being rebuilt under whatever you are watching.
+  updateProgress(job);
+
+  const stop=$('stopJob');
+  if(stop) stop.onclick=async()=>{
+    stop.disabled=true; stop.textContent='stopping…';
+    try{ await api('/api/jobs/'+job.id+'/stop',{method:'POST'});
+         drawn=''; listed=''; refresh(); }
+    catch(e){ stop.textContent='error: '+e.message; stop.disabled=false; }
+  };
 
   const retry=$('retry');
   if(retry) retry.onclick=async()=>{

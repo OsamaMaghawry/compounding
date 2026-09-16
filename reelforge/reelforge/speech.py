@@ -110,7 +110,8 @@ def _pick_device(requested: str) -> tuple[str, str]:
     return device, compute
 
 
-def transcribe_faster_whisper(audio: Path, profile, *, prompt: str | None) -> Transcript:
+def transcribe_faster_whisper(audio: Path, profile, *, prompt: str | None,
+                              on_progress=None, total: float = 0.0) -> Transcript:
     try:
         from faster_whisper import WhisperModel  # noqa: PLC0415
     except ImportError as exc:
@@ -144,6 +145,11 @@ def transcribe_faster_whisper(audio: Path, profile, *, prompt: str | None) -> Tr
 
     segments: list[Segment] = []
     for seg in segments_iter:
+        # Whisper is the long pole and says nothing while it works. Reporting
+        # how much audio it has been through is the difference between a wait
+        # you can sit out and one you assume has died.
+        if on_progress and total > 0:
+            on_progress(max(0.0, min(1.0, float(seg.end) / total)))
         words = [
             Word(text=(w.word or "").strip(), start=float(w.start), end=float(w.end),
                  prob=float(getattr(w, "probability", 1.0) or 0.0))
@@ -159,7 +165,8 @@ def transcribe_faster_whisper(audio: Path, profile, *, prompt: str | None) -> Tr
                       model=model_name, segments=segments)
 
 
-def transcribe_whispercpp(audio: Path, profile, *, prompt: str | None) -> Transcript:
+def transcribe_whispercpp(audio: Path, profile, *, prompt: str | None,
+                          on_progress=None, total: float = 0.0) -> Transcript:
     """Drive a whisper.cpp binary and read its word-level JSON output."""
     binary = shutil.which("whisper-cli") or shutil.which("whisper-cpp") or shutil.which("main")
     if not binary:
@@ -364,7 +371,7 @@ def enforce_order(words: list[Word], *, min_duration: float = 0.06) -> list[Word
 def transcribe(audio: Path, profile, *, analysis: Analysis | None = None,
                corrector: VocabCorrector | None = None, cache_dir: Path | None = None,
                cache_key: str | None = None, refresh: bool = False,
-               on_status=None) -> Transcript:
+               on_status=None, on_progress=None) -> Transcript:
     """Transcribe, apply learned corrections, and tighten word timings."""
     backend_name = available_backend(profile.get("asr.backend"))
     handler = BACKENDS.get(backend_name)
@@ -396,7 +403,8 @@ def transcribe(audio: Path, profile, *, analysis: Analysis | None = None,
     if backend_name == "stub":
         transcript = transcribe_stub(audio, profile, analysis=analysis)
     else:
-        transcript = handler(audio, profile, prompt=prompt)
+        transcript = handler(audio, profile, prompt=prompt, on_progress=on_progress,
+                             total=float(analysis.duration) if analysis else 0.0)
 
     strip_marks = bool(profile.get("captions.strip_diacritics"))
     normalize_punct = bool(profile.get("captions.normalize_punctuation"))
