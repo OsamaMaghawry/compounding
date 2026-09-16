@@ -88,10 +88,15 @@ dark areas are already cut.
 
 ### Pauses and transitions, by dragging
 
-**Adjust pauses** puts a marker on every join between two surviving pieces. Drag
-one right to give back some of the silence the cut removed, left to take more
-away - the beat before a point lands, without cutting anything. A pause can never
-grow past the gap that is actually there, nor eat into the speech either side.
+**Adjust pauses** puts **two** markers on every join between surviving pieces: one
+on the end of the piece before it, one on the start of the piece after. Drag either
+and only that piece moves. The end of one shot and the head of the next are two
+separate decisions, and trimming the tail of a take has no business shortening the
+one that follows it.
+
+Dragging an edge outward gives back silence the cut removed; inward takes more
+away, eating the padding and then the shot itself. Neither can pass the other -
+footage cannot play twice - and neither can shave a piece down to nothing.
 
 Tapping a marker also opens a **Transition** slider for that one join, so a single
 cut can land harder than the rest while the others keep the length set in Motion.
@@ -149,6 +154,18 @@ rather than the stripped-down form it matches on.
 The **B-roll** tab in the Look panel controls how often clips appear, how sure the
 word match has to be, and whether a clip covers the screen, sits in a corner, or
 runs as a band across the middle.
+
+Each clip in the list says whether the edit you have open actually says one of its
+words - **said in this edit**, **not said in this edit**, or **no words yet**. A
+tagged clip that never appears and a broken feature look identical otherwise.
+
+Which clips get cut in is decided when the edit is decided, so adding or tagging
+one re-decides the open edit on the spot. Without that, a clip added to an edit
+that was already planned would change nothing until something else happened to
+re-plan it - which is exactly what it looked like when it was broken.
+
+B-roll also plays in the live preview, laid over you the way the render will do
+it, rather than only appearing after an export.
 
 ## Leaving and coming back
 

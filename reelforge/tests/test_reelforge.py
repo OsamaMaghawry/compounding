@@ -2024,6 +2024,37 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(client.post("/api/login", json={"password": "letmein"}).status_code, 200)
 
     # -- security --------------------------------------------------------
+    def test_the_page_script_actually_parses(self):
+        """A syntax error in the page breaks all of it, login included.
+
+        This is not hypothetical: an escaped backslash that survived into the
+        JavaScript as `split('\\')` left an unterminated string, and the whole
+        app rendered as a blank page. Every test still passed, because they all
+        talk to the API and none of them open the page.
+        """
+        import shutil as _shutil
+        import subprocess
+        if not _shutil.which("node"):
+            self.skipTest("node is needed to parse the page")
+        from reelforge.web import PAGE
+        script = PAGE[PAGE.index("<script>") + len("<script>"):PAGE.rindex("</script>")]
+        path = Path(self.tmp) / "page.js"
+        path.write_text(script, encoding="utf-8")
+        proc = subprocess.run(["node", "--check", str(path)],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0,
+                         f"the page will not parse:\n{proc.stderr[:600]}")
+
+    def test_an_overlay_tells_the_browser_its_filename(self):
+        # So the page never parses a path: one separator per platform, and a
+        # backslash away from exactly the bug above.
+        from reelforge.edl import Overlay
+        made = Overlay(id="o1", asset="/data/broll/فلوس.mp4", out_start=1.0, out_end=2.0)
+        self.assertEqual(made.to_dict()["name"], "فلوس.mp4")
+        windowsish = Overlay(id="o2", asset=r"C:\clips\money.mp4",
+                             out_start=1.0, out_end=2.0)
+        self.assertEqual(windowsish.to_dict()["name"], "money.mp4")
+
     def test_everything_needs_a_password(self):
         client = self.client("sec")
         for path in ("/api/jobs", "/api/templates", "/api/broll"):
@@ -2734,36 +2765,74 @@ class WebAppTests(unittest.TestCase):
         client.post("/api/defaults", json={"clear": True})
         self.assertEqual(client.get("/api/defaults").json()["values"], {})
 
-    def test_a_pause_can_be_made_longer_or_shorter(self):
+    def fresh_pair(self):
         from reelforge.edl import EDL, Cut
-        from reelforge.web import apply_pauses
         # Two pieces with a two-second gap of silence between them.
-        def fresh():
-            return EDL(source="x.mp4", output={},
-                       cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="a"),
-                             Cut(5.0, 8.0, 3.0, 6.0, id="b")])
-        plain = fresh()
-        self.assertEqual(plain.duration, 6.0)
+        return EDL(source="x.mp4", output={},
+                   cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="a"),
+                         Cut(5.0, 8.0, 3.0, 6.0, id="b")])
 
-        longer = fresh()
-        apply_pauses(longer, [[4.0, 1.0]])          # keep one more second of it
-        self.assertAlmostEqual(longer.duration, 7.0, places=3)
-        self.assertAlmostEqual(longer.cuts[0].src_end, 3.5, places=3)
-        self.assertAlmostEqual(longer.cuts[1].src_start, 4.5, places=3)
+    def test_moving_one_edge_leaves_the_other_piece_alone(self):
+        # The whole complaint: dragging the end of one shot was also trimming
+        # the head of the next, because the adjustment was split between them.
+        from reelforge.web import apply_pauses
+        edl = self.fresh_pair()
+        before_start = edl.cuts[1].src_start
 
-        shorter = fresh()
-        apply_pauses(shorter, [[4.0, -0.5]])
-        self.assertAlmostEqual(shorter.duration, 5.5, places=3)
+        apply_pauses(edl, [[4.0, -0.5, "before"]])
+        self.assertAlmostEqual(edl.cuts[0].src_end, 2.5, places=3)
+        self.assertAlmostEqual(edl.cuts[1].src_start, before_start, places=3,
+                               msg="the next piece was moved by an edit to this one")
+        self.assertAlmostEqual(edl.duration, 5.5, places=3)
+
+    def test_the_other_edge_moves_only_its_own_piece(self):
+        from reelforge.web import apply_pauses
+        edl = self.fresh_pair()
+        apply_pauses(edl, [[4.0, -0.5, "after"]])
+        self.assertAlmostEqual(edl.cuts[0].src_end, 3.0, places=3)
+        self.assertAlmostEqual(edl.cuts[1].src_start, 5.5, places=3)
+
+    def test_an_edge_can_give_the_pause_back(self):
+        from reelforge.web import apply_pauses
+        edl = self.fresh_pair()
+        apply_pauses(edl, [[4.0, 1.0, "before"]])
+        self.assertAlmostEqual(edl.cuts[0].src_end, 4.0, places=3)
+        self.assertAlmostEqual(edl.cuts[1].src_start, 5.0, places=3)
+        self.assertAlmostEqual(edl.duration, 7.0, places=3)
+
+    def test_both_edges_can_be_moved_independently(self):
+        from reelforge.web import apply_pauses
+        edl = self.fresh_pair()
+        apply_pauses(edl, [[4.0, 0.5, "before"], [4.0, 0.5, "after"]])
+        self.assertAlmostEqual(edl.cuts[0].src_end, 3.5, places=3)
+        self.assertAlmostEqual(edl.cuts[1].src_start, 4.5, places=3)
+
+    def test_edges_cannot_be_pushed_through_each_other(self):
+        # Footage cannot play twice.
+        from reelforge.web import apply_pauses
+        edl = self.fresh_pair()
+        apply_pauses(edl, [[4.0, 9.0, "before"], [4.0, 9.0, "after"]])
+        self.assertLessEqual(edl.cuts[0].src_end, edl.cuts[1].src_start + 1e-6)
+
+    def test_a_pause_saved_the_old_way_still_opens(self):
+        # Two-item entries predate the sides being separate.
+        from reelforge.web import apply_pauses
+        edl = self.fresh_pair()
+        apply_pauses(edl, [[4.0, 1.0]])
+        self.assertAlmostEqual(edl.duration, 7.0, places=3)
+        self.assertAlmostEqual(edl.cuts[0].src_end, 3.5, places=3)
 
     def test_a_pause_cannot_eat_the_segment_it_borders(self):
         from reelforge.edl import EDL, Cut
         from reelforge.web import apply_pauses
-        edl = EDL(source="x.mp4", output={},
-                  cuts=[Cut(0.0, 0.5, 0.0, 0.5, id="a"),
-                        Cut(2.0, 2.5, 0.5, 1.0, id="b")])
-        apply_pauses(edl, [[1.25, -20.0]])          # absurd, on purpose
-        for cut in edl.cuts:
-            self.assertGreaterEqual(cut.duration, 0.11, "a segment was shaved away")
+        for side in ("before", "after", "both"):
+            edl = EDL(source="x.mp4", output={},
+                      cuts=[Cut(0.0, 0.5, 0.0, 0.5, id="a"),
+                            Cut(2.0, 2.5, 0.5, 1.0, id="b")])
+            apply_pauses(edl, [[1.25, -20.0, side]])        # absurd, on purpose
+            for cut in edl.cuts:
+                self.assertGreaterEqual(cut.duration, 0.11,
+                                        f"a segment was shaved away ({side})")
 
     def test_a_pause_never_takes_more_gap_than_there_is(self):
         from reelforge.edl import EDL, Cut
@@ -2771,7 +2840,7 @@ class WebAppTests(unittest.TestCase):
         edl = EDL(source="x.mp4", output={},
                   cuts=[Cut(0.0, 3.0, 0.0, 3.0, id="a"),
                         Cut(4.0, 7.0, 3.0, 6.0, id="b")])
-        apply_pauses(edl, [[3.5, 9.0]])             # only 1s of gap exists
+        apply_pauses(edl, [[3.5, 9.0, "before"]])   # only 1s of gap exists
         self.assertAlmostEqual(edl.duration, 7.0, places=3)
         self.assertLessEqual(edl.cuts[0].src_end, edl.cuts[1].src_start + 1e-6)
 
@@ -2798,7 +2867,7 @@ class WebAppTests(unittest.TestCase):
         middle = (cuts[0]["src_end"] + cuts[1]["src_start"]) / 2
 
         tried = client.post(f"/api/jobs/{job['id']}/preview-plan",
-                            json={"pauses": [[middle, 0.4]]})
+                            json={"pauses": [[middle, 0.4, "before"]]})
         self.assertEqual(tried.status_code, 200, tried.text)
         self.assertGreater(tried.json()["summary"]["output_duration"],
                            job["summary"]["output_duration"])
@@ -2806,7 +2875,8 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(self.app.state.store.get(job["id"]).pauses, [])
 
         client.post(f"/api/jobs/{job['id']}/save",
-                    json={"pauses": [[middle, 0.4]], "beats": [[middle, 0.5]]})
+                    json={"pauses": [[middle, 0.4, "before"]],
+                          "beats": [[middle, 0.5]]})
         job = self.wait(client, job["id"])
         self.assertEqual(job["status"], "ready", job.get("error"))
         stored = self.app.state.store.get(job["id"])
@@ -2910,6 +2980,38 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.content), 2048)
         self.assertEqual(client.get("/api/fonts/Nonesuch").status_code, 404)
+
+    def test_broll_is_actually_burned_into_the_render(self):
+        # The matcher putting an overlay in the edit is only half of it: ffmpeg
+        # has to survive laying it over the footage, and nothing covered that.
+        client = self.client("brollrender")
+        self.login(client)
+        self.add_broll(client, self.clip_b, "clip.mp4")
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        spoken = next((word for line in edl["captions"] if line["start"] > 2.0
+                       for word in line["text"].split() if len(word) > 3), None)
+        self.assertIsNotNone(spoken)
+        client.post("/api/broll/clip.mp4", json={"keywords": spoken})
+
+        client.post(f"/api/jobs/{job['id']}/save", json={"render": True})
+        job = self.wait(client, job["id"])
+        self.assertEqual(job["status"], "ready", job.get("error"))
+        self.assertGreater(job["summary"]["overlays"], 0, "nothing was cut in")
+
+        preview = self.app.state.store.dir(job["id"]) / "preview.mp4"
+        from reelforge.ffmpeg import probe
+        self.assertGreater(probe(preview).duration, 1.0,
+                           "the render with b-roll produced nothing usable")
+
+    def test_the_library_clip_can_be_played_by_the_browser(self):
+        # The player lays b-roll over you too, so it has to be able to fetch it.
+        client = self.client("brollfile")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        response = client.get("/api/broll/clip.mp4/file", headers={"Range": "bytes=0-512"})
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual(client.get("/api/broll/nope.mp4/file").status_code, 404)
 
     def test_jobs_survive_a_restart_and_are_marked_interrupted(self):
         from reelforge.web import Job, JobStore

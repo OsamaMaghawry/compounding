@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from bisect import bisect_right
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 from .captions import CaptionLine
@@ -105,8 +105,15 @@ class Overlay:
     def duration(self) -> float:
         return max(0.0, self.out_end - self.out_start)
 
+    @property
+    def asset_name(self) -> str:
+        """Just the filename. Sent so the browser never has to parse a path -
+        which is one separator per platform and a backslash away from a bug."""
+        return PurePath(self.asset.replace("\\", "/")).name
+
     def to_dict(self) -> dict:
-        return {"id": self.id, "asset": self.asset, "out_start": round(self.out_start, 3),
+        return {"id": self.id, "asset": self.asset, "name": self.asset_name,
+                "out_start": round(self.out_start, 3),
                 "out_end": round(self.out_end, 3), "mode": self.mode,
                 "opacity": self.opacity, "keyword": self.keyword,
                 "score": round(self.score, 4), "asset_start": round(self.asset_start, 3),

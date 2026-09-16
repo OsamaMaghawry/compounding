@@ -168,40 +168,62 @@ MIN_PIECE = 0.12          # never shave a segment down to nothing
 
 
 def apply_pauses(edl: EDL, pauses: list) -> None:
-    """Lengthen or shorten the silence kept at a join.
+    """Move one edge of one piece, lengthening or shortening the pause after it.
 
-    The planner cuts a pause down to a default. Some pauses want to be longer
-    than that - a beat before the point lands - and some want to be gone. Rather
-    than a number in a settings panel that moves every pause in the video at
-    once, this moves the one you are looking at.
+    Each entry is [anchor, seconds, side]: which join, how far, and which of the
+    two pieces meeting there it belongs to. `before` moves the end of the piece
+    on the left, `after` moves the start of the piece on the right, and neither
+    ever touches the other - dragging the tail of one shot has no business
+    trimming the head of the next.
 
-    Positive seconds give back footage the cut removed, up to the whole gap;
-    negative take more away, eating into the padding either side but never into
-    the segment itself.
+    Positive seconds give back footage the cut removed; negative take more away,
+    eating into the padding and then into the shot, but never past the point
+    where it would have nothing left.
+
+    A two-item entry is from before the sides were separate and still means the
+    old both-at-once behaviour, so edits saved then still open.
     """
-    wanted = [(float(mid), float(delta)) for mid, delta in (pauses or [])
-              if abs(float(delta)) > 0.005]
+    wanted = []
+    for entry in (pauses or []):
+        if len(entry) >= 3:
+            wanted.append((float(entry[0]), float(entry[1]), str(entry[2])))
+        elif len(entry) == 2:
+            wanted.append((float(entry[0]), float(entry[1]), "both"))
+    wanted = [w for w in wanted if abs(w[1]) > 0.005]
     if not wanted:
         return
 
     def shift(cuts: list[Cut]) -> None:
         live = sorted([c for c in cuts if c.enabled and c.duration > 0.01],
                       key=lambda c: c.src_start)
-        for before, after in zip(live, live[1:]):
-            middle = (before.src_end + after.src_start) / 2.0
-            gap = after.src_start - before.src_end
-            match = next((d for mid, d in wanted if abs(mid - middle) <= 0.35), None)
-            if match is None:
-                continue
-            if match > 0:
-                # Give the gap back from both sides until they meet.
-                give = min(match, gap) / 2.0
-                before.src_end += give
-                after.src_start -= give
-            else:
-                take = -match / 2.0
-                before.src_end = max(before.src_start + MIN_PIECE, before.src_end - take)
-                after.src_start = min(after.src_end - MIN_PIECE, after.src_start + take)
+        # Midpoints are read before anything moves: they are what the stored
+        # entries were matched against, and each edit would otherwise be
+        # matched against a join the edit before it had already shifted.
+        joins = [((before.src_end + after.src_start) / 2.0, before, after)
+                 for before, after in zip(live, live[1:])]
+        for middle, before, after in joins:
+            for anchor, delta, side in wanted:
+                if abs(anchor - middle) > 0.35:
+                    continue
+                # Each edge is bounded twice, and the bound against the other
+                # piece is the outer one: footage that played twice would be
+                # worse than a piece trimmed shorter than intended.
+                if side == "before":
+                    before.src_end = min(after.src_start,
+                                         max(before.src_start + MIN_PIECE,
+                                             before.src_end + delta))
+                elif side == "after":
+                    after.src_start = max(before.src_end,
+                                          min(after.src_end - MIN_PIECE,
+                                              after.src_start - delta))
+                else:                                   # saved before the split
+                    give = delta / 2.0
+                    before.src_end = min(after.src_start,
+                                         max(before.src_start + MIN_PIECE,
+                                             before.src_end + give))
+                    after.src_start = max(before.src_end,
+                                          min(after.src_end - MIN_PIECE,
+                                              after.src_start - give))
 
     edl.retime(adjust=shift)
 
@@ -1047,6 +1069,13 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
             broll.write_manifest(runner.broll_dir, manifest)
         return {"deleted": True}
 
+    @app.get("/api/broll/{name}/file", dependencies=[Depends(require_login)])
+    def broll_file(name: str, request: Request) -> Response:
+        """The clip itself, so the player can lay it over you as it will appear."""
+        path = broll_or_404(name)
+        kind = "image/jpeg" if path.suffix.lower() in broll.IMAGE_EXT else "video/mp4"
+        return ranged(path, request, kind)
+
     @app.get("/api/broll/{name}/thumb.jpg", dependencies=[Depends(require_login)])
     def broll_thumb(name: str, request: Request) -> Response:
         path = broll_or_404(name)
@@ -1380,8 +1409,9 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         if pauses is not None:
             if not isinstance(pauses, list):
                 raise HTTPException(status_code=400, detail="pauses must be a list")
-            job.pauses = [[float(mid), float(delta)] for mid, delta in pauses
-                          if abs(float(delta)) > 0.005]
+            job.pauses = [[float(e[0]), float(e[1]),
+                           str(e[2]) if len(e) >= 3 else "both"]
+                          for e in pauses if abs(float(e[1])) > 0.005]
 
         beats = body.get("beats")
         if beats is not None:
@@ -1518,6 +1548,11 @@ input[type=color]{height:44px;padding:4px}
   aspect-ratio:9/16;max-height:62vh;margin:0 auto}
 .stage video{width:100%;height:100%;object-fit:contain;display:block;
   transform-origin:center center;will-change:transform,filter}
+#bv,#bi{position:absolute;object-fit:cover;background:#000;pointer-events:none}
+#bv.cover,#bi.cover{inset:0;width:100%;height:100%}
+#bv.pip,#bi.pip{right:4%;top:6%;width:42%;height:26%;border-radius:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#bv.band,#bi.band{left:0;right:0;top:32%;width:100%;height:32%}
 #caps{position:absolute;left:0;right:0;pointer-events:none;text-align:center;
   padding:0 5%;line-height:1.25;white-space:pre-wrap;word-break:break-word}
 #caps span{transition:color .08s linear}
@@ -1544,8 +1579,10 @@ input[type=color]{height:44px;padding:4px}
 .track .join{position:absolute;top:0;bottom:0;width:30px;margin-left:-15px;display:none;
   touch-action:none;cursor:ew-resize;z-index:2}
 .track.pauses .join{display:block}
-.track .join i{position:absolute;top:50%;left:13px;width:4px;height:26px;margin-top:-13px;
+.track .join i{position:absolute;top:50%;width:4px;height:26px;margin-top:-13px;
   border-radius:2px;background:#6f6fa8}
+.track .join.left i{left:15px}
+.track .join.right i{left:11px}
 .track .join.on i{background:var(--accent);box-shadow:0 0 0 3px rgba(255,210,74,.2)}
 .tools button.on{background:var(--accent);color:#18181f}
 #joinInfo{background:#10101a;border-radius:10px;padding:10px;margin-top:8px;font-size:13px}
@@ -1687,12 +1724,24 @@ function show(authed){ $('login').hidden=authed; $('app').hidden=!authed;
 async function loadBroll(){
   let assets=[];
   try{ assets=await api('/api/broll'); }catch(e){ return; }
+  // Silence is the worst answer here: a tagged clip that never appears looks
+  // identical to a broken feature. Say whether the open edit ever says the word.
+  const spoken = P && P.plan
+    ? new Set((P.plan.captions||[]).flatMap(l=>(l.text||'').split(/\s+/)))
+    : null;
+  const verdict = a => {
+    if(!spoken) return '';
+    const words=(a.keywords||[]);
+    if(!words.length) return ' · no words yet — it will never appear';
+    const hit=words.some(w=>[...spoken].some(s=>s.includes(w)||w.includes(s)));
+    return hit ? ' · said in this edit' : ' · not said in this edit';
+  };
   $('broll').innerHTML = assets.length ? assets.map(a=>`
     <div class="asset">
       <img src="/api/broll/${encodeURIComponent(a.name)}/thumb.jpg" alt=""
         onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'no'}))">
       <span class="grow">
-        <span class="nm">${a.name}${a.from_filename?' · words taken from the filename':''}</span>
+        <span class="nm">${a.name}${a.from_filename?' · words from the filename':''}${verdict(a)}</span>
         <input type="text" dir="auto" data-kw="${a.name}"
           value="${(a.keywords||[]).join(', ').replace(/"/g,'&quot;')}"
           placeholder="words that bring this up, separated by commas">
@@ -1708,6 +1757,7 @@ async function loadBroll(){
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({keywords:el.value})});
         $('brollMsg').textContent='saved';
+        refreshBroll();
       }catch(e){ $('brollMsg').textContent='error: '+e.message; }
       el.disabled=false;
     };
@@ -1715,9 +1765,17 @@ async function loadBroll(){
   $('broll').querySelectorAll('[data-rm]').forEach(el=>{
     el.onclick=async()=>{
       await api('/api/broll/'+encodeURIComponent(el.dataset.rm),{method:'DELETE'}).catch(()=>{});
-      loadBroll();
+      refreshBroll();
     };
   });
+}
+
+// The library is read when the edit is decided, so a clip added afterwards
+// changes nothing until it is decided again. Doing that quietly here is the
+// difference between the feature working and the feature looking broken.
+function refreshBroll(){
+  loadBroll();
+  if(P){ markDirty(); repaintPlan(); }
 }
 
 $('brollUpload').onclick=async()=>{
@@ -1737,7 +1795,7 @@ $('brollUpload').onclick=async()=>{
     }
     $('brollFiles').value='';
     $('brollMsg').textContent='added — now give each one its words';
-    loadBroll();
+    refreshBroll();
   }catch(e){ $('brollMsg').textContent='error: '+e.message; }
   finally{ $('brollUpload').disabled=false; }
 };
@@ -1846,7 +1904,9 @@ async function draw(job){
   }
   if(job.status==='ready'||job.status==='done'){
     html+=`<div class="stage"><video id="pv" playsinline preload="metadata"
-             src="/api/jobs/${job.id}/proxy.mp4"></video><div id="caps"></div></div>
+             src="/api/jobs/${job.id}/proxy.mp4"></video>
+             <video id="bv" playsinline muted hidden></video>
+             <img id="bi" alt="" hidden><div id="caps"></div></div>
       <div class="transport">
         <button id="playBtn">Play</button>
         <button class="ghost" id="markIn">Start here</button>
@@ -1863,8 +1923,8 @@ async function draw(job){
         <button class="ghost" id="undoTrims">Undo all edits</button>
       </div>
       <div id="joinInfo" hidden>
-        <div class="row"><span>Pause</span>
-          <span class="dim" style="flex:1;font-size:12px">drag the marker on the strip</span>
+        <div class="row"><span class="pauseWhich">edge</span>
+          <span class="dim" style="flex:1;font-size:12px">drag its marker on the strip</span>
           <b class="pauseVal">0.00s</b></div>
         <div class="row"><span>Transition</span>
           <input type="range" data-beat min="0" max="0.8" step="0.02">
@@ -1976,6 +2036,7 @@ function tick(){
 function paint(out, src){
   drawCaption(out);
   drawZoom(out);
+  drawOverlay(out);
   if(P.els) P.els.head.style.left=(100*src/P.duration).toFixed(3)+'%';
   const total=kept().reduce((n,c)=>n+(c.src_end-c.src_start),0);
   $('clock').textContent=`${stamp(out)} / ${stamp(total)}`;
@@ -2018,6 +2079,40 @@ function drawCaption(out){
     [{transform:'scale(1.10)'},{transform:'scale(1)'}],{duration:150,easing:'ease-out'});
 }
 function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+// -- b-roll ------------------------------------------------------------------
+//
+// The renderer lays these over you with ffmpeg. Without drawing them here too,
+// tagging a clip and watching nothing happen looks exactly like the matching
+// being broken - which is how it looked, and why this exists.
+function drawOverlay(out){
+  const live=(P.plan.overlays||[]).find(o=>o.enabled && out>=o.out_start && out<=o.out_end);
+  const video=$('bv'), image=$('bi');
+  if(!live){
+    if(!video.hidden){ video.hidden=true; video.removeAttribute('src'); video.load(); }
+    image.hidden=true;
+    P.shown=null;
+    return;
+  }
+  const name=live.name||'';
+  const url='/api/broll/'+encodeURIComponent(name)+'/file';
+  const still=/\.(jpe?g|png|webp)$/i.test(name);
+  const el=still?image:video, other=still?video:image;
+  other.hidden=true;
+  el.className=live.mode||'cover';
+  el.style.opacity=live.opacity ?? 1;
+  // Keyed on the clip as well as the overlay: ids are handed out fresh on every
+  // plan, so the same id can come back pointing at a different clip.
+  const key=live.id+'|'+name;
+  if(P.shown!==key){
+    P.shown=key;
+    el.src=url;
+    if(!still){ video.currentTime=live.asset_start||0; video.play().catch(()=>{}); }
+  }
+  if(!still && Math.abs(video.currentTime-((live.asset_start||0)+(out-live.out_start)))>0.4)
+    video.currentTime=(live.asset_start||0)+(out-live.out_start);
+  el.hidden=false;
+}
 
 // -- zooms and transitions ---------------------------------------------------
 function drawZoom(out){
@@ -2076,13 +2171,15 @@ function layoutTrack(){
   });
 
   const joins=P.pauseMode?junctions():[];
-  if(P.els.joins.children.length!==joins.length)
-    P.els.joins.innerHTML=joins.map(()=>'<div class="join"><i></i></div>').join('');
+  if(P.els.joins.children.length!==joins.length*2)
+    P.els.joins.innerHTML=joins.map(()=>
+      '<div class="join left"><i></i></div><div class="join right"><i></i></div>').join('');
   joins.forEach((j,i)=>{
-    const el=P.els.joins.children[i];
-    el.style.left=pct(j.middle);
-    el.dataset.join=i;
-    el.classList.toggle('on', P.activeJoin===i);
+    const left=P.els.joins.children[i*2], right=P.els.joins.children[i*2+1];
+    left.style.left=pct(j.leftAt);   left.dataset.join=i; left.dataset.side='before';
+    right.style.left=pct(j.rightAt); right.dataset.join=i; right.dataset.side='after';
+    left.classList.toggle('on', P.activeJoin===i);
+    right.classList.toggle('on', P.activeJoin===i);
   });
 
   const s=P.sel;
@@ -2091,7 +2188,7 @@ function layoutTrack(){
   if(s){ P.els.sel.style.left=pct(s[0]); P.els.sel.style.width=pct(s[1]-s[0]); }
   P.els.lbl.textContent = s
     ? `${stamp(s[0])} → ${stamp(s[1])} (${(s[1]-s[0]).toFixed(1)}s selected)`
-    : (P.pauseMode ? 'drag a pause marker — left shortens it, right lengthens it'
+    : (P.pauseMode ? 'each gap has two markers — drag either edge; only that piece moves'
                    : 'tap to jump · drag across to select');
 }
 
@@ -2100,20 +2197,25 @@ function junctions(){
   const live=kept(), out=[];
   for(let i=0;i<live.length-1;i++){
     const before=live[i], after=live[i+1];
-    out.push({middle:(before.src_end+after.src_start)/2,
-              gap:Math.max(0, after.src_start-before.src_end), index:i});
+    out.push({index:i, middle:(before.src_end+after.src_start)/2,
+              gap:Math.max(0, after.src_start-before.src_end),
+              leftAt:before.src_end, rightAt:after.src_start});
   }
   return out;
 }
 
-function pauseOf(i){
-  const stored=P.pauses.find(([mid])=>Math.abs(mid-junctions()[i].middle)<=0.35);
+// One entry per edge. The end of this shot and the start of the next are two
+// different decisions, and moving one has no business moving the other.
+function pauseOf(i, side){
+  const middle=junctions()[i].middle;
+  const stored=P.pauses.find(e=>Math.abs(e[0]-middle)<=0.35 && (e[2]||'both')===side);
   return stored?stored[1]:0;
 }
-function setPause(i, seconds){
+function setPause(i, side, seconds){
   const middle=junctions()[i].middle;
-  const at=P.pauses.findIndex(([mid])=>Math.abs(mid-middle)<=0.35);
-  if(at>=0) P.pauses[at]=[middle,seconds]; else P.pauses.push([middle,seconds]);
+  const at=P.pauses.findIndex(e=>Math.abs(e[0]-middle)<=0.35 && (e[2]||'both')===side);
+  if(at>=0) P.pauses[at]=[middle,seconds,side];
+  else P.pauses.push([middle,seconds,side]);
 }
 
 function atX(clientX){
@@ -2126,7 +2228,7 @@ function atX(clientX){
 // or off the screen - still finishes the drag it started.
 function wireTrack(){
   const t=P.track;
-  let mode=null, anchor=0, which=0, frame=0, pending=null;
+  let mode=null, anchor=0, which=0, side='before', frame=0, pending=null;
 
   const apply=()=>{
     frame=0;
@@ -2144,10 +2246,12 @@ function wireTrack(){
       seekTo(P.sel[which],{quiet:true});
     } else if(mode==='join'){
       const j=junctions()[which];
-      // Right of where you took hold lengthens the pause, left shortens it.
-      const delta=clamp(anchor+(at-P.grabAt), -1.5, j.gap);
-      setPause(which, delta);
-      showJoin(which, delta, j.gap);
+      // The marker follows your finger: the edge you took hold of goes where you
+      // put it. Which way that lengthens the pause depends on which edge it is.
+      const travel=at-P.grabAt;
+      const delta=clamp(anchor+(side==='before'?travel:-travel), -3.0, j.gap);
+      setPause(which, side, delta);
+      showJoin(which, side, delta, j.gap);
     }
     layoutTrack();
   };
@@ -2162,8 +2266,9 @@ function wireTrack(){
       if(P.wasPlaying) P.video.pause();
       seekTo(at);
     }
-    else if(join){ mode='join'; which=Number(join.dataset.join); P.grabAt=at;
-              anchor=pauseOf(which); P.activeJoin=which; layoutTrack(); }
+    else if(join){ mode='join'; which=Number(join.dataset.join); side=join.dataset.side;
+              P.grabAt=at; anchor=pauseOf(which, side);
+              P.activeJoin=which; layoutTrack(); }
     else if(grip){ mode='grip'; which=Number(grip.dataset.grip); }
     else { mode='maybe'; anchor=at; }
     // preventDefault first: if capture throws, a touch that was meant to drag
@@ -2204,11 +2309,13 @@ function wireTrack(){
   t.addEventListener('pointercancel', finish);
 }
 
-function showJoin(i, delta, gap){
+function showJoin(i, side, delta, gap){
   const box=$('joinInfo');
   if(!box) return;
   const beat=beatOf(i);
   box.hidden=false;
+  box.querySelector('.pauseWhich').textContent=
+    side==='before' ? 'end of this piece' : 'start of the next piece';
   box.querySelector('.pauseVal').textContent=
     (delta>=0?'+':'')+delta.toFixed(2)+'s'+(gap?` (up to +${gap.toFixed(2)}s)`:'');
   box.querySelector('input[data-beat]').value=beat;
