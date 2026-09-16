@@ -865,6 +865,84 @@ class FontAndTemplateTests(unittest.TestCase):
         plain = build_ass(group_words(words, StyleProfile()), StyleProfile())
         self.assertIn(",100,100,0,", next(l for l in plain.splitlines() if l.startswith("Style: Reel,")))
 
+    def test_a_chosen_weight_reaches_the_subtitle_file(self):
+        """As a \\b tag on every line, not in the style's Bold field.
+
+        The style field is on/off to libass whatever number it holds: asked for
+        300 or 900 there it drew the same bold, measured in ink. The tag gives
+        thin through black, also measured: 1160, 1921, 3054, 3884 lit pixels for
+        300, 400, 700, 900.
+        """
+        from reelforge.captions import build_ass, group_words
+        words = [Word("كلمة", 0.0, 0.4), Word("ثانية", 0.4, 0.8)]
+        def written(overrides, style="karaoke"):
+            profile = StyleProfile().apply_overrides(overrides + [f"captions.style={style}"])
+            ass = build_ass(group_words(words, profile), profile)
+            events = [l for l in ass.splitlines() if l.startswith("Dialogue:")]
+            style_line = next(l for l in ass.splitlines() if l.startswith("Style: Reel,"))
+            return events, style_line.split(",")[7]
+        for style in ("karaoke", "plain", "word", "box", "pop"):
+            events, _ = written(["captions.weight=300"], style)
+            self.assertTrue(events)
+            for event in events:
+                text = event.split(",", 9)[9]
+                self.assertTrue(text.startswith("{\\b300}") or text.startswith("{\\b300\\"),
+                                f"{style}: {text[:40]}")
+        # The style field stays a plain on/off fallback.
+        _, bold = written(["captions.weight=300"]); self.assertEqual(bold, "0")
+        _, bold = written(["captions.weight=800"]); self.assertEqual(bold, "-1")
+        # Unset, nothing is added and the on/off flag every template uses rules.
+        events, bold = written(["captions.weight=0"])
+        self.assertFalse(any("\\b" in e.split(",", 9)[9][:12] for e in events))
+        self.assertEqual(bold, "-1")
+
+    def test_a_weight_tag_does_not_disturb_the_arabic_order(self):
+        # A tag at the head of the line opens no new run, so the words must
+        # still be emitted in spoken order, not the visual order the per-word
+        # tags need.
+        from reelforge.captions import build_ass, group_words
+        words = [Word("إنت", 0.0, 0.3), Word("وصاحبك", 0.3, 0.8)]
+        profile = StyleProfile().apply_overrides(["captions.weight=300", "captions.style=plain"])
+        ass = build_ass(group_words(words, profile), profile)
+        text = next(l for l in ass.splitlines() if l.startswith("Dialogue:")).split(",", 9)[9]
+        self.assertEqual(text, "{\\b300}إنت وصاحبك")
+
+    def test_a_variable_font_is_cut_to_a_real_face_at_the_weight(self):
+        """libass ignores a variable font's weight axis - asked for 300 or 900
+        it draws the same synthetic bold, measured before believing it. So the
+        face is cut for real, with the weight class libass keys on."""
+        try:
+            from fontTools.ttLib import TTFont
+        except ImportError:
+            self.skipTest("fontTools is needed to cut a weight")
+        from reelforge import fonts
+        folder = Path(tempfile.mkdtemp(prefix="reelforge-wght-"))
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        entry = fonts.resolve("Cairo")
+        changed, message = fonts.download(entry, folder)
+        if not (folder / entry.filename).exists():
+            self.skipTest(f"could not fetch Cairo: {message}")
+
+        light = fonts.weight_file(entry, 300, folder)
+        black = fonts.weight_file(entry, 900, folder)
+        self.assertIsNotNone(light); self.assertIsNotNone(black)
+        self.assertNotEqual(light, black)
+        for path, weight in ((light, 300), (black, 900)):
+            with TTFont(str(path)) as face:
+                self.assertNotIn("fvar", face, "still variable - libass would ignore it")
+                self.assertEqual(face["OS/2"].usWeightClass, weight)
+                family = face["name"].getDebugName(1)
+                self.assertEqual(family, "Cairo", "the family name is what libass matches on")
+        # Asked twice, made once.
+        self.assertEqual(fonts.weight_file(entry, 300, folder), light)
+
+    def test_the_weight_is_in_the_panel(self):
+        from reelforge.web import LOOK_FIELDS
+        field = next(f for f in LOOK_FIELDS if f["key"] == "captions.weight")
+        values = {v for v, _ in field["options"]}
+        self.assertTrue({300, 400, 700, 900} <= values)
+        self.assertIn("captions.outline", {f["key"] for f in LOOK_FIELDS})
+
     def test_catalog_entries_are_well_formed(self):
         from reelforge.fonts import CATALOG, resolve
         self.assertGreaterEqual(len(CATALOG), 10)

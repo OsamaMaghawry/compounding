@@ -103,6 +103,13 @@ with sync_playwright() as pw:
     page.wait_for_selector("[data-set='captions.style']", timeout=15000)
     print("font is reachable:", page.locator("[data-set='captions.font']").count() == 1)
 
+    # Weight is a real control now: pick light, and the live caption goes light.
+    page.select_option("[data-set='captions.weight']", "300")
+    page.wait_for_timeout(300)
+    weight = page.evaluate("""() => { const l=P.plan.captions[0]; paint(l.start+0.05, 0);
+        return getComputedStyle(document.getElementById('caps')).fontWeight; }""")
+    print("live weight      :", weight)
+    assert weight == "300", f"weight did not apply live: {weight}"
     page.select_option("[data-set='captions.style']", "box")
     page.wait_for_timeout(600)
     print("dirty banner     :", repr(page.inner_text("#dirty")[:60]))

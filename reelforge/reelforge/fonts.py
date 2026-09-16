@@ -112,3 +112,102 @@ def install(names: list[str] | None, fonts_dir: Path, *, force: bool = False):
 
     for entry in chosen:
         yield download(entry, fonts_dir, force=force)
+
+
+# ------------------------------------------------------------------- weights
+
+WEIGHT_NAMES = {100: "Thin", 200: "ExtraLight", 300: "Light", 400: "Regular",
+                500: "Medium", 600: "SemiBold", 700: "Bold", 800: "ExtraBold",
+                900: "Black"}
+
+
+def _stem(entry: FontEntry) -> str:
+    """The file stem Google uses for this family: Cairo, ElMessiri, Amiri."""
+    name = Path(entry.filename).stem
+    for cut in ("-", "["):
+        name = name.split(cut)[0]
+    return name
+
+
+def _google_dir(entry: FontEntry) -> str:
+    return entry.url.split("/ofl/")[1].split("/")[0]
+
+
+def weight_file(entry: FontEntry, weight: int, fonts_dir: Path) -> Path | None:
+    """A face of this family at this weight, made or fetched, or None.
+
+    libass does not read a variable font's weight axis: asked for 300 or 900 on
+    a variable Cairo it draws the same synthetic bold either way, which was
+    measured before believing it. So a variable font is cut to a real static
+    face at the weight wanted, with its weight class set so libass picks it. A
+    family that ships one file per weight gets that file fetched instead.
+    """
+    weight = int(round(weight / 100.0) * 100)
+    if weight not in WEIGHT_NAMES:
+        return None
+    fonts_dir = Path(fonts_dir)
+    base = fonts_dir / entry.filename
+    target = fonts_dir / f"{_stem(entry)}-{WEIGHT_NAMES[weight]}.ttf"
+    if target.exists():
+        return target
+    if base.exists() and _is_variable(base):
+        return _instance(base, target, weight, family=entry.family)
+    # A static family: Google keeps one file per weight where the weight exists.
+    for candidate in (f"{GOOGLE}/{_google_dir(entry)}/{target.name}",):
+        try:
+            with urllib.request.urlopen(candidate, timeout=60) as response:
+                data = response.read()
+            if len(data) > 2048:
+                target.write_bytes(data)
+                return target
+        except Exception:
+            continue
+    return None
+
+
+def _is_variable(path: Path) -> bool:
+    try:
+        from fontTools.ttLib import TTFont  # noqa: PLC0415
+        with TTFont(str(path), lazy=True) as font:
+            return "fvar" in font
+    except Exception:
+        return False
+
+
+def _instance(base: Path, target: Path, weight: int, *, family: str) -> Path | None:
+    """Cut a variable font to one weight. Needs fontTools; None without it."""
+    try:
+        from fontTools.ttLib import TTFont  # noqa: PLC0415
+        from fontTools.varLib import instancer  # noqa: PLC0415
+    except ImportError:
+        return None
+    try:
+        font = TTFont(str(base))
+        axes = {a.axisTag: (a.minValue, a.maxValue) for a in font["fvar"].axes}
+        if "wght" not in axes:
+            return None
+        low, high = axes["wght"]
+        pinned = {"wght": max(low, min(high, float(weight)))}
+        for tag in axes:
+            if tag != "wght":
+                pinned[tag] = 0.0 if tag == "slnt" else None    # leave others at default
+        pinned = {k: v for k, v in pinned.items() if v is not None}
+        cut = instancer.instantiateVariableFont(font, pinned, inplace=False,
+                                                updateFontNames=True)
+        # What libass keys on: the family name stays, the weight class says
+        # which face this is.
+        cut["OS/2"].usWeightClass = weight
+        style = WEIGHT_NAMES[weight]
+        for record in cut["name"].names:
+            if record.nameID in (1, 16):
+                record.string = family
+            elif record.nameID in (2, 17):
+                record.string = style
+            elif record.nameID == 4:
+                record.string = f"{family} {style}"
+            elif record.nameID == 6:
+                record.string = f"{family.replace(' ', '')}-{style}"
+        cut.save(str(target))
+        return target
+    except Exception:
+        return None

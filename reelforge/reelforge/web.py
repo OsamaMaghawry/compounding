@@ -73,6 +73,18 @@ LOOK_FIELDS: list[dict] = [
      "help": "Reels read best at three or four. Set 1 for one-word-at-a-time."},
     {"group": "Captions", "key": "captions.font_size", "label": "Size", "type": "number",
      "min": 40, "max": 170, "step": 2},
+    {"group": "Captions", "key": "captions.weight", "label": "Weight of the letters",
+     "type": "select", "help": "How thick the strokes are.",
+     "options": [
+         (0, "as the template"),
+         (300, "light"), (400, "regular"), (500, "medium"), (600, "semi-bold"),
+         (700, "bold"), (800, "extra bold"), (900, "black"),
+     ]},
+    {"group": "Captions", "key": "captions.outline", "label": "Outline around the letters",
+     "type": "number", "min": 0, "max": 20, "step": 0.5,
+     "help": "Pixels. The dark edge that keeps text readable over footage."},
+    {"group": "Captions", "key": "captions.shadow", "label": "Shadow", "type": "number",
+     "min": 0, "max": 12, "step": 0.5},
     {"group": "Captions", "key": "captions.scale_x", "label": "Width of the letters",
      "type": "number", "min": 50, "max": 160, "step": 2,
      "help": "Percent. Below 100 condenses the font; above stretches it."},
@@ -772,14 +784,18 @@ class Runner:
         from .render import check_font       # noqa: PLC0415
         if not profile.get("captions.enabled"):
             return
-        if check_font(profile, self.fonts_dir) is None:
-            return
         entry = font_catalog.resolve(profile.get("captions.font") or "")
-        if entry is None:
-            return
-        note(f"downloading {entry.family}")
-        _changed, message = font_catalog.download(entry, self.fonts_dir)
-        note(message)
+        if check_font(profile, self.fonts_dir) is not None and entry is not None:
+            note(f"downloading {entry.family}")
+            _changed, message = font_catalog.download(entry, self.fonts_dir)
+            note(message)
+        # A chosen weight needs a face at that weight, or libass draws its one
+        # synthetic bold whatever was asked for.
+        weight = int(float(profile.get("captions.weight", 0) or 0))
+        if entry is not None and 100 <= weight <= 900:
+            made = font_catalog.weight_file(entry, weight, self.fonts_dir)
+            if made is None:
+                note(f"{entry.family} has no {weight} weight here; using what it has")
 
     def _ensure_proxy(self, job: Job, source: Path | None = None) -> Path | None:
         """The small copy the browser plays. Built once, then kept.
@@ -2544,7 +2560,9 @@ function drawCaption(out){
   caps.style.bottom=((1-(look.y_pct??0.72))*h)+'px';
   caps.style.fontFamily=`"${look.font||'Cairo'}", system-ui, sans-serif`;
   caps.style.fontSize=size.toFixed(1)+'px';
-  caps.style.fontWeight=(look.bold===false)?'600':'800';
+  const weight=Number(look.weight||0);
+  caps.style.fontWeight = (weight>=100 && weight<=900) ? String(weight)
+                        : ((look.bold===false)?'400':'700');
   caps.style.color=primary;
   // The same three knobs libass has: ScaleX, ScaleY, Spacing.
   const sx=(look.scale_x??100)/100, sy=(look.scale_y??100)/100;

@@ -86,6 +86,9 @@ DEFAULTS: dict[str, Any] = {
         "font": "Cairo",
         "font_size": 92,
         "bold": True,
+        # The stroke weight of the letters, 100 (thin) to 900 (black). 0 means
+        # follow `bold` above, which is how every existing template is written.
+        "weight": 0,
         # How the letters themselves are shaped, beyond size. ScaleX below 100
         # condenses, ScaleY above 100 makes a tall look, Spacing spreads the
         # letters. Arabic letters join, so spacing pulls them apart; condense

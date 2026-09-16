@@ -60,7 +60,20 @@ none; the banner tells you when you are looking at something unsaved, and
 
 ### The shape of the letters
 
-Under **Captions**, beyond size, three controls change the letters themselves:
+Under **Captions**, beyond size, the letters themselves can be changed.
+
+**Weight** runs from light to black. This is a real weight, not a bold switch:
+the font is cut to a genuine face at that weight the first time you pick it, and
+the renderer is handed that face. It has to be done that way because the
+renderer ignores a variable font's weight axis - asked for light or black it draws
+the same bold either way, which was measured before it was believed. Families
+that ship one file per weight have that file fetched instead. A weight a family
+does not have falls back to the nearest it does, and the log says so.
+
+**Outline** and **shadow** are the dark edge and drop that keep text readable
+over footage.
+
+Then three controls change the letters' proportions:
 **width** and **height** as percentages, and **space between letters** in pixels.
 Width below 100 condenses the font; height above 100 gives the tall, narrow look.
 They are the same three settings the renderer has, so the live view and the

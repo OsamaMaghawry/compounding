@@ -214,6 +214,14 @@ def _style_spec(profile, font_size: int) -> dict:
         # gives it the beat instead.
         spec["active_open"] = "{\\fscx88\\fscy88\\t(0,120,\\fscx100\\fscy100)}"
         spec["active_close"] = ""
+
+    # The stroke weight, as libass actually takes it: a \b<weight> tag at the
+    # head of the line. The style's Bold field is on/off no matter what number
+    # it holds - asked for 300 or 900 there it drew the same bold. A tag at the
+    # very start opens no new run, so it leaves the Arabic ordering alone.
+    weight = int(float(profile.get("captions.weight", 0) or 0))
+    if 100 <= weight <= 900:
+        spec["line_prefix"] = f"{{\\b{weight}}}" + spec["line_prefix"]
     return spec
 
 
@@ -224,7 +232,14 @@ def build_ass(lines: list[CaptionLine], profile, *, width: int | None = None,
     height = height or int(profile.get("output.height"))
 
     font = profile.get("captions.font")
-    bold = -1 if profile.get("captions.bold") else 0
+    # The style's Bold field is on/off to libass, whatever number it holds -
+    # measured, not assumed. A real weight goes in as a \b tag at the head of
+    # every line instead (see _style_spec); this field is only the fallback.
+    weight = int(float(profile.get("captions.weight", 0) or 0))
+    if 100 <= weight <= 900:
+        bold = -1 if weight >= 600 else 0
+    else:
+        bold = -1 if profile.get("captions.bold") else 0
     primary = _ass_color(profile.get("captions.primary"))
     margin_x = int(profile.get("captions.margin_x"))
     y_pct = float(profile.get("captions.y_pct"))

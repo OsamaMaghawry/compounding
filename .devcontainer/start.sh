@@ -19,7 +19,11 @@ if [ -z "${REELFORGE_NO_UPDATE:-}" ] && git -C "$repo" rev-parse --git-dir >/dev
   if git -C "$repo" pull --ff-only --quiet 2>/dev/null; then
     now="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
     [ "$was" != "$now" ] && moved="yes"
-    pip install -e . --quiet --no-deps 2>/dev/null || true
+    # With dependencies: an update that brings a new one would otherwise leave
+    # the code expecting a library the machine never got, failing quietly where
+    # that library was needed. pip is quick when nothing has changed.
+    pip install -e ".[web,asr]" --quiet 2>/dev/null \
+      || pip install -e . --quiet --no-deps 2>/dev/null || true
   else
     echo "could not update automatically - carrying on with what is here."
   fi
