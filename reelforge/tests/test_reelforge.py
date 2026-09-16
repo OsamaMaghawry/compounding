@@ -778,6 +778,46 @@ class FontAndTemplateTests(unittest.TestCase):
         self.assertEqual(hold_seconds(BrollAsset(path=Path("a.jpg"), hold=5),
                                       cutaway=2.6, photo=2.0), 5.0)
 
+    def test_a_clip_told_to_play_out_is_used_once(self):
+        # Repeating a long clip is how b-roll ends up covering most of a video,
+        # which reads as b-roll that will not go away.
+        from reelforge.broll import BrollAsset, BrollLibrary
+        from reelforge.captions import CaptionLine
+        from reelforge.profile import StyleProfile
+        from reelforge.brain import plan_overlays
+
+        asset = BrollAsset(path=Path("money.mp4"), keywords=["فلوس"],
+                           duration=12.0, hold="full")
+        library = BrollLibrary([asset])
+        lines = [CaptionLine(words=[Word("فلوس", t, t + 0.5)], start=t, end=t + 0.5)
+                 for t in (4.0, 20.0, 40.0, 60.0)]
+        profile = StyleProfile()
+        placed = plan_overlays(lines, library, profile, out_duration=90.0)
+        self.assertEqual(len(placed), 1, "a deliberate insert was repeated")
+        self.assertAlmostEqual(placed[0].duration, 12.0, places=1)
+
+        # A cutaway is decoration, and may appear more than once.
+        asset.hold = "cutaway"
+        again = plan_overlays(lines, BrollLibrary([asset]), profile, out_duration=90.0)
+        self.assertGreater(len(again), 1)
+
+    def test_broll_cannot_bury_the_person_talking(self):
+        from reelforge.broll import BrollAsset, BrollLibrary
+        from reelforge.captions import CaptionLine
+        from reelforge.profile import StyleProfile
+        from reelforge.brain import plan_overlays
+        # Ten different long clips, all matching, on a short video.
+        assets = [BrollAsset(path=Path(f"c{i}.mp4"), keywords=["فلوس"],
+                             duration=20.0, hold="full") for i in range(10)]
+        lines = [CaptionLine(words=[Word("فلوس", t, t + 0.5)], start=t, end=t + 0.5)
+                 for t in range(3, 40, 4)]
+        placed = plan_overlays(lines, BrollLibrary(assets), StyleProfile(),
+                               out_duration=40.0)
+        covered = sum(o.duration for o in placed)
+        self.assertLessEqual(covered, 40.0 * 0.6 + 20.0,
+                             "b-roll covered the whole video")
+        self.assertTrue(placed, "it went too far the other way and dropped them all")
+
     def test_catalog_entries_are_well_formed(self):
         from reelforge.fonts import CATALOG, resolve
         self.assertGreaterEqual(len(CATALOG), 10)

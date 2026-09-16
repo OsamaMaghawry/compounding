@@ -161,6 +161,12 @@ wants. A ten-second clip added to illustrate a point is not a cutaway, so choose
 *play the whole clip* and it runs to its end before handing back to you. Or pick a
 fixed number of seconds. A still has no length of its own, so it gets one.
 
+A clip told to play out is used **once** in an edit. It is a deliberate insert
+rather than decoration, and repeating it is how a long clip ends up covering most
+of a video - which looks like b-roll that will not go away. Cutaways may still
+appear more than once. Whatever the settings, b-roll never covers more than about
+three fifths of the finished video: the person talking is the video.
+
 Each clip in the list says whether the edit you have open actually says one of its
 words - **said in this edit**, **not said in this edit**, or **no words yet**. A
 tagged clip that never appears and a broken feature look identical otherwise.

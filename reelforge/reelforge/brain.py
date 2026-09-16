@@ -226,8 +226,12 @@ def plan_overlays(lines: list[CaptionLine], library: BrollLibrary, profile,
 
     overlays: list[Overlay] = []
     last_end = -999.0
+    placed_in_full: set[str] = set()
+    # However many clips are allowed, they may not bury the person talking.
+    screen_time = 0.0
+    screen_budget = out_duration * 0.6
     for line in lines:
-        if len(overlays) >= budget:
+        if len(overlays) >= budget or screen_time >= screen_budget:
             break
         if line.start < head_guard:            # never cover the hook
             continue
@@ -238,6 +242,12 @@ def plan_overlays(lines: list[CaptionLine], library: BrollLibrary, profile,
             continue
         asset, keyword, score = match
         from .broll import hold_seconds  # noqa: PLC0415
+        # A clip told to play out is a deliberate insert, not decoration: it
+        # belongs once. Repeating it is how a long clip ends up covering most of
+        # the video, which reads as b-roll that will not go away.
+        deliberate = str(asset.hold).lower() != "cutaway"
+        if deliberate and str(asset.path) in placed_in_full:
+            continue
         asked = hold_seconds(asset,
                              cutaway=_clamp(line.duration, min_duration, max_duration),
                              photo=photo_duration)
@@ -245,6 +255,11 @@ def plan_overlays(lines: list[CaptionLine], library: BrollLibrary, profile,
         end = min(out_duration, line.start + duration)
         if end - line.start < min_duration * 0.6:
             continue
+        if screen_time + (end - line.start) > screen_budget and overlays:
+            continue
+        if deliberate:
+            placed_in_full.add(str(asset.path))
+        screen_time += end - line.start
         overlays.append(Overlay(
             id=f"o{len(overlays) + 1}", asset=str(asset.path),
             out_start=round(line.start, 3), out_end=round(end, 3),
