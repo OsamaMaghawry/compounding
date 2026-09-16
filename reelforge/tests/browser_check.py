@@ -167,6 +167,20 @@ with sync_playwright() as pw:
     }""")
     page.wait_for_timeout(1200)
     print("overlay walked   :", overlay)
+    if overlay:
+        # The property said hidden three times while the clip stayed on screen,
+        # because a stylesheet rule outranked the browser's own [hidden]. So this
+        # asks the screen: computed display and a real bounding box.
+        gone = page.evaluate("""() => {
+            const o = P.plan.overlays[0], bv = document.getElementById('bv');
+            paint(o.out_end + 1.0, 0);
+            const r = bv.getBoundingClientRect();
+            return {display: getComputedStyle(bv).display,
+                    onScreen: r.width > 0 && r.height > 0};
+        }""")
+        print("after its window :", gone)
+        assert gone["display"] == "none" and not gone["onScreen"], \
+            f"b-roll still on screen after its window: {gone}"
     print("broll requests   :", len(hits), "(one appearance)")
     if overlay:
         frames = int(overlay["span"] * 60)

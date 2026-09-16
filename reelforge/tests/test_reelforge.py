@@ -2205,6 +2205,21 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(edl.overlays[0].id, "o1")
         self.assertEqual(len(edl.cuts), 1)
 
+    def test_hiding_the_broll_outranks_the_stage_stylesheet(self):
+        """`.stage video{display:block}` beats the browser's [hidden]{display:none}.
+
+        So setting `hidden` on the b-roll video did nothing, and a clip that
+        had finished stayed over the footage to the end of the video. Three
+        fixes went past it because they checked the property, not the screen.
+        The rule that wins has to stay, and this notices if it goes.
+        """
+        from reelforge.web import PAGE
+        style = PAGE[PAGE.index("<style>"):PAGE.index("</style>")]
+        self.assertIn("#bv[hidden]", style)
+        rule = style[style.index("#bv[hidden]"):]
+        rule = rule[:rule.index("}")]
+        self.assertIn("display:none!important", rule.replace(" ", ""))
+
     def test_an_overlay_tells_the_browser_its_filename(self):
         # So the page never parses a path: one separator per platform, and a
         # backslash away from exactly the bug above.

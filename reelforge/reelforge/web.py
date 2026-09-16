@@ -1681,6 +1681,11 @@ input[type=color]{height:44px;padding:4px}
 .stage video{width:100%;height:100%;object-fit:contain;display:block;
   transform-origin:center center;will-change:transform,filter}
 #bv,#bi{position:absolute;object-fit:cover;background:#000;pointer-events:none}
+/* The b-roll video sits inside .stage, and `.stage video{display:block}` above
+   outranks the browser's own `[hidden]{display:none}` - so `hidden` did nothing,
+   and a clip that had finished stayed over the footage to the end of the video.
+   Three fixes went past it because they checked the property, not the screen. */
+#bv[hidden],#bi[hidden]{display:none!important}
 #bv.cover,#bi.cover{inset:0;width:100%;height:100%}
 #bv.pip,#bi.pip{right:4%;top:6%;width:42%;height:26%;border-radius:10px;
   box-shadow:0 6px 24px rgba(0,0,0,.5)}
@@ -2222,20 +2227,18 @@ function mountPlayer(job){
 
   P.duration = Math.max(...(P.plan.cuts||[]).map(c=>c.src_end), 1);
   buildTrack(); wireTransport(); wireTrack(); tick();
-  // A clip that will not play falls back to its still, so the preview shows
-  // that b-roll happens here even when the browser cannot decode it.
-  // A clip shorter than the moment it was given would otherwise sit on its last
-  // frame until the window ran out, which looks like it got stuck.
-  $('bv').addEventListener('ended', ()=>{ $('bv').hidden=true; });
   // A clip shorter than the moment it was given would otherwise sit on its last
   // frame until the window ran out, which reads as it having got stuck.
-  $('bv').addEventListener('ended', ()=>{ $('bv').hidden=true; });
+  $('bv').addEventListener('ended', ()=>{ $('bv').hidden=true; $('bv').style.display='none'; });
+  // A clip that will not play falls back to its still, so the preview shows
+  // that b-roll happens here even when the browser cannot decode it.
   $('bv').addEventListener('error', ()=>{
     const name=(P.shown||'').split('|')[1];
     if(!name) return;
-    $('bv').hidden=true;
+    $('bv').hidden=true; $('bv').style.display='none';
     $('bi').src='/api/broll/'+encodeURIComponent(name)+'/thumb.jpg';
-    $('bi').className=$('bv').className; $('bi').hidden=false;
+    $('bi').className=$('bv').className||'cover';
+    $('bi').style.display=''; $('bi').hidden=false;
   });
   video.addEventListener('loadedmetadata', layoutTrack);
 }
@@ -2344,9 +2347,14 @@ function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'
 function hideOverlay(){
   if(!P) return;
   clearTimeout(P.overlayTimer);
-  const video=$('bv'), image=$('bi');
-  if(video){ try{ video.pause(); }catch(_){} video.hidden=true; }
-  if(image) image.hidden=true;
+  // Three ways, on purpose: the attribute, an inline display, and dropping the
+  // class that positions it over the footage. Any one of them is enough; all
+  // three means no future stylesheet rule can quietly bring it back.
+  for(const el of [$('bv'), $('bi')]){
+    if(!el) continue;
+    if(el.tagName==='VIDEO'){ try{ el.pause(); }catch(_){} }
+    el.hidden=true; el.style.display='none'; el.className='';
+  }
   P.shown=null;
 }
 
@@ -2373,6 +2381,7 @@ function drawOverlay(out){
     el.src=(still?'/api/broll/':'/api/broll/')+encodeURIComponent(name)+'/file';
     el.className=live.mode||'cover';
     el.style.opacity=live.opacity ?? 1;
+    el.style.display='';
     el.hidden=false;
     if(!still){
       // Seek and play once, when the clip is ready. Doing it every frame is

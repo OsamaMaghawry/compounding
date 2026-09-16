@@ -177,7 +177,11 @@ that was already planned would change nothing until something else happened to
 re-plan it - which is exactly what it looked like when it was broken.
 
 B-roll also plays in the live preview, laid over you the way the render will do
-it, rather than only appearing after an export. What the preview streams is a
+it, rather than only appearing after an export. When its moment is over it leaves
+the screen - that sounds too obvious to write down, but for a while it did not:
+a stylesheet rule for the main video outranked the browser's own way of hiding
+things, so the clip was told to go and stayed. The checks now ask the screen
+whether it is gone, not the element whether it was told to. What the preview streams is a
 small copy of each clip, made once when you add it: the original is whatever came
 off a phone, and this goes down the wire every time the clip comes up on screen.
 A clip the browser cannot decode falls back to its still picture, so you still see
