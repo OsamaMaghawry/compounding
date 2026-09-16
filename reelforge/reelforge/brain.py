@@ -218,6 +218,7 @@ def plan_overlays(lines: list[CaptionLine], library: BrollLibrary, profile,
 
     min_duration = float(profile.get("broll.min_duration"))
     max_duration = float(profile.get("broll.max_duration"))
+    photo_duration = float(profile.get("broll.photo_duration", 2.0))
     cooldown = float(profile.get("broll.cooldown"))
     head_guard = float(profile.get("broll.head_guard"))
     min_score = float(profile.get("broll.min_score"))
@@ -236,7 +237,11 @@ def plan_overlays(lines: list[CaptionLine], library: BrollLibrary, profile,
         if not match:
             continue
         asset, keyword, score = match
-        duration = _clamp(line.duration, min_duration, max_duration)
+        from .broll import hold_seconds  # noqa: PLC0415
+        asked = hold_seconds(asset,
+                             cutaway=_clamp(line.duration, min_duration, max_duration),
+                             photo=photo_duration)
+        duration = asked if asked else _clamp(line.duration, min_duration, max_duration)
         end = min(out_duration, line.start + duration)
         if end - line.start < min_duration * 0.6:
             continue

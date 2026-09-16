@@ -69,6 +69,7 @@ DEFAULTS: dict[str, Any] = {
         "max_per_min": 6.0,
         "min_duration": 1.0,
         "max_duration": 2.6,
+        "photo_duration": 2.0,     # a still has no length of its own, so it needs one
         "cooldown": 2.5,
         "mode": "cover",           # cover | pip | band
         "opacity": 1.0,

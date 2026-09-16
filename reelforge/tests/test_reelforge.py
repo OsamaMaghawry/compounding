@@ -753,6 +753,31 @@ class FontAndTemplateTests(unittest.TestCase):
         self.assertIsNone(check_font(
             StyleProfile().apply_overrides(["captions.font="]), None))
 
+    def test_how_long_a_clip_stays_is_the_clips_business(self):
+        from reelforge.broll import BrollAsset, hold_seconds
+        ten = lambda **kw: BrollAsset(path=Path("a.mp4"), duration=10.2, **kw)
+
+        # A cutaway is sized to the sentence, never longer than the clip.
+        self.assertEqual(hold_seconds(ten(), cutaway=2.6, photo=2.0), 2.6)
+        short = BrollAsset(path=Path("a.mp4"), duration=1.5)
+        self.assertEqual(hold_seconds(short, cutaway=2.6, photo=2.0), 1.5)
+
+        # A ten-second clip added to make a point is not a cutaway.
+        self.assertAlmostEqual(hold_seconds(ten(hold="full"), cutaway=2.6, photo=2.0),
+                               10.2, places=3)
+        # Starting part-way in leaves less of it to play.
+        self.assertAlmostEqual(
+            hold_seconds(ten(hold="full", start=4.0), cutaway=2.6, photo=2.0),
+            6.2, places=3)
+        # A fixed length, capped by what the clip actually has.
+        self.assertEqual(hold_seconds(ten(hold=4), cutaway=2.6, photo=2.0), 4.0)
+        self.assertEqual(hold_seconds(ten(hold=99), cutaway=2.6, photo=2.0), 10.2)
+        # A still has no length of its own.
+        self.assertEqual(hold_seconds(BrollAsset(path=Path("a.jpg")),
+                                      cutaway=2.6, photo=2.0), 2.0)
+        self.assertEqual(hold_seconds(BrollAsset(path=Path("a.jpg"), hold=5),
+                                      cutaway=2.6, photo=2.0), 5.0)
+
     def test_catalog_entries_are_well_formed(self):
         from reelforge.fonts import CATALOG, resolve
         self.assertGreaterEqual(len(CATALOG), 10)
@@ -3092,6 +3117,50 @@ class WebAppTests(unittest.TestCase):
         finally:
             broll_module.make_proxy = real
         self.assertEqual(len(calls), 1, f"encoded {len(calls)} times for one clip")
+
+    def test_a_clip_can_be_told_to_play_in_full(self):
+        # A ten-second clip added to illustrate a point is not a cutaway; capping
+        # it at a couple of seconds throws the point away.
+        client = self.client("brollhold")
+        self.login(client)
+        self.add_broll(client, self.clip_b, "clip.mp4")
+
+        listed = client.get("/api/broll").json()[0]
+        self.assertEqual(listed["hold"], "cutaway")
+        self.assertIsNotNone(listed["seconds"], "the clip's length was never measured")
+        self.assertAlmostEqual(listed["seconds"], 4.0, delta=0.6)
+
+        job = self.wait(client, self.upload(client, [self.clip_a, self.clip_b]).json()["id"])
+        edl = client.get(f"/api/jobs/{job['id']}/edl").json()
+        spoken = next((w for line in edl["captions"] if line["start"] > 2.0
+                       for w in line["text"].split() if len(w) > 3), None)
+        client.post("/api/broll/clip.mp4", json={"keywords": spoken})
+        client.post(f"/api/jobs/{job['id']}/settings", json={"values": {}})
+        self.wait(client, job["id"])
+        cutaway = client.get(f"/api/jobs/{job['id']}/edl").json()["overlays"]
+        self.assertTrue(cutaway)
+        short = cutaway[0]["out_end"] - cutaway[0]["out_start"]
+        self.assertLessEqual(short, 2.7)
+
+        self.assertEqual(client.post("/api/broll/clip.mp4",
+                                     json={"hold": "full"}).status_code, 200)
+        self.assertEqual(client.get("/api/broll").json()[0]["hold"], "full")
+        client.post(f"/api/jobs/{job['id']}/settings", json={"values": {}})
+        self.wait(client, job["id"])
+        full = client.get(f"/api/jobs/{job['id']}/edl").json()["overlays"]
+        self.assertTrue(full)
+        played = full[0]["out_end"] - full[0]["out_start"]
+        self.assertGreater(played, short, "asking for the whole clip changed nothing")
+
+    def test_a_nonsense_length_is_refused(self):
+        client = self.client("brollholdbad")
+        self.login(client)
+        self.add_broll(client, self.clip_a, "clip.mp4")
+        response = client.post("/api/broll/clip.mp4", json={"hold": "forever"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("must be a number", response.json()["detail"])
+        # Keywords set in the same breath are not lost to the refusal.
+        self.assertEqual(client.get("/api/broll").json()[0]["hold"], "cutaway")
 
     def test_the_small_copy_is_not_offered_as_broll(self):
         client = self.client("brollhidden")

@@ -1011,6 +1011,10 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
     @app.get("/api/broll", dependencies=[Depends(require_login)])
     def list_broll() -> list[dict]:
         manifest = broll.read_manifest(runner.broll_dir)
+        for asset in broll.BrollLibrary.load(runner.broll_dir).assets:
+            if not asset.is_image and not (manifest.get(asset.name) or {}).get("duration"):
+                broll.remember_length(runner.broll_dir, asset.name, asset.path)
+        manifest = broll.read_manifest(runner.broll_dir)
         library = broll.BrollLibrary.load(runner.broll_dir)
         out = []
         for asset in library.assets:
@@ -1022,6 +1026,8 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
                 # normalised form strips the vowels and reads like a typo.
                 "keywords": list(entry.get("keywords") or asset.keywords),
                 "from_filename": not entry.get("keywords"),
+                "seconds": entry.get("duration"),
+                "hold": entry.get("hold", "cutaway"),
                 "size": asset.path.stat().st_size,
             })
         return out
@@ -1046,12 +1052,32 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         if done:
             broll.thumbnail(target, runner.broll_dir / ".thumbs" / f"{safe}.jpg")
             runner.broll_proxy(target)
+            broll.remember_length(runner.broll_dir, safe, target)
+            broll.remember_length(runner.broll_dir, safe, target)
         return {"ok": True, "complete": done, "size": target.stat().st_size}
 
     @app.post("/api/broll/{name}", dependencies=[Depends(require_login)])
     def set_broll_keywords(name: str, body: dict) -> dict:
-        """The words that make this clip appear. Without them it never will."""
+        """The words that make this clip appear, and how long it stays."""
         path = broll_or_404(name)
+
+        if "hold" in body:
+            hold = body.get("hold")
+            if hold not in ("cutaway", "full"):
+                try:
+                    hold = round(max(0.2, min(60.0, float(hold))), 2)
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(status_code=400,
+                                        detail="how long must be a number, "
+                                               "'cutaway' or 'full'") from exc
+            manifest = broll.read_manifest(runner.broll_dir)
+            entry = dict(manifest.get(path.name) or {})
+            entry["hold"] = hold
+            manifest[path.name] = entry
+            broll.write_manifest(runner.broll_dir, manifest)
+            if "keywords" not in body:
+                return {"ok": True, "hold": hold}
+
         raw = body.get("keywords")
         if isinstance(raw, str):
             raw = raw.replace("،", ",").split(",")
@@ -1767,10 +1793,31 @@ async function loadBroll(){
         <input type="text" dir="auto" data-kw="${a.name}"
           value="${(a.keywords||[]).join(', ').replace(/"/g,'&quot;')}"
           placeholder="words that bring this up, separated by commas">
+        <select data-hold="${a.name}">
+          <option value="cutaway" ${a.hold==='cutaway'?'selected':''}>
+            short cutaway — a couple of seconds</option>
+          ${a.kind==='video'?`<option value="full" ${a.hold==='full'?'selected':''}>
+            play the whole clip${a.seconds?` — ${a.seconds.toFixed(1)}s`:''}</option>`:''}
+          ${[2,3,5,8,12].map(n=>`<option value="${n}" ${Number(a.hold)===n?'selected':''}>
+            hold for ${n}s</option>`).join('')}
+        </select>
       </span>
       <span class="pill" data-rm="${a.name}" title="remove">✕</span>
     </div>`).join('') : '<span class="dim">empty — nothing will be cut in yet</span>';
 
+  $('broll').querySelectorAll('[data-hold]').forEach(el=>{
+    el.onchange=async()=>{
+      el.disabled=true;
+      try{
+        await api('/api/broll/'+encodeURIComponent(el.dataset.hold),{method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({hold:el.value})});
+        $('brollMsg').textContent='saved';
+      }catch(e){ $('brollMsg').textContent='error: '+e.message; }
+      el.disabled=false;
+      refreshBroll();
+    };
+  });
   $('broll').querySelectorAll('[data-kw]').forEach(el=>{
     el.onchange=async()=>{
       el.disabled=true;
@@ -2021,6 +2068,12 @@ function mountPlayer(job){
   buildTrack(); wireTransport(); wireTrack(); tick();
   // A clip that will not play falls back to its still, so the preview shows
   // that b-roll happens here even when the browser cannot decode it.
+  // A clip shorter than the moment it was given would otherwise sit on its last
+  // frame until the window ran out, which looks like it got stuck.
+  $('bv').addEventListener('ended', ()=>{ $('bv').hidden=true; });
+  // A clip shorter than the moment it was given would otherwise sit on its last
+  // frame until the window ran out, which reads as it having got stuck.
+  $('bv').addEventListener('ended', ()=>{ $('bv').hidden=true; });
   $('bv').addEventListener('error', ()=>{
     const name=(P.shown||'').split('|')[1];
     if(!name) return;
@@ -2049,17 +2102,31 @@ function tick(){
   cancelAnimationFrame(P.raf);
   const step=()=>{
     if(!P || !document.body.contains(P.video)) return;
-    const v=P.video, t=v.currentTime;
-    let out=outAt(t);
-    if(out===null){
-      // In footage that is cut. Jump to the next piece that survives, so
-      // playback is the edit rather than the raw take.
-      const nxt=nextKeptAfter(t);
-      if(nxt){ v.currentTime=nxt.src_start; out=nxt.out_start; }
-      else if(!v.paused){ v.pause(); const first=kept()[0]; if(first) v.currentTime=first.src_start; }
-    }
-    paint(out===null?0:out, t);
+    // The next frame is asked for FIRST, and the work is wrapped. This loop is
+    // what hides the b-roll, moves the captions and advances the playhead, so
+    // one thrown error used to stop all of it for good: the footage kept playing
+    // underneath, because that is the browser's own doing, while the b-roll sat
+    // on screen to the end of the video and nothing answered. A bad frame should
+    // cost a frame.
     P.raf=requestAnimationFrame(step);
+    try{
+      const v=P.video, t=v.currentTime;
+      let out=outAt(t);
+      if(out===null){
+        // In footage that is cut. Jump to the next piece that survives, so
+        // playback is the edit rather than the raw take.
+        const nxt=nextKeptAfter(t);
+        if(nxt){ v.currentTime=nxt.src_start; out=nxt.out_start; }
+        else if(!v.paused){ v.pause(); const first=kept()[0]; if(first) v.currentTime=first.src_start; }
+      }
+      paint(out===null?0:out, t);
+    }catch(err){
+      // Said once, not sixty times a second, and never silently: a preview that
+      // quietly stops matching the edit is worse than one that admits it.
+      if(!P.complained){ P.complained=true;
+        $('dirty').textContent='the preview hit a problem: '+(err&&err.message||err);
+        console.error(err); }
+    }
   };
   P.raf=requestAnimationFrame(step);
 }
@@ -2116,17 +2183,23 @@ function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'
 // The renderer lays these over you with ffmpeg. Without drawing them here too,
 // tagging a clip and watching nothing happen looks exactly like the matching
 // being broken - which is how it looked, and why this exists.
+// Hidden, not torn down: removing the source and reloading would make coming
+// back to the same clip fetch the whole thing again.
+function hideOverlay(){
+  if(!P) return;
+  clearTimeout(P.overlayTimer);
+  const video=$('bv'), image=$('bi');
+  if(video){ try{ video.pause(); }catch(_){} video.hidden=true; }
+  if(image) image.hidden=true;
+  P.shown=null;
+}
+
 function drawOverlay(out){
   const live=(P.plan.overlays||[]).find(o=>o.enabled && out>=o.out_start && out<=o.out_end);
   const video=$('bv'), image=$('bi');
 
   if(!live){
-    if(P.shown!==null){
-      // Hidden, not torn down. Removing the source and reloading would make
-      // coming back to the same clip fetch it all over again.
-      video.pause(); video.hidden=true; image.hidden=true;
-      P.shown=null;
-    }
+    if(P.shown!==null) hideOverlay();
     return;
   }
 
@@ -2150,11 +2223,19 @@ function drawOverlay(out){
       // what took the server down: an unloaded video answers a seek with a
       // fresh range request, so sixty a second went out until nothing was
       // left to serve the page itself.
-      const begin=()=>{ try{ video.currentTime=live.asset_start||0; }catch(_){}
-                        video.play().catch(()=>{}); };
+      const begin=()=>{
+        try{ video.currentTime=live.asset_start||0; }catch(_){}
+        try{ const started=video.play(); if(started) started.catch(()=>{}); }catch(_){}
+      };
       if(video.readyState>=1) begin();
       else video.addEventListener('loadedmetadata', begin, {once:true});
     }
+    // Belt and braces. The loop above normally takes it away at the right
+    // moment; this takes it away even if the loop is not running, because a
+    // b-roll that will not leave is the worst way for that to show up.
+    clearTimeout(P.overlayTimer);
+    const left=(live.out_end-out)/(P.video.playbackRate||1);
+    P.overlayTimer=setTimeout(hideOverlay, Math.max(120, left*1000)+150);
   }
 }
 

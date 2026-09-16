@@ -155,6 +155,12 @@ The **B-roll** tab in the Look panel controls how often clips appear, how sure t
 word match has to be, and whether a clip covers the screen, sits in a corner, or
 runs as a band across the middle.
 
+Each clip also has a **how long** setting. The default, *short cutaway*, sizes it
+to the sentence that triggered it - a couple of seconds, which is what a cutaway
+wants. A ten-second clip added to illustrate a point is not a cutaway, so choose
+*play the whole clip* and it runs to its end before handing back to you. Or pick a
+fixed number of seconds. A still has no length of its own, so it gets one.
+
 Each clip in the list says whether the edit you have open actually says one of its
 words - **said in this edit**, **not said in this edit**, or **no words yet**. A
 tagged clip that never appears and a broken feature look identical otherwise.

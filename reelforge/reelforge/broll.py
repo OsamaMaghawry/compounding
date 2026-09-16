@@ -33,6 +33,11 @@ class BrollAsset:
     keywords: list[str] = field(default_factory=list)
     start: float = 0.0
     duration: float | None = None
+    # How long it should be on screen: "cutaway" for a brief illustration the
+    # planner sizes to the sentence, "full" to play the clip out, or a number of
+    # seconds. A ten-second clip added to make a point is not a cutaway, and
+    # capping it at a couple of seconds throws away the point.
+    hold: str | float = "cutaway"
 
     @property
     def is_image(self) -> bool:
@@ -107,7 +112,8 @@ class BrollLibrary:
             keywords = [k for k in keywords if k] or _keywords_from_filename(path)
             assets.append(BrollAsset(path=path, keywords=keywords,
                                      start=float(config.get("start", 0.0)),
-                                     duration=config.get("duration")))
+                                     duration=config.get("duration"),
+                                     hold=config.get("hold", "cutaway")))
         return cls(assets)
 
     def match(self, text: str, *, weights: dict[str, float] | None = None,
@@ -157,6 +163,59 @@ def write_manifest(directory: str | Path, data: dict) -> Path:
     path = directory / MANIFEST
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def hold_seconds(asset: "BrollAsset", *, cutaway: float, photo: float) -> float | None:
+    """How long this asset should be on screen, or None to size it to the line.
+
+    Returns the length asked for; the planner still has to fit it in what is
+    left of the video.
+    """
+    available = None
+    if asset.duration:
+        available = max(0.0, float(asset.duration) - float(asset.start))
+
+    wanted = asset.hold
+    if isinstance(wanted, str):
+        wanted = wanted.strip().lower()
+    if wanted == "full":
+        return available or None
+    try:
+        seconds = float(wanted)
+    except (TypeError, ValueError):
+        seconds = None
+    if seconds and seconds > 0.05:
+        return min(seconds, available) if available else seconds
+    if asset.is_image:
+        return photo
+    # A cutaway: the planner sizes it to the sentence, but never asks for more
+    # of a clip than the clip has - the rest would be its last frame, frozen.
+    return min(cutaway, available) if available else None
+
+
+def remember_length(directory: str | Path, name: str, asset: str | Path) -> float | None:
+    """Record how long a clip runs, so the planner never asks for more than it has.
+
+    Measured once, when the clip is added, and kept in the manifest: the planner
+    runs on every re-decide and probing the whole library each time would be a
+    lot of ffprobe for an answer that cannot change.
+    """
+    asset = Path(asset)
+    if asset.suffix.lower() not in VIDEO_EXT:
+        return None
+    from .ffmpeg import probe  # noqa: PLC0415 - avoid a cycle at import time
+    try:
+        seconds = float(probe(asset).duration)
+    except Exception:
+        return None
+    if seconds <= 0:
+        return None
+    manifest = read_manifest(directory)
+    entry = dict(manifest.get(name) or {})
+    entry["duration"] = round(seconds, 3)
+    manifest[name] = entry
+    write_manifest(directory, manifest)
+    return seconds
 
 
 def is_supported(name: str) -> bool:
