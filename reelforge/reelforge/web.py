@@ -15,6 +15,7 @@ import hmac
 import json
 import os
 import queue
+import re
 import secrets
 import shutil
 import threading
@@ -609,6 +610,36 @@ class JobStore:
             return list(job.sources)
 
 
+def explain(error: str) -> str:
+    """What a failure means, in words that say what to do about it.
+
+    "command failed (-9)" is true and useless. The three that actually happen
+    here are worth naming: the machine ran out of memory and killed the work,
+    the disk filled up, or one clip is not really a video.
+    """
+    text = re.sub(r"^\w*Error: ", "", (error or "").strip())
+    low = text.lower()
+    if "cannot be read as video" in low:
+        return text.split("\n")[0]
+    if ("(-9)" in text or "(137)" in text or "killed" in low
+            or "cannot allocate memory" in low or "out of memory" in low):
+        return ("the machine ran out of memory and stopped the work. Fewer clips "
+                "at a time, or footage recorded at 1080p rather than 4K, will get "
+                "through" + _tail(text))
+    if "no space left" in low or "enospc" in low:
+        return ("the disk is full. Delete an old edit or two - each one keeps its "
+                "clips, its joined timeline and its exports" + _tail(text))
+    if "ffmpegmissing" in low or "was not found on path" in low:
+        return "ffmpeg is not installed on this machine" + _tail(text)
+    return text
+
+
+def _tail(text: str) -> str:
+    """The machine's own last words, kept for when the plain answer is not enough."""
+    lines = [line for line in text.strip().splitlines() if line.strip()]
+    return f" ({lines[-1][:160]})" if lines else ""
+
+
 class Runner:
     """One worker thread. Renders saturate the CPU, so they do not overlap."""
 
@@ -771,8 +802,12 @@ class Runner:
                 elif task == "export":
                     self._export(job)
             except Exception as exc:                      # a failed job must not kill the worker
-                self.store.update(job, status="error", stage="failed",
-                                  error=f"{type(exc).__name__}: {exc}"[:400])
+                reason = explain(f"{type(exc).__name__}: {exc}")
+                # The stage is what the list shows. "failed" there, with the
+                # reason hidden one click away inside the edit, is how a failure
+                # becomes a mystery.
+                self.store.update(job, status="error", error=reason[:400],
+                                  stage=reason.split("\n")[0][:120] or "failed")
 
     def _process(self, job: Job) -> None:
         directory = self.store.dir(job.id)
@@ -789,6 +824,20 @@ class Runner:
                             fonts_dir=self.fonts_dir, on_status=note,
                             on_progress=lambda f: self.beat(job, percent=10 + 45 * f))
         clips = [Path(p) for p in job.sources]
+        # Check every clip before anything long starts. Transcribing for twenty
+        # minutes and then failing on a file that was never a video is a bad way
+        # to find out, and the file has to be named or it is a search through
+        # thirty of them.
+        from .ffmpeg import FFmpegError, probe  # noqa: PLC0415
+        note(f"checking {len(clips)} clip(s)")
+        for clip in clips:
+            try:
+                probe(clip)
+            except FFmpegError as exc:
+                raise FFmpegError(
+                    f"{clip.name.split('-', 1)[-1]} cannot be read as video - remove "
+                    f"that clip and try again ({str(exc).splitlines()[-1][:120]})") from exc
+
         if len(clips) > 1:
             from .join import join_clips  # noqa: PLC0415
             source = join_clips(clips, editor.work_dir / "joined.mp4",
@@ -2464,7 +2513,8 @@ function renderJobs(jobs){
   $('jobs').innerHTML = jobs.length ? jobs.map(j=>{
     const cls = j.status==='ready'||j.status==='done' ? 'ready' : (j.status==='error'?'error':'working');
     return `<div class="job" data-id="${j.id}">
-      <span class="grow"><b>${j.title}</b><br><span class="dim">${j.stage}</span></span>
+      <span class="grow"><b>${plain(j.title)}</b><br>
+        <span class="dim">${plain(j.stage)}</span></span>
       <span class="pill ${cls}">${j.status}</span>
       <span class="pill" data-del="${j.id}" title="remove">✕</span></div>`;
   }).join('') : '<span class="dim">none yet</span>';
@@ -2497,7 +2547,11 @@ async function draw(job){
   const s=job.summary||{};
   let html=`<div class="card"><h2>${job.title}</h2>`;
   if(job.status==='error'){
-    html+=`<div style="color:var(--bad)">${job.error||job.stage}</div>`;
+    html+=`<div style="color:var(--bad)">${plain(job.error||job.stage)}</div>`;
+    // What it was doing when it stopped. Without this the reason is a sentence
+    // with no context, and the step it died on is the most useful part of it.
+    if((job.progress||[]).length)
+      html+=`<div class="log">${plain(job.progress.slice(-12).join('\\n'))}</div>`;
     // The clips are still here. A render cut off by an idle timeout should cost
     // a button, not another upload.
     if((job.sources||[]).length) html+=`<button id="retry">Try again</button>`;

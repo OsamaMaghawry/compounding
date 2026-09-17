@@ -305,8 +305,31 @@ Two things are refused rather than half-accepted:
   not in the takes. `.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`, `.avi`, `.3gp`, `.mts`
   and a few more are accepted, in any capitalisation; a picker that hands over a
   name with no extension at all is accepted on the type it declares.
-- A clip that cannot be read as video at all. Joining says which one by name, so
-  one bad file out of thirty is a file to remove, not a search.
+- A clip that cannot be read as video at all. Every clip is checked before any of
+  the long work starts, and the one that is broken is named - so a bad file out of
+  thirty is a file to remove rather than twenty minutes of transcription followed
+  by a mystery.
+
+Thirty clips cost the same memory as three. Both of the steps that used to grow
+with the number of clips - joining them, and cutting the result - now read the
+footage once instead of holding all of it open, so a long shoot is slower than a
+short one but never heavier.
+
+## When an edit fails
+
+The list says what went wrong, not the word "failed", and opening the edit shows
+the last dozen steps it got through before it stopped. Your clips are still on the
+machine, so **Try again** picks up from them - and the joined timeline is reused
+if it got that far.
+
+Three failures are worth recognising:
+
+- **The machine ran out of memory.** Rare now, but a very long shoot on a small
+  machine can still get there. Fewer clips at a time, or 1080p rather than 4K.
+- **The disk is full.** Each edit keeps its clips, its joined timeline and its
+  exports. Deleting an old one gets the space back.
+- **A clip cannot be read as video.** The name is in the message; remove it and
+  try again.
 
 ## Leaving and coming back
 

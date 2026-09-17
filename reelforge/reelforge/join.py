@@ -12,10 +12,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import suppress
 from pathlib import Path
 
 from .ffmpeg import (FFmpegError, MediaInfo, ffmpeg_bin, probe, run, run_ffmpeg,
                      run_watched)
+
+
+# Past this many clips, shaping them one at a time beats one big filtergraph:
+# the memory of the graph grows with every input, and a machine that runs out
+# says so by killing ffmpeg, which reads as nothing at all.
+FILTERGRAPH_LIMIT = 4
+BATCH = 4
 
 
 def _even(value: float) -> int:
@@ -156,6 +164,20 @@ def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "supe
                   f"({total:.0f}s) - every frame is re-encoded, which on 4K takes "
                   f"minutes; recording at 1080p makes this step almost free")
 
+    # One filtergraph over every clip opens every decoder at once, and ffmpeg's
+    # memory then grows with the number of clips: measured at roughly 50 MB a
+    # clip for 1080p, four times that for 4K. Thirty 4K takes is more memory
+    # than the machine has, and the kill that follows says nothing useful. Past
+    # a handful of clips, each one is shaped on its own - one decoder at a time,
+    # flat memory however many there are - and the matching pieces are then
+    # stuck together without re-encoding.
+    if len(sources) > FILTERGRAPH_LIMIT:
+        return _join_one_at_a_time(sources, infos, dest, stamp, signature,
+                                   width=width, height=height, fps=fps,
+                                   audio_rate=audio_rate, preset=preset, crf=crf,
+                                   on_status=on_status, on_fraction=on_fraction,
+                                   owner=owner)
+
     args: list[str] = []
     for path in sources:
         args += ["-i", str(path)]
@@ -204,6 +226,128 @@ def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "supe
         raise FFmpegError(f"joining produced no output at {dest}")
     stamp.write_text(json.dumps({"signature": signature}), encoding="utf-8")
     return dest
+
+
+def _shape_args(info: MediaInfo, width: int, height: int, fps: int,
+                audio_rate: int) -> tuple[list[str], str]:
+    """The filters that fit one clip to the shared canvas, and its inputs."""
+    video = (f"[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+             f"setsar=1,fps={fps},format=yuv420p[v]")
+    if info.has_audio:
+        audio = (f"[0:a]aresample={audio_rate},"
+                 f"aformat=sample_fmts=fltp:channel_layouts=stereo[a]")
+        return [], f"{video};{audio}"
+    # A silent clip gets real silence for its whole length, so nothing after it
+    # drifts out of sync.
+    inputs = ["-f", "lavfi", "-t", f"{max(info.duration, 0.05):.3f}", "-i",
+              f"anullsrc=channel_layout=stereo:sample_rate={audio_rate}"]
+    audio = (f"[1:a]aresample={audio_rate},"
+             f"aformat=sample_fmts=fltp:channel_layouts=stereo[a]")
+    return inputs, f"{video};{audio}"
+
+
+def _join_one_at_a_time(sources: list[Path], infos: list[MediaInfo], dest: Path,
+                        stamp: Path, signature: str, *, width: int, height: int,
+                        fps: int, audio_rate: int, preset: str, crf: int,
+                        on_status=None, on_fraction=None,
+                        owner: int | None = None) -> Path:
+    """Shape each clip by itself, then stick the matching pieces together.
+
+    The same frames are encoded exactly once, as they are in one big filtergraph
+    - the difference is that only one clip is open at a time, so this works the
+    same with thirty clips as with three.
+    """
+    parts_dir = dest.parent / f".{dest.stem}-parts"
+    parts_dir.mkdir(parents=True, exist_ok=True)
+    parts: list[Path] = []
+    total = sum(info.duration for info in infos)
+    try:
+        for index, (path, info) in enumerate(zip(sources, infos)):
+            part = parts_dir / f"{index:03d}.mp4"
+            extra, graph = _shape_args(info, width, height, fps, audio_rate)
+            if on_status:
+                on_status(f"shaping clip {index + 1} of {len(sources)} "
+                          f"({path.name.split('-', 1)[-1]})")
+            done = sum(i.duration for i in infos[:index])
+            run_watched(
+                [ffmpeg_bin(), "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
+                 "-i", str(path), *extra, "-filter_complex", graph,
+                 "-map", "[v]", "-map", "[a]",
+                 "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+                 "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+                 "-video_track_timescale", "90000", str(part)],
+                total=max(info.duration, 0.05), owner=owner,
+                on_fraction=(lambda f, done=done, info=info:
+                             on_fraction(min(1.0, (done + f * info.duration) / max(total, 0.05))))
+                            if on_fraction else None)
+            if not part.exists() or part.stat().st_size == 0:
+                raise FFmpegError(
+                    f"{path.name.split('-', 1)[-1]} could not be prepared for joining")
+            parts.append(part)
+
+        if not _copy_together(parts, dest, total):
+            # Every piece came out of the same encoder with the same settings, so
+            # this should not happen - but a join that silently lost time is far
+            # worse than a slow one, so the pieces go through the filter instead.
+            if on_status:
+                on_status("the pieces would not stick together cleanly, "
+                          "so they are being re-joined")
+            _filter_together(parts, dest, total, preset=preset, crf=crf,
+                             on_fraction=on_fraction, owner=owner)
+    finally:
+        for part in parts:
+            part.unlink(missing_ok=True)
+        with suppress(OSError):
+            parts_dir.rmdir()
+
+    if not dest.exists() or dest.stat().st_size == 0:
+        raise FFmpegError(f"joining produced no output at {dest}")
+    stamp.write_text(json.dumps({"signature": signature}), encoding="utf-8")
+    return dest
+
+
+def _filter_together(parts: list[Path], dest: Path, total: float, *, preset: str,
+                     crf: int, on_fraction=None, owner: int | None = None) -> None:
+    """Concatenate already-matching pieces, a few at a time.
+
+    Batched for the same reason the whole thing is: memory grows with the number
+    of inputs open at once, and the point of getting here is that there are many.
+    """
+    batch = BATCH
+    stage = list(parts)
+    round_number = 0
+    while len(stage) > 1:
+        round_number += 1
+        made: list[Path] = []
+        for start in range(0, len(stage), batch):
+            group = stage[start:start + batch]
+            if len(group) == 1:
+                made.append(group[0])
+                continue
+            out = dest.parent / f".{dest.stem}-r{round_number}-{start:03d}.mp4"
+            args: list[str] = []
+            for piece in group:
+                args += ["-i", str(piece)]
+            pairs = "".join(f"[{i}:v][{i}:a]" for i in range(len(group)))
+            run_watched([ffmpeg_bin(), "-hide_banner", "-nostdin", "-y",
+                         "-loglevel", "error", *args, "-filter_complex",
+                         f"{pairs}concat=n={len(group)}:v=1:a=1[outv][outa]",
+                         "-map", "[outv]", "-map", "[outa]",
+                         "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+                         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+                         str(out)],
+                        total=total, on_fraction=on_fraction, owner=owner)
+            made.append(out)
+        for piece in stage:
+            if piece not in parts and piece not in made:
+                piece.unlink(missing_ok=True)
+        stage = made
+    final = stage[0]
+    if final != dest:
+        if dest.exists():
+            dest.unlink()
+        final.replace(dest)
 
 
 def _signature(sources: list[Path], width: int, height: int, fps: int,

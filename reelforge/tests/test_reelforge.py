@@ -419,6 +419,130 @@ class PipelineTests(unittest.TestCase):
         self.assertLess(info.duration, 8.0)                  # dead air removed
         self.assertTrue(info.has_audio)
 
+    def colour_clip(self) -> Path:
+        """Three seconds: red, green, blue - and the green one silent.
+
+        One colour and one state of sound per second, so what a cut kept and
+        whether the sound came with it can both be read straight off the result.
+        """
+        source = Path(self.tmp) / "colours.mp4"
+        if not source.exists():
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "color=c=red:s=320x568:r=25:d=1",
+                "-f", "lavfi", "-i", "color=c=green:s=320x568:r=25:d=1",
+                "-f", "lavfi", "-i", "color=c=blue:s=320x568:r=25:d=1",
+                "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+                "-filter_complex",
+                "[0:v][1:v][2:v]concat=n=3:v=1:a=0[v];"
+                "[3:a]volume='if(between(t,1.0,2.0),0.0,1.0)':eval=frame[a]",
+                "-map", "[v]", "-map", "[a]", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                str(source)], check=True, capture_output=True)
+        return source
+
+    def colour_at(self, video: Path, when: float) -> tuple:
+        """The colour in the middle of the frame at this moment, as r, g, b."""
+        raw = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", str(when),
+             "-i", str(video), "-frames:v", "1", "-vf",
+             "crop=in_w/4:in_h/4:in_w*3/8:in_h*3/8,scale=1:1",
+             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+            check=True, capture_output=True).stdout
+        self.assertGreaterEqual(len(raw), 3, f"no frame came back at {when}s")
+        return tuple(raw[:3])
+
+    def test_cutting_keeps_the_right_seconds_and_the_sound_with_them(self):
+        """What survives a cut, and whether the sound comes with it.
+
+        One trim branch per surviving stretch, joined with concat, holds the
+        whole decoded video in memory while concat works through the first
+        branch - three minutes of 1080p is about 17 GB, so a long source cut
+        into many stretches kills the machine. Reading the frames once and
+        dropping the unwanted ones costs nothing, but it is a different filter,
+        and a cut that keeps the wrong seconds or slides the sound out of step
+        with the picture would be far worse than a slow one.
+
+        So: three seconds, one colour and one state of sound each. Keep the
+        first and the third. The green second and its silence must be gone, and
+        what is left must still line up.
+        """
+        from reelforge.edl import EDL, Cut
+        from reelforge.ffmpeg import probe
+        from reelforge.render import Renderer
+
+        source = self.colour_clip()
+
+        edl = EDL(source=str(source), output={"width": 320, "height": 568},
+                  cuts=[Cut(src_start=0.0, src_end=1.0, out_start=0.0, out_end=1.0,
+                            id="c0"),
+                        Cut(src_start=2.0, src_end=3.0, out_start=1.0, out_end=2.0,
+                            id="c1")])
+        profile = self.profile("captions.enabled=false", "zoom.enabled=false",
+                               "transitions.enabled=false", "broll.enabled=false",
+                               "reframe.mode=pad")
+        output = Path(self.tmp) / "cut-colours.mp4"
+        Renderer(profile, work_dir=Path(self.tmp) / "cut-work").render(
+            edl, output, preview=True)
+
+        info = probe(output)
+        self.assertAlmostEqual(info.duration, 2.0, delta=0.25)
+        self.assertTrue(info.has_audio)
+
+        # What colour is on screen, a quarter of the way in and three quarters.
+        colour_at = lambda when: self.colour_at(output, when)   # noqa: E731
+
+        first, second = colour_at(0.5), colour_at(1.5)
+        self.assertGreater(first[0], 150, f"the first second is not red: {first}")
+        self.assertLess(first[1], 90, f"green leaked into the first second: {first}")
+        self.assertGreater(second[2], 150, f"the second half is not blue: {second}")
+        self.assertLess(second[1], 90, f"the green second survived: {second}")
+
+        # And the sound: the silent second was cut out with its picture, so what
+        # is left is loud throughout. A drift would leave silence in the middle.
+        levels = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-nostdin", "-i", str(output),
+             "-af", "astats=metadata=1:reset=0", "-f", "null", "-"],
+            capture_output=True, text=True, errors="replace").stderr
+        peak = [float(line.split(":")[1]) for line in levels.splitlines()
+                if "Peak level dB" in line]
+        self.assertTrue(peak, "no audio statistics came back")
+        self.assertGreater(max(peak), -20.0, f"the sound went missing: {peak}")
+
+    def test_stretches_out_of_order_are_still_put_in_that_order(self):
+        """Reading once cannot reorder, so an out-of-order edit takes the old way.
+
+        Nothing in the editor moves a stretch later than one that follows it, but
+        the fast path is only correct because that is true, so it is checked in
+        the code rather than assumed - and checked here, because an assumption
+        nobody tests is how the fast path quietly becomes the wrong one.
+        """
+        from reelforge.edl import EDL, Cut
+        from reelforge.ffmpeg import probe
+        from reelforge.render import Renderer
+
+        source = self.colour_clip()
+
+        # Blue first, then red: the third second before the first.
+        edl = EDL(source=str(source), output={"width": 320, "height": 568},
+                  cuts=[Cut(src_start=2.0, src_end=3.0, out_start=0.0, out_end=1.0,
+                            id="c0"),
+                        Cut(src_start=0.0, src_end=1.0, out_start=1.0, out_end=2.0,
+                            id="c1")])
+        profile = self.profile("captions.enabled=false", "zoom.enabled=false",
+                               "transitions.enabled=false", "broll.enabled=false",
+                               "reframe.mode=pad")
+        output = Path(self.tmp) / "reordered.mp4"
+        Renderer(profile, work_dir=Path(self.tmp) / "reorder-work").render(
+            edl, output, preview=True)
+
+        self.assertAlmostEqual(probe(output).duration, 2.0, delta=0.25)
+
+        colour_at = lambda when: self.colour_at(output, when)   # noqa: E731
+
+        first, second = colour_at(0.5), colour_at(1.5)
+        self.assertGreater(first[2], 150, f"blue should come first: {first}")
+        self.assertGreater(second[0], 150, f"red should come second: {second}")
+
     def test_render_survives_awkward_paths(self):
         """Filtergraph arguments must be escaped - paths like this used to break it."""
         awkward = Path(self.tmp) / "my clip, take [2].mp4"
@@ -1554,6 +1678,81 @@ class JoinRenderTests(unittest.TestCase):
         # The silent clip must not knock out the audio track for the others.
         self.assertTrue(info.has_audio)
 
+    def test_many_clips_are_shaped_one_at_a_time(self):
+        """Past a handful, clips are not all opened at once.
+
+        One filtergraph over every clip keeps every decoder open, and ffmpeg's
+        memory then grows with the number of clips - measured at about 50 MB a
+        clip at 1080p and four times that at 4K, so thirty 4K takes is more than
+        a small machine has. It is killed, and a kill leaves no error worth
+        reading. Shaping each clip by itself encodes exactly the same frames
+        with one decoder open, so thirty clips cost what three do.
+        """
+        from reelforge import join as join_module
+        from reelforge.ffmpeg import probe
+        from reelforge.join import join_clips
+
+        opened = []
+        real = join_module.run_watched
+
+        def watch(args, **kwargs):
+            opened.append(sum(1 for a in args if a == "-i"))
+            return real(args, **kwargs)
+
+        clips = [self.portrait, self.small, self.silent, self.portrait,
+                 self.small, self.silent]
+        out = Path(self.tmp) / "joined-many.mp4"
+        join_module.run_watched = watch
+        try:
+            join_clips(clips, out)
+        finally:
+            join_module.run_watched = real
+
+        self.assertTrue(opened, "nothing was encoded")
+        self.assertLessEqual(max(opened), 2,
+                             f"a clip was joined with {max(opened)} inputs open at once")
+        info = probe(out)
+        self.assertAlmostEqual(info.duration, 12.0, delta=0.8)    # six 2s clips
+        self.assertTrue(info.has_audio)                            # silence, not a gap
+        self.assertEqual((info.width, info.height), (480, 854))
+
+    def test_the_pieces_are_tidied_away(self):
+        """The intermediates are half the footage again; they do not stay."""
+        from reelforge.join import join_clips
+        out = Path(self.tmp) / "joined-tidy.mp4"
+        join_clips([self.portrait, self.small, self.silent,
+                    self.portrait, self.small], out)
+        leftovers = [p.name for p in out.parent.glob(f".{out.stem}*")]
+        self.assertEqual(leftovers, [], f"left behind: {leftovers}")
+
+    def test_pieces_that_will_not_copy_are_joined_anyway(self):
+        """The fallback still produces the whole timeline, a few clips at a time."""
+        from reelforge import join as join_module
+        from reelforge.ffmpeg import probe
+        from reelforge.join import join_clips
+
+        widest = []
+        real_copy, real_watched = join_module._copy_together, join_module.run_watched
+
+        def watch(args, **kwargs):
+            widest.append(sum(1 for a in args if a == "-i"))
+            return real_watched(args, **kwargs)
+
+        out = Path(self.tmp) / "joined-fallback.mp4"
+        join_module._copy_together = lambda *a, **k: False
+        join_module.run_watched = watch
+        try:
+            join_clips([self.portrait, self.small, self.silent,
+                        self.portrait, self.small, self.silent], out)
+        finally:
+            join_module._copy_together = real_copy
+            join_module.run_watched = real_watched
+
+        self.assertLessEqual(max(widest), join_module.BATCH,
+                             "the fallback opened more clips at once than it batches")
+        self.assertAlmostEqual(probe(out).duration, 12.0, delta=0.8)
+        self.assertEqual([p.name for p in out.parent.glob(f".{out.stem}*")], [])
+
     def test_clip_boundaries_mark_the_joins(self):
         from reelforge.join import clip_boundaries
         boundaries = clip_boundaries([self.portrait, self.small, self.silent])
@@ -2532,6 +2731,44 @@ class WebAppTests(unittest.TestCase):
         sources = self.app.state.store.get(job_id).sources
         self.assertEqual([Path(s).name.split("-", 1)[1] for s in sources],
                          [Path(self.clip_b).name, Path(self.clip_a).name])
+
+    def test_a_failure_says_what_it_was_and_what_to_do(self):
+        """"failed" in the list, with the reason a click away, is a mystery.
+
+        The three that actually happen are worth saying plainly: the machine ran
+        out of memory, the disk filled, or one clip is not really a video. An
+        ffmpeg exit code of -9 is the memory one, and on its own it reads as
+        nothing at all.
+        """
+        from reelforge.web import explain
+        killed = explain("FFmpegError: command failed (-9): ffmpeg -i a.mp4 ...\nx")
+        self.assertIn("ran out of memory", killed)
+        self.assertIn("1080p", killed)                  # and what to do about it
+
+        full = explain("FFmpegError: command failed (1): ffmpeg ...\n"
+                       "[out#0] Error writing trailer: No space left on device")
+        self.assertIn("disk is full", full)
+
+        unreadable = explain("FFmpegError: IMG_4093.mp4 cannot be read as video - "
+                             "remove that clip and try again (x)")
+        self.assertTrue(unreadable.startswith("IMG_4093.mp4"), unreadable)
+
+        # Anything unrecognised is passed through, minus the class name.
+        self.assertEqual(explain("ValueError: something else"), "something else")
+
+    def test_the_list_line_carries_the_reason_not_the_word_failed(self):
+        client = self.client("saysreason")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        client.post(f"/api/jobs/{job_id}/chunk",
+                    data={"name": "a.mp4", "index": "0", "offset": "0", "final": "true"},
+                    files={"file": ("a.mp4", b"this is not a video at all", "video/mp4")})
+        client.post(f"/api/jobs/{job_id}/start")
+        job = self.wait(client, job_id)
+        self.assertEqual(job["status"], "error")
+        self.assertIn("a.mp4", job["stage"])
+        self.assertNotEqual(job["stage"], "failed")
+        self.assertIn("cannot be read", job["stage"])
 
     def test_many_short_clips_all_arrive_and_keep_their_order(self):
         """Thirty five-second takes, which is how a phone shoot actually looks.

@@ -275,21 +275,48 @@ class Renderer:
             if has_audio:
                 graph.append("[0:a]anull[ca];")
         else:
-            for index, cut in enumerate(cuts):
-                graph.append(
-                    f"[0:v]trim=start={cut.src_start:.3f}:end={cut.src_end:.3f},"
-                    f"setpts=PTS-STARTPTS[v{index}];"
-                )
+            # Keep the surviving stretches in one pass.
+            #
+            # The obvious way - one trim branch per stretch, joined with concat -
+            # is a memory trap. Every branch reads the same input, and concat
+            # drains them in order, so while it is working through the first
+            # stretch ffmpeg must hold every decoded frame the later branches
+            # have not consumed yet. That is the whole video, uncompressed: three
+            # minutes of 1080p is about 17 GB, and the machine kills it. Thirty
+            # short takes make a long source cut into many stretches, which is
+            # exactly when it happens.
+            #
+            # select reads the frames once, in order, and drops the ones outside
+            # every stretch. Memory is a frame or two whatever the length.
+            # One pass can only ever hand the frames back in the order they were
+            # read. That is what an edit looks like - stretches of the take in
+            # the order they were shot, with the dull parts gone - but it is not
+            # the only thing an edit could be, so it is checked rather than
+            # assumed. Anything out of order goes the old way, which is correct
+            # at any length and only ever runs on a handful of stretches.
+            in_order = all(a.src_end <= b.src_start + 0.001
+                           for a, b in zip(cuts, cuts[1:]))
+            if in_order:
+                keep = "+".join(f"between(t,{cut.src_start:.3f},{cut.src_end:.3f})"
+                                for cut in cuts)
+                graph.append(f"[0:v]select='{keep}',setpts=N/FRAME_RATE/TB[cv];")
                 if has_audio:
-                    graph.append(
-                        f"[0:a]atrim=start={cut.src_start:.3f}:end={cut.src_end:.3f},"
-                        f"asetpts=PTS-STARTPTS[a{index}];"
-                    )
-            pairs = "".join(f"[v{i}][a{i}]" if has_audio else f"[v{i}]" for i in range(len(cuts)))
-            if has_audio:
-                graph.append(f"{pairs}concat=n={len(cuts)}:v=1:a=1[cv][ca];")
+                    graph.append(f"[0:a]aselect='{keep}',asetpts=N/SR/TB[ca];")
             else:
-                graph.append(f"{pairs}concat=n={len(cuts)}:v=1:a=0[cv];")
+                for index, cut in enumerate(cuts):
+                    graph.append(
+                        f"[0:v]trim=start={cut.src_start:.3f}:end={cut.src_end:.3f},"
+                        f"setpts=PTS-STARTPTS[v{index}];"
+                    )
+                    if has_audio:
+                        graph.append(
+                            f"[0:a]atrim=start={cut.src_start:.3f}:end={cut.src_end:.3f},"
+                            f"asetpts=PTS-STARTPTS[a{index}];"
+                        )
+                pairs = "".join(f"[v{i}][a{i}]" if has_audio else f"[v{i}]"
+                                for i in range(len(cuts)))
+                tail = "a=1[cv][ca]" if has_audio else "a=0[cv]"
+                graph.append(f"{pairs}concat=n={len(cuts)}:v=1:{tail};")
 
         graph.append(f"[cv]fps={fps},setsar=1[cvf];")
 
