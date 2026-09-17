@@ -315,6 +315,31 @@ with the number of clips - joining them, and cutting the result - now read the
 footage once instead of holding all of it open, so a long shoot is slower than a
 short one but never heavier.
 
+## When the link goes nowhere
+
+`404 - no webpage was found` on the forwarded address means nothing is listening
+on port 8000. It is not a problem with the link, and reloading will not fix it.
+Almost always the Codespace itself has stopped - it does that after thirty idle
+minutes, and a stopped machine cannot serve anything.
+
+**Open [github.com/codespaces](https://github.com/codespaces) and click the
+Codespace.** Starting it runs the setup again: it pulls the newest version,
+installs anything new, and starts the app. Then the link works. Nothing to type.
+
+What no longer needs your attention:
+
+- **The app stops on its own** - a bug, or the system killing it for using too
+  much memory. Something is now watching it and starts it again, so the link
+  comes back by itself within a few seconds.
+- **An update that will not run.** Updating used to be a one-way door: the app
+  was stopped, the new version started, and if it could not start there was no
+  terminal to fix it from. Now the new version has to answer before it is kept.
+  If it does not, the machine goes back to the version that was working and
+  starts that instead. `reelforge.log` beside your data records what happened.
+
+`bash reelforge/tests/recovery_check.sh` exercises all three of those against a
+throwaway copy, if you want to see it for yourself.
+
 ## When an edit fails
 
 The list says what went wrong, not the word "failed", and opening the edit shows

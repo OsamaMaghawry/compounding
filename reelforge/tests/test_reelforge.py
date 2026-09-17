@@ -2588,6 +2588,17 @@ class WebAppTests(unittest.TestCase):
         self.assertIsInstance(body["behind"], int)
         self.assertEqual(client.get("/api/version").status_code, 200)
 
+    def test_health_answers_without_a_password(self):
+        """What keeps the app alive has to be able to ask, without logging in.
+
+        And it must mean serving, not merely running: a process that is up but
+        not answering is what leaves a link going nowhere.
+        """
+        client = self.client("health")
+        response = client.get("/api/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+
     def test_the_version_check_needs_a_password(self):
         client = self.client("versionsec")
         self.assertEqual(client.get("/api/version").status_code, 401)

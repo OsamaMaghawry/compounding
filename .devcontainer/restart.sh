@@ -8,7 +8,8 @@
 # the start sees it still alive and quietly does nothing.
 set -uo pipefail
 
-PIDFILE=/workspaces/.reelforge.pid
+STATE="${REELFORGE_STATE:-/workspaces}"
+PIDFILE="$STATE/.reelforge.pid"
 here="$(cd "$(dirname "$0")" && pwd)"
 
 if [ -f "$PIDFILE" ]; then
@@ -29,4 +30,7 @@ if [ -f "$PIDFILE" ]; then
   rm -f "$PIDFILE"
 fi
 
+# Which version was serving before this restart, so that if the new one will not
+# start, there is something known-good to go back to.
+export REELFORGE_CAME_FROM="${REELFORGE_CAME_FROM:-$(git -C "$here/.." rev-parse HEAD@{1} 2>/dev/null || true)}"
 exec bash "$here/start.sh"

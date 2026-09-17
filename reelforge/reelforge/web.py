@@ -1247,6 +1247,17 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
 
     _version_seen: dict = {"at": 0.0, "behind": 0}
 
+    @app.get("/api/health")
+    def health() -> dict:
+        """Is the app actually serving? No password, because nothing is told.
+
+        Whatever starts this needs a plain yes or no. Without one it can only
+        guess from the fact that a process exists, and a process that is alive
+        but not answering is exactly the case worth catching - it is what leaves
+        a link that goes nowhere.
+        """
+        return {"ok": True}
+
     @app.get("/api/version", dependencies=[Depends(require_login)])
     def version(check: int = 0) -> dict:
         """What is running, and whether something newer is waiting.
@@ -1295,6 +1306,11 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
             raise HTTPException(status_code=409,
                                 detail="this copy was not installed from git, so it "
                                        "cannot update itself")
+        # Where we are now, so that if what arrives will not run, there is a
+        # known-good version to go back to. Read before the pull, not guessed
+        # from the reflog afterwards.
+        before = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                                capture_output=True, text=True).stdout.strip()
         # --ff-only: never invent a merge on a machine nobody is watching.
         pull = subprocess.run(["git", "-C", str(repo), "pull", "--ff-only"],
                               capture_output=True, text=True)
@@ -1312,7 +1328,11 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         def restart() -> None:
             # After the response has gone, because this kills the process serving it.
             time.sleep(1.0)
+            environment = dict(os.environ)
+            if before:
+                environment["REELFORGE_CAME_FROM"] = before
             subprocess.Popen(["bash", str(script)], start_new_session=True,
+                             env=environment,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         background.add_task(restart)
