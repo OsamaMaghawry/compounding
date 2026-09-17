@@ -32,8 +32,41 @@ wait_until_answering() {          # long enough to cover the retries below
 }
 
 install_deps() {
-  pip install -e ".[web,asr]" --quiet 2>/dev/null \
-    || pip install -e . --quiet --no-deps 2>/dev/null || true
+  # Three attempts, each one less than the last. The speech library is the big,
+  # fragile one; if it will not install, an app that runs and says so beats no
+  # app at all, because there is no terminal here to find out from.
+  pip install -e ".[web,asr]" --quiet 2>/dev/null && return 0
+  echo "the speech library would not install - installing the rest…"
+  pip install -e ".[web]" --quiet 2>/dev/null && return 0
+  pip install -e . --quiet --no-deps 2>/dev/null || true
+}
+
+# The one-time setup that runs when the Codespace is created can fail - an apt
+# mirror having a bad morning is enough - and it used to stop at the first error,
+# which meant ffmpeg failing took the install of ReelForge itself down with it.
+# The machine then came up with nothing to run and the link went nowhere. So
+# check here too: this runs on every start, and the check costs nothing.
+ensure_installed() {
+  # Asked from elsewhere on purpose. This script works inside the project
+  # folder, and from there Python finds the package sitting on disk whether it
+  # was ever installed or not - so asking here would always say yes.
+  if command -v reelforge >/dev/null 2>&1 \
+     && (cd / && python -c "import reelforge" 2>/dev/null); then
+    return 0
+  fi
+  echo "ReelForge is not installed on this machine yet - installing it…"
+  install_deps
+  command -v reelforge >/dev/null 2>&1 \
+    || echo "it could not be installed; the log will say why."
+}
+
+ensure_ffmpeg() {
+  command -v ffmpeg >/dev/null 2>&1 && return 0
+  echo "ffmpeg is missing - installing it…"
+  sudo apt-get update -qq 2>/dev/null || true
+  sudo apt-get install -y -qq --no-install-recommends ffmpeg 2>/dev/null || true
+  command -v ffmpeg >/dev/null 2>&1 \
+    || echo "ffmpeg is still missing - the app will run, but edits will fail."
 }
 
 # Pick up new code every time the machine starts, so the usual way to get an
@@ -97,6 +130,9 @@ if [ ! -f "$KEYS" ]; then
 fi
 # shellcheck disable=SC1090
 set -a; . "$KEYS"; set +a
+
+ensure_installed
+ensure_ffmpeg
 
 start_supervisor() {
   nohup bash "$repo/.devcontainer/serve.sh" >>"$LOG" 2>&1 &

@@ -151,6 +151,14 @@ Useful flags: `--no-zoom`, `--no-broll`, `--no-cuts`, `--no-captions` to turn of
 `--set zoom.max_factor=1.3` to override any setting, `--model small` for a faster/less
 accurate transcript.
 
+## Running it in a Codespace
+
+ReelForge lives on the branch `claude/ai-video-editor-reels-52docy`. Make the
+Codespace from that branch - the default branch of this repository does not
+contain the app, and a Codespace made from it has nothing to start and will
+never answer on port 8000. `docs/HOSTING.md` has the details and what to do when
+the link goes nowhere.
+
 ## Several takes, one video
 
 You do not shoot a Reel as one file. Pass every take and they are joined into one

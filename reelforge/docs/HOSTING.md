@@ -319,12 +319,32 @@ short one but never heavier.
 
 `404 - no webpage was found` on the forwarded address means nothing is listening
 on port 8000. It is not a problem with the link, and reloading will not fix it.
-Almost always the Codespace itself has stopped - it does that after thirty idle
-minutes, and a stopped machine cannot serve anything.
+There are two reasons, and they need different answers.
 
-**Open [github.com/codespaces](https://github.com/codespaces) and click the
-Codespace.** Starting it runs the setup again: it pulls the newest version,
-installs anything new, and starts the app. Then the link works. Nothing to type.
+**The Codespace is stopped.** It stops itself after thirty idle minutes, and a
+stopped machine serves nothing. Opening the forwarded link does not wake it -
+only opening the Codespace does. Go to
+[github.com/codespaces](https://github.com/codespaces) and click it. Starting it
+pulls the newest version, installs anything new and starts the app, and then the
+link works. Nothing to type.
+
+**The Codespace is on the wrong branch.** ReelForge lives on the branch
+`claude/ai-video-editor-reels-52docy`. The default branch of this repository has
+only an `index.html` in it - no app, no `.devcontainer`, nothing to start. A
+Codespace made the ordinary way is made from the default branch, so it comes up
+empty and the link 404s for ever, however many times you restart it.
+
+Make it from the branch instead:
+
+    https://github.com/OsamaMaghawry/compounding/tree/claude/ai-video-editor-reels-52docy
+
+then **Code → Codespaces → Create codespace on
+claude/ai-video-editor-reels-52docy**. If a Codespace is already open on the
+wrong branch, switching branches inside it and restarting works too.
+
+A quick way to tell which one you have: open the Codespace and look at the files.
+One `index.html` and nothing else means the wrong branch. `reelforge/` and
+`.devcontainer/` means the right one, and then it is the stopped case above.
 
 What no longer needs your attention:
 
@@ -336,6 +356,11 @@ What no longer needs your attention:
   terminal to fix it from. Now the new version has to answer before it is kept.
   If it does not, the machine goes back to the version that was working and
   starts that instead. `reelforge.log` beside your data records what happened.
+- **ReelForge was never installed.** The one-time setup could fail at its first
+  step - an unreachable package mirror was enough - and it used to stop there,
+  so the machine came up with nothing to run. Setup no longer gives up at the
+  first failure, and starting checks anyway and installs what is missing. If the
+  speech library is the part that will not install, the app still starts.
 
 `bash reelforge/tests/recovery_check.sh` exercises all three of those against a
 throwaway copy, if you want to see it for yourself.

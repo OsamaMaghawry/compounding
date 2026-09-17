@@ -3,4 +3,4 @@
 Everything runs on your machine. No upload, no server, no account.
 """
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"

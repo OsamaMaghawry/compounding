@@ -9,9 +9,10 @@
 # There is no terminal in the Codespace setup - there is a link, and the link
 # either works or it does not. So all three of these must fix themselves:
 #
-#   1. the machine starts     - the app comes up on its own
-#   2. the app is killed      - something starts it again
-#   3. an update will not run - the version that did run comes back
+#   1. the machine starts      - the app comes up on its own
+#   2. the app is killed       - something starts it again
+#   3. an update will not run  - the version that did run comes back
+#   4. it was never installed  - starting installs it
 #
 # The third is the dangerous one. An update that cannot start leaves a dead link
 # on a machine with no way to type a command, and nobody watching to notice.
@@ -79,3 +80,23 @@ else
 fi
 echo "--- what the log says about the rollback ---"
 grep -i "rolling back\|stopped after\|failed to start" "$REELFORGE_STATE/reelforge.log" | tail -4
+
+say "4. a machine where the one-time setup fell over, so nothing was installed"
+kill "$(cat "$REELFORGE_STATE/.reelforge.pid" 2>/dev/null)" 2>/dev/null
+rm -f "$REELFORGE_STATE/.reelforge.pid"
+sleep 1
+# A python of its own, and a PATH without this machine's own copy on it.
+python -m venv "$work/venv" >/dev/null
+export PATH="$work/venv/bin:/usr/bin:/bin"
+unset PYTHONPATH
+unset PIP_NO_INDEX          # this one genuinely has to reach the network
+echo "reelforge before: $(command -v reelforge || echo 'not installed')"
+if command -v reelforge >/dev/null 2>&1; then
+  echo "SKIP: a copy is still on the PATH, so this would prove nothing"
+else
+  bash "$work/repo/.devcontainer/start.sh" >"$work/start3.log" 2>&1
+  echo "reelforge after : $(command -v reelforge || echo 'not installed')"
+  echo "health: $(ask)"
+  [ -n "$(ask)" ] && echo "PASS: it installed itself and came up" \
+                  || { echo "FAIL"; tail -20 "$work/start3.log"; }
+fi
