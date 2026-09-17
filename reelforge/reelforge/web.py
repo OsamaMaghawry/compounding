@@ -42,9 +42,39 @@ try:
 except ImportError:                                  # the core tool works without it
     HAVE_FASTAPI = False
 
-VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi"}
+VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".3gp", ".3g2",
+                  ".mts", ".m2ts", ".mpg", ".mpeg", ".wmv", ".flv"}
+# Phone pickers sometimes hand over a clip with no extension at all, only a
+# type. The type is enough: ffmpeg reads the file by its contents, not its name.
+MIME_SUFFIXES = {"video/mp4": ".mp4", "video/quicktime": ".mov", "video/webm": ".webm",
+                 "video/x-matroska": ".mkv", "video/3gpp": ".3gp", "video/x-m4v": ".m4v",
+                 "video/mpeg": ".mpg", "video/x-msvideo": ".avi"}
 COOKIE = "reelforge_session"
-MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024      # 4 GB per job
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024      # 4 GB per clip; no limit on how many
+
+
+def clip_filename(name: str, content_type: str | None = None) -> str | None:
+    """The name a clip is stored under, or None if it is not a video at all.
+
+    The name decides whenever it can: a .txt or a .heic is not a video however
+    the browser labels it. The declared type is the fallback only for a name
+    with no extension at all, which is what some phone pickers hand over.
+    """
+    safe = Path(name).name
+    suffix = Path(safe).suffix.lower()
+    if suffix in VIDEO_SUFFIXES:
+        return safe
+    kind = (content_type or "").split(";")[0].strip().lower()
+    if not suffix and kind.startswith("video/"):
+        return safe + MIME_SUFFIXES.get(kind, ".mp4")
+    return None
+
+
+def clip_order(path: str | Path) -> tuple[int, str]:
+    """Clips are stored as NN-name; this puts them back in the order chosen."""
+    name = Path(path).name
+    head = name.split("-", 1)[0]
+    return (int(head) if head.isdigit() else 10 ** 6, name)
 
 
 # ---------------------------------------------------------------- look panel
@@ -498,6 +528,10 @@ class Job:
     def to_dict(self) -> dict:
         data = asdict(self)
         data["progress"] = self.progress[-40:]
+        # The clips by the names they were chosen under, so the page can tell
+        # which of a folder of takes are in and which are still missing.
+        data["clips"] = [Path(s).name.split("-", 1)[-1]
+                         for s in sorted(self.sources, key=clip_order)]
         return data
 
 
@@ -557,6 +591,22 @@ class JobStore:
         for key, value in changes.items():
             setattr(job, key, value)
         self.save(job)
+
+    def add_source(self, job: Job, path: str) -> list[str]:
+        """Record one finished clip, under the lock.
+
+        Reading the list, appending to it and writing it back is three steps. Two
+        clips finishing at once can interleave them and lose one - and a clip
+        that vanished after the browser said it arrived is the hardest kind of
+        missing to explain.
+        """
+        with self._lock:
+            if path not in job.sources:
+                job.sources = sorted([*job.sources, path], key=clip_order)
+            job.stage = f"{len(job.sources)} clip(s) uploaded"
+            job.heartbeat = time.time()
+            self.save(job)
+            return list(job.sources)
 
 
 class Runner:
@@ -1397,8 +1447,11 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         # An upload that failed leaves an empty edit behind. Clear the stale ones
         # rather than letting them pile up looking like real work.
         for job in store.list():
-            if (job.status == "uploading" and not job.sources
-                    and time.time() - job.created > 600):
+            # Idle since the last piece arrived, not since it was opened: a slow
+            # connection can take longer than this on its first clip, and the
+            # upload must not be pulled out from under it.
+            idle = time.time() - max(job.created, job.heartbeat)
+            if job.status == "uploading" and not job.sources and idle > 600:
                 store.delete(job.id)
         return [job.to_dict() for job in store.list()]
 
@@ -1426,9 +1479,13 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
         Small pieces always get through, and each one that does is progress kept.
         """
         job = job_or_404(job_id)
-        safe = Path(name).name
-        if Path(safe).suffix.lower() not in VIDEO_SUFFIXES:
-            raise HTTPException(status_code=400, detail=f"{safe} is not a video file")
+        if job.status != "uploading":
+            raise HTTPException(status_code=409, detail="this edit has already started")
+        safe = clip_filename(name, file.content_type)
+        if safe is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{Path(name).name} is not a video file (mp4, mov, mkv, webm, 3gp…)")
         if offset < 0 or index < 0:
             raise HTTPException(status_code=400, detail="bad chunk position")
 
@@ -1448,19 +1505,27 @@ def create_app(data_dir: str | Path = "data", password: str | None = None,
             handle.write(payload)
 
         done = str(final).lower() == "true"
-        if done and str(target) not in job.sources:
-            store.update(job, sources=[*job.sources, str(target)],
-                         stage=f"{len(job.sources) + 1} clip(s) uploaded")
+        # Every piece is a sign of life, so a slow upload is never mistaken for
+        # an abandoned one. Finished clips are kept in the order chosen, whatever
+        # order they happen to land in.
+        if done:
+            sources = store.add_source(job, str(target))
+        else:
+            store.update(job, heartbeat=time.time())
+            sources = job.sources
         return {"ok": True, "received": len(payload), "size": target.stat().st_size,
-                "complete": done}
+                "complete": done, "clips": len(sources)}
 
     @app.post("/api/jobs/{job_id}/start", dependencies=[Depends(require_login)])
     def start_job(job_id: str) -> dict:
         job = job_or_404(job_id)
         if not job.sources:
             raise HTTPException(status_code=400, detail="no clips were uploaded")
-        job.title = Path(job.sources[0]).stem.split("-", 1)[-1] or job.title
-        store.update(job, status="queued", stage="queued")
+        if job.status in ("queued", "working", "exporting"):
+            return job.to_dict()                 # a second press is not a second run
+        sources = sorted(job.sources, key=clip_order)
+        job.title = Path(sources[0]).stem.split("-", 1)[-1] or job.title
+        store.update(job, sources=sources, status="queued", stage="queued")
         runner.submit(job.id)
         return job.to_dict()
 
@@ -1981,8 +2046,11 @@ input[type=color]{height:44px;padding:4px}
       <span id="newVersionText"></span>
       <button id="updateNow" style="margin-top:8px">Update now</button>
     </div>
-    <div class="dim">Pick every take of one video. They are joined in the order chosen.</div>
-    <input type="file" id="files" accept="video/*" multiple>
+    <div class="dim">Pick every take of one video. They are joined in the order chosen.
+      There is no limit on how many — thirty short takes are as fine as one long one.</div>
+    <input type="file" id="files" multiple
+      accept="video/*,.mp4,.mov,.m4v,.mkv,.webm,.avi,.3gp,.3g2,.mts,.m2ts,.mpg,.mpeg">
+    <div class="dim" id="chosen" style="font-size:12px;margin:4px 0"></div>
     <select id="template"></select>
     <select id="model">
       <option value="small">small — a few minutes, good Arabic</option>
@@ -2054,9 +2122,16 @@ function postChunk(url, blob, fields){
   });
 }
 
+// A wrong file type is the one failure worth giving up on at once: retrying it
+// five times changes nothing, and the message already says what to do.
+const hopeless = m => /is not a video|too large|already started/.test(m);
+
 async function uploadFile(jobId, file, index, onProgress){
   // Send the clip in pieces. One failed piece is retried on its own, instead of
-  // losing a 150 MB upload and starting again.
+  // losing a 150 MB upload and starting again. Five tries, backing off to eight
+  // seconds: a phone on a lift or a train drops out for longer than one second,
+  // and giving up there is what turns a thirty-clip upload into a failed one.
+  if(file.size===0) throw new Error(`${file.name}: this file is empty`);
   for(let offset=0; offset<file.size; offset+=CHUNK){
     const slice=file.slice(offset, Math.min(offset+CHUNK, file.size));
     const last = offset+CHUNK >= file.size;
@@ -2068,12 +2143,40 @@ async function uploadFile(jobId, file, index, onProgress){
            final:last?'true':'false'});
         break;
       }catch(e){
-        if(++attempt>=3) throw new Error(`${file.name}: ${e.message}`);
-        await new Promise(r=>setTimeout(r, 1000*attempt));
+        if(hopeless(e.message) || ++attempt>=5) throw new Error(`${file.name}: ${e.message}`);
+        await new Promise(r=>setTimeout(r, 1000*Math.min(8, 2**(attempt-1))));
       }
     }
     onProgress(Math.min(offset+CHUNK, file.size)/file.size);
   }
+}
+
+const bytes = n => n > 1e9 ? (n/1e9).toFixed(1)+' GB'
+                : n > 1e6 ? Math.round(n/1e6)+' MB' : Math.max(1, Math.round(n/1e3))+' KB';
+const plain = t => String(t).replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const tell = (id, text) => { const el=$(id); if(el) el.textContent=text; };
+
+async function sendClips(jobId, items){
+  // Every clip is tried, and the ones that fail are handed back rather than
+  // taking the other twenty-nine down with them.
+  const total=items.reduce((n,it)=>n+it.file.size,0)||1;
+  const failed=[]; let done=0;
+  sending=true;
+  try{
+    for(const it of items){
+      try{
+        await uploadFile(jobId, it.file, it.index, frac=>{
+          const pct=Math.round(100*(done+frac*it.file.size)/total);
+          tell('msg', `sending ${it.file.name} — clip ${it.index+1} — `
+                     +`${pct}% of ${bytes(total)}`);
+        });
+      }catch(e){ failed.push({...it, why:e.message.replace(it.file.name+': ','')}); }
+      done+=it.file.size;
+    }
+  } finally { sending=false; }
+  return failed;
 }
 function show(authed){ $('login').hidden=authed; $('app').hidden=!authed;
   if(authed){loadTemplates();refresh();loadBroll();} }
@@ -2223,31 +2326,77 @@ $('model').onchange=()=>{
   $('modelNote').textContent = slow[$('model').value] || '';
 };
 
+$('files').onchange=()=>{
+  const files=[...$('files').files];
+  $('chosen').textContent = files.length
+    ? `${files.length} clip(s) chosen — ${bytes(files.reduce((n,f)=>n+f.size,0))}`
+    : '';
+  $('msg').textContent='';
+};
+
+async function startEdit(jobId){
+  await api(`/api/jobs/${jobId}/start`,{method:'POST'});
+  $('files').value=''; $('chosen').textContent=''; stalled=null;
+  current=jobId; drawn=''; listed=''; refresh();
+}
+
+// The clips that did not make it, kept so they can be sent again without
+// choosing thirty files a second time.
+let stalled=null;
+// True while bytes are going up. A poll that rebuilt the panel mid-upload would
+// throw away the chosen files and the line saying how far it had got.
+let sending=false;
+
+function offerRetry(jobId, arrived, failed){
+  stalled={jobId, items:failed};
+  $('msg').innerHTML=
+    `<b>${arrived} clip(s) arrived.</b> ${failed.length} did not:<br>`
+    + failed.map(f=>`<span class="dim">• ${plain(f.file.name)} — ${plain(f.why)}</span>`)
+            .join('<br>')
+    + `<div style="margin-top:8px"><button id="retryClips">Send those again</button>`
+    + (arrived ? ` <button class="ghost" id="startAnyway">Start without them</button>` : '')
+    + ` <button class="ghost" id="dropJob">Start over</button></div>`;
+  $('retryClips').onclick=async()=>{
+    $('retryClips').disabled=true;
+    const again=await sendClips(jobId, failed);
+    if(again.length) return offerRetry(jobId, arrived + failed.length - again.length, again);
+    tell('msg','all clips arrived — editing has started');
+    await startEdit(jobId);
+  };
+  if(arrived) $('startAnyway').onclick=async()=>{
+    $('msg').textContent=`starting with ${arrived} clip(s)`;
+    await startEdit(jobId);
+  };
+  $('dropJob').onclick=async()=>{
+    stalled=null;
+    try{ await api('/api/jobs/'+jobId,{method:'DELETE'}); }catch(_){}
+    $('msg').textContent='cleared — choose the clips again';
+    listed=''; refresh();
+  };
+}
+
 $('upload').onclick=async()=>{
   const files=[...$('files').files];
   if(!files.length){ $('msg').textContent='choose at least one video'; return; }
-  const total=files.reduce((n,f)=>n+f.size,0);
   $('upload').disabled=true;
   let job=null;
   try{
     job=await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({template:$('template').value, model:$('model').value,
                            title:files[0].name.replace(/\.[^.]+$/,'')})});
-    let done=0;
-    for(let i=0;i<files.length;i++){
-      const f=files[i];
-      await uploadFile(job.id, f, i, frac=>{
-        const pct=Math.round(100*(done+frac*f.size)/total);
-        $('msg').textContent=`uploading ${i+1} of ${files.length} — ${f.name} — ${pct}%`;
-      });
-      done+=f.size;
+    const items=files.map((file,index)=>({file,index}));
+    const failed=await sendClips(job.id, items);
+    if(failed.length){
+      // Twenty-nine clips that arrived are not rubbish because the thirtieth
+      // did not. They stay on the machine, and only the missing ones go again.
+      offerRetry(job.id, files.length-failed.length, failed);
+      return;
     }
-    $('msg').textContent='uploaded — editing has started';
-    await api(`/api/jobs/${job.id}/start`,{method:'POST'});
-    $('files').value=''; current=job.id; drawn=''; listed=''; refresh();
+    tell('msg','uploaded — editing has started');
+    await startEdit(job.id);
   }catch(e){
     $('msg').textContent='error: '+e.message;
-    // Do not leave a half-made edit sitting in the list.
+    // Nothing arrived at all, so there is no half-made edit worth keeping.
     if(job) { try{ await api('/api/jobs/'+job.id,{method:'DELETE'}); refresh(); }catch(_){} }
   }
   finally{ $('upload').disabled=false; }
@@ -2337,6 +2486,9 @@ async function draw(job){
   const sig=[job.id,job.status,job.stage,job.output_name,
              JSON.stringify(job.summary||{}),(job.progress||[]).length].join('|');
   if(sig===drawn) return;
+  // Each clip that lands changes the stage line. Redrawing on that would empty
+  // the file picker halfway through adding the rest of them.
+  if(sending) return;
   // Rebuilding throws away the video position, the selection on the timeline and
   // anything tried but not saved. A poll arriving mid-edit must not do that, so
   // while there is work on screen the panel stays exactly as it is.
@@ -2349,6 +2501,20 @@ async function draw(job){
     // The clips are still here. A render cut off by an idle timeout should cost
     // a button, not another upload.
     if((job.sources||[]).length) html+=`<button id="retry">Try again</button>`;
+  }
+  if(job.status==='uploading'){
+    // An upload cut off by a locked phone or a closed tab leaves the clips that
+    // did arrive sitting here. Without this they were unreachable: not an error,
+    // so no "Try again", and not started, so nothing to open. Pick the upload up
+    // where it stopped, or go with what arrived.
+    const got=(job.clips||[]);
+    html+=`<div class="dim">${got.length} clip(s) arrived before the upload stopped:</div>
+      <div class="dim" style="font-size:12px;margin:4px 0">${got.map(plain).join(', ')||'none'}</div>
+      <input type="file" id="moreFiles" multiple
+        accept="video/*,.mp4,.mov,.m4v,.mkv,.webm,.avi,.3gp,.3g2,.mts,.m2ts,.mpg,.mpeg">
+      <button id="addMore">Add the rest</button>
+      ${got.length?`<button class="ghost" id="startWith">Start with these ${got.length}</button>`:''}
+      <div id="moreMsg"></div>`;
   }
   if(job.status==='working'||job.status==='queued'||job.status==='exporting'){
     html+=`<div class="dim">${job.stage}…</div>
@@ -2413,6 +2579,29 @@ async function draw(job){
     try{ await api('/api/jobs/'+job.id+'/stop',{method:'POST'});
          drawn=''; listed=''; refresh(); }
     catch(e){ stop.textContent='error: '+e.message; stop.disabled=false; }
+  };
+
+  const addMore=$('addMore');
+  if(addMore) addMore.onclick=async()=>{
+    const more=[...$('moreFiles').files];
+    if(!more.length){ tell('moreMsg','choose the clips that are missing'); return; }
+    addMore.disabled=true;
+    // Numbered on from what is already here, so the new ones follow rather than
+    // overwriting a clip that arrived.
+    const from=(job.clips||[]).length;
+    const failed=await sendClips(job.id, more.map((file,i)=>({file, index:from+i})));
+    addMore.disabled=false;
+    tell('moreMsg', failed.length
+      ? `${more.length-failed.length} added, ${failed.length} still failing: ${failed[0].why}`
+      : 'added — press start');
+    drawn=''; listed=''; refresh();
+  };
+
+  const startWith=$('startWith');
+  if(startWith) startWith.onclick=async()=>{
+    startWith.disabled=true; startWith.textContent='starting…';
+    try{ await startEdit(job.id); }
+    catch(e){ startWith.textContent='error: '+e.message; startWith.disabled=false; }
   };
 
   const retry=$('retry');

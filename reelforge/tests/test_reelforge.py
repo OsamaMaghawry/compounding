@@ -1527,6 +1527,21 @@ class JoinRenderTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
+    def test_an_unreadable_clip_is_named(self):
+        """Out of thirty takes, say which one is broken.
+
+        "joining failed" sends you through thirty files by hand. The name is the
+        whole fix: remove that one and go again.
+        """
+        from reelforge.ffmpeg import FFmpegError
+        from reelforge.join import join_clips
+        broken = Path(self.tmp) / "07-IMG_4093.mp4"
+        broken.write_bytes(b"not really a video")
+        with self.assertRaises(FFmpegError) as caught:
+            join_clips([self.portrait, broken], Path(self.tmp) / "out.mp4")
+        self.assertIn("IMG_4093.mp4", str(caught.exception))
+        self.assertIn("cannot be read", str(caught.exception))
+
     def test_mismatched_clips_join_into_one_continuous_file(self):
         from reelforge.ffmpeg import probe
         from reelforge.join import join_clips
@@ -2517,6 +2532,149 @@ class WebAppTests(unittest.TestCase):
         sources = self.app.state.store.get(job_id).sources
         self.assertEqual([Path(s).name.split("-", 1)[1] for s in sources],
                          [Path(self.clip_b).name, Path(self.clip_a).name])
+
+    def test_many_short_clips_all_arrive_and_keep_their_order(self):
+        """Thirty five-second takes, which is how a phone shoot actually looks.
+
+        There is no limit on how many clips an edit may have, and there never
+        was one in the code - but "it does not upload" had to be answered with a
+        number, not an opinion. Thirty of them, in the order chosen, is the
+        answer. The order matters past nine, where 10- sorts before 2- as text.
+        """
+        client = self.client("many")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        data = Path(self.clip_a).read_bytes()
+        for index in range(30):
+            response = client.post(
+                f"/api/jobs/{job_id}/chunk",
+                data={"name": f"IMG_{1000 + index}.mp4", "index": str(index),
+                      "offset": "0", "final": "true"},
+                files={"file": (f"IMG_{1000 + index}.mp4", data, "video/mp4")})
+            self.assertEqual(response.status_code, 200, response.text)
+
+        sources = client.get(f"/api/jobs/{job_id}").json()["sources"]
+        self.assertEqual(len(sources), 30)
+        self.assertEqual([Path(s).name.split("-", 1)[1] for s in sources],
+                         [f"IMG_{1000 + i}.mp4" for i in range(30)])
+        # And the page is told the names it chose, not the numbered files.
+        self.assertEqual(client.get(f"/api/jobs/{job_id}").json()["clips"][9],
+                         "IMG_1009.mp4")
+
+    def test_clips_land_in_the_chosen_order_even_if_they_finish_out_of_order(self):
+        """A retried clip finishes last but belongs where it was chosen."""
+        client = self.client("outoforder")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        data = Path(self.clip_a).read_bytes()
+        for index in (2, 0, 1):
+            client.post(f"/api/jobs/{job_id}/chunk",
+                        data={"name": f"take{index}.mp4", "index": str(index),
+                              "offset": "0", "final": "true"},
+                        files={"file": (f"take{index}.mp4", data, "video/mp4")})
+        self.assertEqual(client.get(f"/api/jobs/{job_id}").json()["clips"],
+                         ["take0.mp4", "take1.mp4", "take2.mp4"])
+
+    def test_more_phone_formats_are_accepted(self):
+        """A phone does not always hand over an .mp4.
+
+        Older Androids write .3gp, camcorders write .mts, and some pickers hand
+        over a name with no extension at all - only a type. Rejecting those read
+        as "it does not upload", which is exactly what it was.
+        """
+        client = self.client("formats")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        data = Path(self.clip_a).read_bytes()
+        for index, (name, kind) in enumerate([("clip.3gp", "video/3gpp"),
+                                              ("clip.MTS", "video/mp2t"),
+                                              ("IMG_4021", "video/quicktime")]):
+            response = client.post(
+                f"/api/jobs/{job_id}/chunk",
+                data={"name": name, "index": str(index), "offset": "0", "final": "true"},
+                files={"file": (name, data, kind)})
+            self.assertEqual(response.status_code, 200, f"{name}: {response.text}")
+        self.assertEqual(client.get(f"/api/jobs/{job_id}").json()["clips"],
+                         ["clip.3gp", "clip.MTS", "IMG_4021.mov"])
+
+    def test_a_slow_upload_is_not_swept_away_underneath_itself(self):
+        """The stale-job sweep must not delete the upload it is watching.
+
+        The sweep cleared any upload with no finished clip that was more than
+        ten minutes old. Thirty clips over a phone connection takes longer than
+        that, and the first one is not finished until it is finished - so the
+        job vanished mid-upload and every later chunk got a 404. That is the
+        bug behind "around 30 videos but it doesn't upload".
+        """
+        client = self.client("slowup")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        job = self.app.state.store.get(job_id)
+        data = Path(self.clip_a).read_bytes()
+        half = len(data) // 2
+        client.post(f"/api/jobs/{job_id}/chunk",
+                    data={"name": "a.mp4", "index": "0", "offset": "0", "final": "false"},
+                    files={"file": ("a.mp4", data[:half], "video/mp4")})
+
+        job.created = time.time() - 3600          # opened an hour ago, still sending
+        self.app.state.store.save(job)
+        self.assertIn(job_id, [j["id"] for j in client.get("/api/jobs").json()])
+
+        rest = client.post(f"/api/jobs/{job_id}/chunk",
+                           data={"name": "a.mp4", "index": "0", "offset": str(half),
+                                 "final": "true"},
+                           files={"file": ("a.mp4", data[half:], "video/mp4")})
+        self.assertEqual(rest.status_code, 200, rest.text)
+        self.assertEqual(len(self.app.state.store.get(job_id).sources), 1)
+
+    def test_an_upload_abandoned_without_a_single_clip_is_still_cleared(self):
+        client = self.client("abandoned")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        job = self.app.state.store.get(job_id)
+        job.created = job.heartbeat = time.time() - 3600
+        self.app.state.store.save(job)
+        self.assertNotIn(job_id, [j["id"] for j in client.get("/api/jobs").json()])
+
+    def test_two_clips_finishing_at_once_do_not_lose_one(self):
+        """Read, append, write is three steps, and two clips can interleave them.
+
+        A clip that disappears after the browser said it arrived is the worst
+        kind of missing: nothing failed, the count is just wrong.
+        """
+        client = self.client("race")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        data = Path(self.clip_a).read_bytes()[:4096]
+
+        def send(index):
+            client.post(f"/api/jobs/{job_id}/chunk",
+                        data={"name": f"r{index}.mp4", "index": str(index),
+                              "offset": "0", "final": "true"},
+                        files={"file": (f"r{index}.mp4", data, "video/mp4")})
+
+        import threading
+        threads = [threading.Thread(target=send, args=(i,)) for i in range(12)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(client.get(f"/api/jobs/{job_id}").json()["clips"],
+                         [f"r{i}.mp4" for i in range(12)])
+
+    def test_a_late_chunk_cannot_land_on_a_running_edit(self):
+        """Writing into the clips of an edit that is already being cut."""
+        client = self.client("late")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        client.post(f"/api/jobs/{job_id}/chunk",
+                    data={"name": "a.mp4", "index": "0", "offset": "0", "final": "true"},
+                    files={"file": ("a.mp4", Path(self.clip_a).read_bytes(), "video/mp4")})
+        self.assertEqual(client.post(f"/api/jobs/{job_id}/start").status_code, 200)
+        late = client.post(f"/api/jobs/{job_id}/chunk",
+                           data={"name": "b.mp4", "index": "1", "offset": "0", "final": "true"},
+                           files={"file": ("b.mp4", b"x" * 100, "video/mp4")})
+        self.assertEqual(late.status_code, 409)
 
     def test_a_clip_arrives_intact_when_sent_in_pieces(self):
         client = self.client("chunks")

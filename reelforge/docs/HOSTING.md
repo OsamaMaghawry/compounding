@@ -283,6 +283,31 @@ The one exception is **uploading**: those bytes come from the browser, so closin
 the tab mid-upload does stop that. Once the clips are up and the edit has started,
 the browser has no part in it.
 
+## How many clips
+
+As many as you like. There is no limit on the number of takes in one edit -
+thirty five-second clips are as ordinary as one long one, and they are joined in
+the order you chose them. The only ceiling is **4 GB per clip**, which no phone
+take reaches.
+
+If some of them do not arrive, the ones that did are kept. You get the list of
+what failed and why, and three buttons: **Send those again**, which re-sends only
+the missing ones, **Start without them**, and **Start over**. Nothing you have
+already uploaded is thrown away because the last file went wrong.
+
+An upload cut off by a locked phone or a closed tab leaves its edit in the list
+marked *uploading*. Open it and it says which clips arrived, takes the rest, and
+starts. The clips already on the machine are not sent twice.
+
+Two things are refused rather than half-accepted:
+
+- A file that is not a video. Photos and screenshots belong in the b-roll library,
+  not in the takes. `.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`, `.avi`, `.3gp`, `.mts`
+  and a few more are accepted, in any capitalisation; a picker that hands over a
+  name with no extension at all is accepted on the type it declares.
+- A clip that cannot be read as video at all. Joining says which one by name, so
+  one bad file out of thirty is a file to remove, not a search.
+
 ## Leaving and coming back
 
 Everything saves itself as you go, to whatever `--data` points at - `/workspaces/data`

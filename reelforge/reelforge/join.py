@@ -118,7 +118,16 @@ def join_clips(paths: list[str | Path], dest: str | Path, *, preset: str = "supe
     if len(sources) == 1:
         return sources[0]
 
-    infos = [probe(path) for path in sources]
+    # Name the clip that cannot be read. One unreadable take out of thirty is a
+    # file to remove, not a mystery to debug - so say which one it is.
+    infos = []
+    for path in sources:
+        try:
+            infos.append(probe(path))
+        except FFmpegError as exc:
+            raise FFmpegError(
+                f"{path.name.split('-', 1)[-1]} cannot be read as video - remove that "
+                f"clip and try again ({exc})") from exc
     width, height, fps, audio_rate = target_shape(infos, max_height=max_height)
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)

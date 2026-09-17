@@ -170,6 +170,13 @@ everything.
 Order is as you typed it; `--order name` or `--order time` sorts instead. Wildcards are
 expanded by ReelForge itself, because PowerShell does not expand them for you.
 
+There is no limit on how many takes go into one edit — thirty short clips are as
+ordinary as one long one. In the web app they are sent one at a time, so a clip that
+fails costs that clip and not the other twenty-nine: you are told which ones did not
+arrive and can send just those again, start without them, or pick the upload up later
+from the edit itself. A file that cannot be read as video is named, so one bad take out
+of thirty is a file to remove rather than a search.
+
 ## Engagement effects
 
 **Captions never get typed by you.** Your voice is transcribed automatically with per-word
