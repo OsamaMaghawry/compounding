@@ -2758,6 +2758,58 @@ console.log(JSON.stringify({
         self.assertIsInstance(body["behind"], int)
         self.assertEqual(client.get("/api/version").status_code, 200)
 
+    def test_a_clip_is_only_complete_once_every_piece_is_in(self):
+        """The finishing flag must not overtake the pieces it finishes.
+
+        Pieces go up several at a time now, so whichever one carried "that was
+        the last" could arrive before the ones in front of it - and the clip
+        would be recorded as complete with holes in it, which surfaces much
+        later as footage that will not decode. The flag travels on its own,
+        after everything else has landed.
+        """
+        client = self.client("finish")
+        self.login(client)
+        job_id = client.post("/api/jobs", json={"template": "", "model": "small"}).json()["id"]
+        data = Path(self.clip_a).read_bytes()
+        piece = len(data) // 3
+
+        # Out of order, none of them claiming to be the last.
+        for offset in (piece, 0, 2 * piece):
+            body = data[offset:offset + piece] if offset < 2 * piece else data[2 * piece:]
+            response = client.post(
+                f"/api/jobs/{job_id}/chunk",
+                data={"name": "a.mp4", "index": "0", "offset": str(offset), "final": "false"},
+                files={"file": ("a.mp4", body, "video/mp4")})
+            self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(client.get(f"/api/jobs/{job_id}").json()["clips"], [],
+                         "it counted the clip before it was finished")
+
+        # Then the flag on its own, with nothing to write.
+        done = client.post(f"/api/jobs/{job_id}/chunk",
+                           data={"name": "a.mp4", "index": "0", "offset": str(len(data)),
+                                 "final": "true"},
+                           files={"file": ("a.mp4", b"", "video/mp4")})
+        self.assertEqual(done.status_code, 200, done.text)
+        self.assertEqual(client.get(f"/api/jobs/{job_id}").json()["clips"], ["a.mp4"])
+
+        landed = Path(self.app.state.store.get(job_id).sources[0])
+        self.assertEqual(landed.read_bytes(), data, "the clip did not arrive intact")
+
+    def test_leaving_an_empty_choice_alone_is_not_a_change(self):
+        """"Nothing chosen" has two spellings, and they must agree.
+
+        A select whose default option is empty posts "", and the override
+        machinery turns that into None on the way in. Read as a change, the
+        first Apply pins the control against the template for ever - so the
+        template quietly stops meaning anything for that setting.
+        """
+        from reelforge.web import _differs
+        self.assertFalse(_differs(None, ""))
+        self.assertFalse(_differs("", None))
+        self.assertFalse(_differs(None, None))
+        self.assertTrue(_differs("source", ""))      # a real choice still counts
+        self.assertTrue(_differs("", "source"))
+
     def test_health_answers_without_a_password(self):
         """What keeps the app alive has to be able to ask, without logging in.
 

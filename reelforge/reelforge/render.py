@@ -255,6 +255,14 @@ class Renderer:
             width, height = _even(width / 2), _even(height / 2)
 
         budget = float(self.profile.get("output.zoom_headroom"))
+        # Never ask for more picture than the footage has. The canvas is
+        # oversized so a push-in is a crop rather than a blow-up, but when the
+        # export is already as big as the source there is nothing above it to
+        # crop from - and enlarging the whole take to pretend otherwise would
+        # cost minutes an export and add not one real detail.
+        if info.width and info.height:
+            room = min(info.width / max(width, 1), info.height / max(height, 1))
+            budget = max(1.0, min(budget, room))
         zooms = edl.active_zooms()
         transitions = edl.active_transitions()
         held = max([z.end_factor for z in zooms] + [z.start_factor for z in zooms] + [1.0])

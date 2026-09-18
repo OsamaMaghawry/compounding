@@ -13,6 +13,7 @@ from .analysis import Analysis, Interval
 from .broll import BrollLibrary
 from .captions import CaptionLine, group_words
 from .edl import EDL, Cut, Overlay, Timeline, Transition, Zoom, build_timeline
+from .profile import resolve_output
 from .speech import Transcript, Word, drop_repeated_words, enforce_order
 
 
@@ -446,6 +447,9 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
               *, library: BrollLibrary | None = None, scorer=None,
               weights: dict[str, float] | None = None) -> EDL:
     """Run the whole decision pass and return an inspectable edit."""
+    # Settled here, against the footage that is actually in hand, and written on
+    # the edit - so the renderer aims at the same thing the join kept room for.
+    out_width, out_height = resolve_output(profile, analysis.width, analysis.height)
     cuts = plan_cuts(analysis, transcript, profile)
     label_cuts(cuts, transcript)
     timeline = Timeline(cuts)
@@ -476,8 +480,8 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
     return EDL(
         source=source,
         output={
-            "width": int(profile.get("output.width")),
-            "height": int(profile.get("output.height")),
+            "width": out_width,
+            "height": out_height,
             "fps": int(profile.get("output.fps")),
             # How much picture is kept beyond the frame for pushing in. The
             # browser needs it too: it draws the same motion live, and a punch

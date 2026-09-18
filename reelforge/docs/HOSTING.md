@@ -234,6 +234,27 @@ minute, barely leaves the wide shot, and takes a slow beat to do it. So if the
 motion is not what you want, the style is the first thing to change, not the
 numbers.
 
+## Making it faster
+
+The things that actually cost time, in order:
+
+1. **Joining the takes.** On 4K this is minutes, and it is entirely avoidable:
+   set Export size to **Match the footage** and the takes are copied end to end
+   instead of being re-encoded. See the table below.
+2. **Transcribing.** Depends on the model, not the picture - `small` is minutes,
+   `large-v3` can be ten to twenty minutes per minute of talking on a machine
+   with no graphics card. 4K makes no difference here at all; it only listens.
+3. **The export.** Four times the pixels is roughly four times the encode.
+   Encoding effort trades that against file size.
+4. **Uploading.** Pieces now go up three at a time rather than one after
+   another, so the connection is not idle waiting for a round trip on each one.
+   On a phone that is most of the time.
+
+What does *not* help: recording at 4K for a Reel that will be watched at 1080 on
+a phone. It costs upload time, disk and export time for detail the platform
+re-compresses away. Record 4K when you intend to crop or push in hard and want
+the pixels; record 1080 otherwise.
+
 ## Quality: what you watch, and what you get
 
 They are not the same file, on purpose.
@@ -248,6 +269,41 @@ judge the picture on the download.
 **What you download** is re-encoded, not copied: 1080x1920 at 30 frames a second,
 H.264 at quality 20, audio AAC at 192 kbps. Those are the `output` settings in
 the profile - `width`, `height`, `fps`, `crf` and `audio_bitrate`.
+
+### Choosing what you get
+
+In the Look panel under **Quality**:
+
+- **Export size** — 1080x1920, 1440x2560, 2160x3840, or **Match the footage**,
+  which keeps whatever the footage has and throws nothing away.
+- **Picture quality** — 20 by default. 17 is close to untouched and makes a much
+  bigger file; 24 is noticeably softer.
+- **Encoding effort** — slower squeezes the same quality into a smaller file. It
+  changes how long the export takes, not how it looks.
+
+Change it before uploading (save it as your default) or afterwards. Changing it
+afterwards is handled properly: asking for a bigger export than the working copy
+holds goes back to your original takes and rebuilds from them, because enlarging
+a copy that has already been shrunk is a bigger file with nothing more in it.
+
+**Match the footage is also the fastest.** Three 4K takes, measured end to end:
+
+| Export size | Working copy | You download | File | Takes re-encoded to join? |
+|---|---|---|---|---|
+| 1080 x 1920 | 1458x2592 | 1080x1920 | 4.1 MB | yes |
+| 1440 x 2560 | 1944x3456 | 1440x2560 | 8.1 MB | yes |
+| Match the footage | 2160x3840 | 2160x3840 | 30.5 MB | **no - copied** |
+
+The reason is worth knowing, because it is the whole trick to a fast 4K edit.
+Takes shot back to back on one phone already match each other exactly, so they
+can be laid end to end without re-encoding a single frame. Asking for a smaller
+export breaks that: every take has to be resized first, and resizing means
+decoding and encoding all of it. Ask for the footage's own size and that step
+disappears.
+
+So the fast path and the no-loss path are the same path. What it costs is file
+size - a 4K minute is several hundred megabytes - and a slightly longer export,
+since there are four times the pixels to encode at the end.
 
 ### Where 4K loses its pixels
 
@@ -272,6 +328,8 @@ have shown is thrown away - only what it could not.
 
 The rest:
 
+- **Match the footage** removes the cap entirely: the working copy is the
+  footage, and nothing is thrown away at any point.
 - Shot at 1080p: essentially the same picture, re-encoded once.
 - Nothing is ever encoded twice at full quality. The joined timeline is an
   intermediate at a higher quality than the export, and the export is made from

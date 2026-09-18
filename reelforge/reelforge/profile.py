@@ -25,6 +25,10 @@ DEFAULTS: dict[str, Any] = {
         "crf": 20,
         "audio_bitrate": "192k",
         "zoom_headroom": 1.35,     # render canvas oversize so punch-ins stay sharp
+        # What size to export. Empty means the width and height above. "source"
+        # keeps the footage's own detail; a number is the height to aim for.
+        "size": "",                # "" | 1440 | 2160 | source
+        "max_height": 3840,        # a ceiling, so odd footage cannot run away
     },
 
     "reframe": {
@@ -218,6 +222,47 @@ def _load_mapping(path: Path) -> dict:
             "or use a .json profile instead."
         ) from exc
     return yaml.safe_load(text) or {}
+
+
+def _even(value: float) -> int:
+    return max(2, int(round(value / 2.0)) * 2)
+
+
+def resolve_output(profile, source_width: int = 0, source_height: int = 0) -> tuple[int, int]:
+    """The size to export at, given the footage.
+
+    Kept in one place because two steps need the same answer before the edit
+    exists: joining the takes has to know how much picture to keep, and the
+    renderer has to know what it is aiming at. If they disagreed, the join would
+    throw away detail the export was still asking for.
+    """
+    width = int(profile.get("output.width"))
+    height = int(profile.get("output.height"))
+    choice = str(profile.get("output.size") or "").strip().lower()
+    if not choice:
+        return width, height
+
+    ceiling = int(profile.get("output.max_height") or 3840)
+    shape = width / height if height else 9 / 16      # 0.5625 for a 9:16 frame
+
+    if choice == "source":
+        if not source_width or not source_height:
+            return width, height          # nothing known yet; decide later
+        # How much picture the vertical frame can actually take from this
+        # footage. A landscape take cropped to 9:16 is only as wide as its own
+        # height allows, and claiming its full width would be an upscale of a
+        # crop that never had those pixels.
+        across = min(source_width, source_height * shape)
+    else:
+        try:
+            across = float(choice)
+        except ValueError:
+            return width, height
+
+    tall = across / shape if shape else across
+    if tall > ceiling:                                # keep the shape, obey the cap
+        tall, across = ceiling, ceiling * shape
+    return _even(across), _even(tall)
 
 
 class StyleProfile:

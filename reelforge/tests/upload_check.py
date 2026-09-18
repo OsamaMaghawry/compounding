@@ -108,6 +108,34 @@ with sync_playwright() as pw:
     print("both edits      :", two)
     assert sorted(n for n, _ in two) == [2, CLIPS], two
 
+    # -- a clip big enough to go in several pieces, sent at once ---------
+    import hashlib
+    big = tmp / "LONG_TAKE.mp4"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-f", "lavfi", "-i", "testsrc2=size=1080x1920:rate=30:duration=25",
+        "-f", "lavfi", "-i", "sine=frequency=220:duration=25",
+        "-map", "0:v", "-map", "1:a", "-pix_fmt", "yuv420p",
+        "-c:v", "libx264", "-preset", "ultrafast", "-b:v", "8M",
+        "-c:a", "aac", str(big)], check=True, capture_output=True)
+    pieces = -(-big.stat().st_size // (6 * 1024 * 1024))
+    print(f"big take        : {big.stat().st_size/1e6:.0f} MB, {pieces} pieces")
+    assert pieces >= 3, "make it bigger or this proves nothing about sending several at once"
+
+    page.set_input_files("#files", [str(big)])
+    page.click("#upload")
+    page.wait_for_function(
+        "document.getElementById('msg').textContent.includes('editing has started')",
+        timeout=300000)
+    landed = poll(lambda: page.evaluate(
+        "fetch('/api/jobs').then(r=>r.json()).then(j=>j.filter(x=>x.clips.length===1).length)"),
+        lambda n: n >= 1)
+    on_disk = sorted((tmp / "data" / "jobs").rglob("*LONG_TAKE.mp4"))
+    assert on_disk, "the big take never landed"
+    same = hashlib.sha256(on_disk[0].read_bytes()).hexdigest() == \
+           hashlib.sha256(big.read_bytes()).hexdigest()
+    print(f"arrived intact  : {same} ({on_disk[0].stat().st_size/1e6:.0f} MB)")
+    assert same, "the pieces did not reassemble into the same file"
+
     # -- an upload cut off halfway can be picked up again ----------------
     cut = page.evaluate("""() => fetch('/api/jobs', {method:'POST',
         headers:{'Content-Type':'application/json'},

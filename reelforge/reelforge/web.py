@@ -140,6 +140,27 @@ LOOK_FIELDS: list[dict] = [
     {"group": "Captions", "key": "captions.emphasis_color", "label": "Important-word colour",
      "type": "color"},
 
+    {"group": "Quality", "key": "output.size", "label": "Export size", "type": "select",
+     "help": "What you download. The player always streams a small copy so "
+             "editing stays instant - this is the finished file, not the preview.",
+     "options": [
+         ("", "1080 x 1920 — standard for Reels"),
+         ("1440", "1440 x 2560 — sharper, larger file"),
+         ("2160", "2160 x 3840 — 4K"),
+         ("source", "Match the footage — keep everything it has"),
+     ]},
+    {"group": "Quality", "key": "output.crf", "label": "Picture quality",
+     "type": "number", "min": 14, "max": 30, "step": 1,
+     "help": "Lower keeps more detail and makes a bigger file. 20 is the "
+             "default, 17 is close to untouched, 24 is noticeably softer."},
+    {"group": "Quality", "key": "output.preset", "label": "Encoding effort", "type": "select",
+     "help": "Slower squeezes the same quality into a smaller file. It changes "
+             "how long the export takes, not how it looks.",
+     "options": [
+         ("veryfast", "Fast — the default"),
+         ("medium", "Medium — smaller file, slower"),
+         ("slow", "Slow — smallest file"),
+     ]},
     {"group": "Motion", "key": "zoom.enabled", "label": "Punch in while speaking",
      "type": "bool"},
     {"group": "Motion", "key": "zoom.rate_per_min", "label": "Moves per minute",
@@ -491,6 +512,12 @@ def _differs(new: object, old: object) -> bool:
     anything. Colours come back from the browser lower-cased and numbers as
     floats, neither of which is a change.
     """
+    # "Nothing chosen" has two spellings. A select whose default option is empty
+    # posts "", and the override machinery turns that into None on the way in -
+    # so without this, leaving such a control alone reads as changing it, and
+    # the first Apply pins it against the template for ever.
+    if new in (None, "") and old in (None, ""):
+        return False
     if isinstance(new, str) and isinstance(old, str):
         return new.strip().lower() != old.strip().lower()
     if (isinstance(new, (int, float)) and isinstance(old, (int, float))
@@ -853,20 +880,7 @@ class Runner:
                     f"{clip.name.split('-', 1)[-1]} cannot be read as video - remove "
                     f"that clip and try again ({str(exc).splitlines()[-1][:120]})") from exc
 
-        if len(clips) > 1:
-            from .join import join_clips  # noqa: PLC0415
-            source = join_clips(clips, editor.work_dir / "joined.mp4",
-                                max_height=int(profile.get("output.height")
-                                               * float(profile.get("output.zoom_headroom"))),
-                                on_status=note,
-                                # Joining is the longest step on phone footage and
-                                # said nothing while it ran, so the page called it
-                                # stuck when it was working perfectly well.
-                                on_fraction=lambda f: self.beat(job, percent=2 + 8 * f),
-                                owner=self._owner(job))
-        else:
-            source = clips[0]
-
+        source = self._prepare(job, profile, editor, note)
         self.store.update(job, prepared=str(source))
         note("preparing the footage for playback")
         self._ensure_proxy(job, source)
@@ -1001,6 +1015,36 @@ class Runner:
         return {"edl": result.edl.to_dict(), "summary": result.edl.summary(),
                 "look": profile.section("captions")}
 
+    def _prepare(self, job: Job, profile, editor, note) -> Path:
+        """The one file the edit is made from, at the size the export wants.
+
+        How much picture to keep is the export's decision, so this has to be
+        asked again whenever that changes. Ask for the footage's own size and
+        nothing is thrown away - and the takes then usually need no re-encoding
+        at all, which is the slow step on 4K. Joining remembers what it already
+        made, so asking again when nothing changed costs a file read.
+        """
+        from .ffmpeg import probe  # noqa: PLC0415
+        from .join import join_clips  # noqa: PLC0415
+        from .profile import resolve_output  # noqa: PLC0415
+
+        clips = [Path(p) for p in job.sources if Path(p).exists()]
+        if not clips:
+            raise RuntimeError("this edit is no longer loaded - upload it again")
+        if len(clips) == 1:
+            return clips[0]
+
+        first = probe(clips[0])
+        _, want = resolve_output(profile, first.width, first.height)
+        keep = int(want * float(profile.get("output.zoom_headroom")))
+        return join_clips(clips, editor.work_dir / "joined.mp4", max_height=keep,
+                          on_status=note,
+                          # Joining is the longest step on phone footage and said
+                          # nothing while it ran, so the page called it stuck when
+                          # it was working perfectly well.
+                          on_fraction=lambda f: self.beat(job, percent=2 + 8 * f),
+                          owner=self._owner(job))
+
     def _replan(self, job: Job, *, render: bool = True) -> None:
         """Re-decide the edit with new look settings.
 
@@ -1010,10 +1054,6 @@ class Runner:
         checkboxes - a different rate gives you different moves, so there is
         nothing for the old ticks to attach to.
         """
-        source = Path(job.prepared) if job.prepared else None
-        if not source or not source.exists():
-            raise RuntimeError("this edit is no longer loaded - upload it again")
-
         def note(message: str) -> None:
             job.progress.append(message)
             self.beat(job, stage=message, percent=self._phase_percent(message))
@@ -1025,6 +1065,18 @@ class Runner:
         editor = AutoEditor(profile, project_dir=self.store.dir(job.id) / "project",
                             fonts_dir=self.fonts_dir, on_status=note,
                             on_progress=lambda f: self.beat(job, percent=10 + 45 * f))
+        # Asking for a bigger export than the working copy holds has to go back
+        # to the takes themselves. Exporting 4K from a 1080 working copy would
+        # be an enlargement of something already thrown away - a bigger file
+        # with no more in it.
+        try:
+            source = self._prepare(job, profile, editor, note)
+        except Exception:
+            source = Path(job.prepared) if job.prepared else None
+        if not source or not Path(source).exists():
+            raise RuntimeError("this edit is no longer loaded - upload it again")
+        if str(source) != job.prepared:
+            self.store.update(job, prepared=str(source))
         self._plan_into(job, source, editor, note, render=render)
         if fixes:
             self._apply_fixes(job, fixes)
@@ -2210,29 +2262,52 @@ function postChunk(url, blob, fields){
 // five times changes nothing, and the message already says what to do.
 const hopeless = m => /is not a video|too large|already started/.test(m);
 
-async function uploadFile(jobId, file, index, onProgress){
-  // Send the clip in pieces. One failed piece is retried on its own, instead of
-  // losing a 150 MB upload and starting again. Five tries, backing off to eight
-  // seconds: a phone on a lift or a train drops out for longer than one second,
-  // and giving up there is what turns a thirty-clip upload into a failed one.
-  if(file.size===0) throw new Error(`${file.name}: this file is empty`);
-  for(let offset=0; offset<file.size; offset+=CHUNK){
-    const slice=file.slice(offset, Math.min(offset+CHUNK, file.size));
-    const last = offset+CHUNK >= file.size;
-    let attempt=0;
-    for(;;){
-      try{
-        await postChunk(`/api/jobs/${jobId}/chunk`, slice,
-          {name:file.name, index:String(index), offset:String(offset),
-           final:last?'true':'false'});
-        break;
-      }catch(e){
-        if(hopeless(e.message) || ++attempt>=5) throw new Error(`${file.name}: ${e.message}`);
-        await new Promise(r=>setTimeout(r, 1000*Math.min(8, 2**(attempt-1))));
-      }
+const LANES = 3;   // pieces in the air at once
+
+async function sendPiece(jobId, file, index, offset, blob, done){
+  // Five tries, backing off to eight seconds: a phone in a lift or on a train
+  // drops out for longer than one second, and giving up there is what turns a
+  // thirty-clip upload into a failed one.
+  for(let attempt=0;;){
+    try{
+      await postChunk(`/api/jobs/${jobId}/chunk`, blob,
+        {name:file.name, index:String(index), offset:String(offset), final:done?'true':'false'});
+      return;
+    }catch(e){
+      if(hopeless(e.message) || ++attempt>=5) throw new Error(`${file.name}: ${e.message}`);
+      await new Promise(r=>setTimeout(r, 1000*Math.min(8, 2**(attempt-1))));
     }
-    onProgress(Math.min(offset+CHUNK, file.size)/file.size);
   }
+}
+
+async function uploadFile(jobId, file, index, onProgress){
+  // Send the clip in pieces, a few at a time. One failed piece is retried on
+  // its own instead of losing a 150 MB upload and starting again - and sending
+  // three at once means the connection is not sitting idle waiting for the
+  // round trip on every one of them, which on a phone is most of the time.
+  if(file.size===0) throw new Error(`${file.name}: this file is empty`);
+  const offsets=[];
+  for(let offset=0; offset<file.size; offset+=CHUNK) offsets.push(offset);
+
+  // None of them carries the "that was the last one" flag. Out of order, it
+  // would arrive before the pieces it claims to finish, and the clip would be
+  // taken as complete with holes in it. The flag goes on its own at the end.
+  let sent=0;
+  let next=0;
+  const lane=async()=>{
+    for(;;){
+      const i=next++;
+      if(i>=offsets.length) return;
+      const offset=offsets[i];
+      await sendPiece(jobId, file, index, offset,
+                      file.slice(offset, Math.min(offset+CHUNK, file.size)), false);
+      sent+=Math.min(CHUNK, file.size-offset);
+      onProgress(sent/file.size);
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(LANES, offsets.length)}, lane));
+  await sendPiece(jobId, file, index, file.size, new Blob([]), true);
+  onProgress(1);
 }
 
 const bytes = n => n > 1e9 ? (n/1e9).toFixed(1)+' GB'
@@ -3428,7 +3503,7 @@ function control(f){
 // An icon per group, opening its controls right under the video. The panel used
 // to be one long list below everything else, which meant scrolling past the
 // whole edit to change a font and scrolling back to see what it did.
-const GROUP_ICONS={Captions:'💬', Motion:'🎬', 'B-roll':'🎞️', Pacing:'⏱️'};
+const GROUP_ICONS={Captions:'💬', Motion:'🎬', 'B-roll':'🎞️', Pacing:'⏱️', Quality:'✨'};
 
 async function renderLook(job){
   let look;
