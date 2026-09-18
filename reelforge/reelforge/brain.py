@@ -134,9 +134,60 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
 
 
+def _ladder(min_factor: float, max_factor: float, levels: int) -> list[float]:
+    """Resting, then a few depths up to the strongest push.
+
+    Having more than one depth is the whole point. With only "in" and "out",
+    every second move is a return to where it started whatever the line
+    deserved, which is what makes the motion feel arbitrary: half of it is not
+    about the video at all.
+    """
+    levels = max(1, int(levels))
+    top = max(min_factor, max_factor)
+    return [1.0] + [round(1.0 + (top - 1.0) * (i + 1) / levels, 4) for i in range(levels)]
+
+
+def _shape(index: int, score: float, previous: float, beat: Beat, *, levels: int,
+           steps: int, held: float, settings: dict) -> tuple[int, str, float]:
+    """Where this line should take the framing, how, and how long the move takes.
+
+    Returns the rung to move to, a name for what it is, and the seconds it takes.
+    """
+    punch_time = settings["punch_time"]
+    release_time = settings["release_time"]
+    long_line = beat.duration >= settings["drift_beat"]
+
+    if index == 0:                                   # resting - going in
+        # Shallow on the way in, even for a strong line. Going straight to the
+        # deepest framing spends the whole range on one moment and leaves
+        # nowhere to go afterwards, which is why it then had to come all the way
+        # back out - the bounce that reads as arbitrary.
+        depth = min(levels, 2 if score >= 0.72 else 1)
+        if long_line and score < 0.62:
+            # A long, unhurried line reads better as a slow creep than a shove.
+            return depth, "drift_in", min(beat.duration, settings["max_duration"])
+        return depth, "punch_in", punch_time
+
+    must_come_out = steps >= settings["max_consecutive"] or held >= settings["hold_max"]
+    if must_come_out:
+        # Coming out by one rung is still coming out, and from deep framing it
+        # keeps the moment rather than throwing the whole push away.
+        if index >= 2 and score >= 0.5 and held < settings["hold_max"]:
+            return index - 1, "step_out", release_time
+        if long_line:
+            return 0, "drift_out", min(beat.duration, settings["max_duration"])
+        return 0, "release", release_time
+    if index < levels and score >= previous - 0.05:
+        # As strong as the line that got us here: go deeper rather than reset.
+        return index + 1, "step_in", punch_time
+    if index >= 2:
+        return index - 1, "step_out", release_time
+    return 0, "release", release_time
+
+
 def plan_zooms(lines: list[CaptionLine], analysis: Analysis, timeline: Timeline,
-               profile, *, scorer=None) -> list[Zoom]:
-    """Place punch-ins and pull-outs on the most emphatic phrases.
+               profile, *, scorer=None, transitions: list[Transition] | None = None) -> list[Zoom]:
+    """Place the framing moves on the phrases that carry the emphasis.
 
     Moves are chained: each starts at the factor the previous one ended on, so the
     framing never snaps back. Between moves the factor simply holds.
@@ -165,6 +216,13 @@ def plan_zooms(lines: list[CaptionLine], analysis: Analysis, timeline: Timeline,
         score = scorer(features) if scorer else rule_score(features, profile)
         scored.append((score, beat, features))
 
+    # Transitions sit on the cuts, and a beat right after a cut scores higher on
+    # purpose - so the two were being drawn to the same instants, and landed on
+    # top of one another. Keep the moves clear of them: a transition is already
+    # saying "something changed here", and it does not need help.
+    clearance = float(profile.get("zoom.transition_clearance"))
+    blocked = [t.out_time for t in (transitions or []) if t.enabled]
+
     chosen: list[tuple[float, Beat, dict]] = []
     for candidate in sorted(scored, key=lambda item: item[0], reverse=True):
         if candidate[0] < threshold:
@@ -172,6 +230,8 @@ def plan_zooms(lines: list[CaptionLine], analysis: Analysis, timeline: Timeline,
         if len(chosen) >= budget:
             break
         if any(abs(candidate[1].start - other[1].start) < min_gap for other in chosen):
+            continue
+        if any(abs(candidate[1].start - at) < clearance for at in blocked):
             continue
         chosen.append(candidate)
 
@@ -184,27 +244,59 @@ def plan_zooms(lines: list[CaptionLine], analysis: Analysis, timeline: Timeline,
             features = first.features(analysis.loudness_mean, 30.0)
             chosen.insert(0, (max(threshold, 0.7), first, features))
 
-    zooms: list[Zoom] = []
-    current = 1.0
-    for index, (score, beat, features) in enumerate(chosen):
-        duration = _clamp(beat.duration, min_duration, max_duration)
-        start = beat.start
-        end = min(out_duration, start + duration)
-        if end - start < 0.2:
-            continue
+    ladder = _ladder(min_factor, max_factor, int(profile.get("zoom.levels")))
+    settings = {
+        "punch_time": float(profile.get("zoom.punch_time")),
+        "release_time": float(profile.get("zoom.release_time")),
+        "drift_beat": float(profile.get("zoom.drift_beat")),
+        "max_consecutive": int(profile.get("zoom.max_consecutive")),
+        "hold_max": float(profile.get("zoom.hold_max")),
+        "max_duration": max_duration,
+    }
+    old_way = str(profile.get("zoom.strategy")).lower() == "alternate"
+    levels = len(ladder) - 1
 
-        magnitude = min_factor + (max_factor - min_factor) * _clamp(score)
-        if profile.get("zoom.alternate") and current > 1.005:
-            target, kind = 1.0, "pull_out"          # already pushed in - come back
+    zooms: list[Zoom] = []
+    rung = 0                # where the framing is now, as a rung on the ladder
+    steps = 0               # pushes in a row, so it cannot creep ever deeper
+    entered_at = 0.0        # when it last left resting, to notice a long hold
+    previous_score = 0.0
+    for index, (score, beat, features) in enumerate(chosen):
+        start = beat.start
+        # Never run one move into the next: the framing should arrive and hold
+        # for a moment, which is what makes a push read as a decision.
+        ceiling = chosen[index + 1][1].start - 0.1 if index + 1 < len(chosen) else out_duration
+
+        if old_way:
+            duration = _clamp(beat.duration, min_duration, max_duration)
+            magnitude = min_factor + (max_factor - min_factor) * _clamp(score)
+            if profile.get("zoom.alternate") and rung:
+                target, kind, rung = 1.0, "release", 0
+            else:
+                target, kind, rung = magnitude, "punch_in", 1
         else:
-            target, kind = magnitude, "punch_in"
+            next_rung, kind, duration = _shape(
+                rung, _clamp(score), previous_score, beat, levels=levels,
+                steps=steps, held=start - entered_at, settings=settings)
+            target = ladder[next_rung]
+            steps = steps + 1 if next_rung > rung else 0
+            if rung == 0 and next_rung > 0:
+                entered_at, steps = start, 1
+            rung = next_rung
+
+        end = min(out_duration, ceiling, start + max(0.12, duration))
+        if end - start < 0.12:
+            continue
+        current = zooms[-1].end_factor if zooms else 1.0
+        if abs(target - current) < 0.002:
+            continue                       # nowhere to go; do not spend a move
 
         zooms.append(Zoom(
-            id=f"z{index + 1}", out_start=round(start, 3), out_end=round(end, 3),
+            id=f"z{len(zooms) + 1}", out_start=round(start, 3), out_end=round(end, 3),
             start_factor=round(current, 4), end_factor=round(target, 4),
             kind=kind, score=round(float(score), 4), features=features,
         ))
-        current = target
+        previous_score = _clamp(score)
     return zooms
 
 
@@ -372,11 +464,14 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
     # enforce_order would otherwise remove first.
     retimed = enforce_order(drop_repeated_words(retimed))
     lines = group_words(retimed, profile) if profile.get("captions.enabled") else []
+    # Transitions first, so the framing moves can be kept clear of them. They
+    # both want the moment just after a cut, and when they both take it the
+    # result is one muddle rather than two ideas.
+    transitions = plan_transitions(timeline, analysis, profile)
     zooms = plan_zooms(lines or _fallback_lines(out_duration), analysis, timeline,
-                       profile, scorer=scorer)
+                       profile, scorer=scorer, transitions=transitions)
     overlays = plan_overlays(lines, library or BrollLibrary(), profile,
                              out_duration=out_duration, weights=weights)
-    transitions = plan_transitions(timeline, analysis, profile)
 
     return EDL(
         source=source,
@@ -384,6 +479,10 @@ def build_edl(source: str, analysis: Analysis, transcript: Transcript, profile,
             "width": int(profile.get("output.width")),
             "height": int(profile.get("output.height")),
             "fps": int(profile.get("output.fps")),
+            # How much picture is kept beyond the frame for pushing in. The
+            # browser needs it too: it draws the same motion live, and a punch
+            # has to be the size there that it will be in the export.
+            "zoom_headroom": float(profile.get("output.zoom_headroom")),
         },
         cuts=cuts,
         zooms=zooms,

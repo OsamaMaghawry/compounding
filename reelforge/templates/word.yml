@@ -12,6 +12,8 @@ cuts:
   pad_before: 0.05
   pad_after: 0.07
 zoom:
+  levels: 3
+  max_consecutive: 2
   rate_per_min: 18.0
 transitions:
   kind: flash

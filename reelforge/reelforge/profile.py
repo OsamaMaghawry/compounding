@@ -57,9 +57,24 @@ DEFAULTS: dict[str, Any] = {
         "hook_punch": True,        # always punch in on the opening hook
         "hook_window": 1.6,
         "ease": "smooth",          # smooth | linear
-        "alternate": True,         # alternate in/out so it doesn't creep
         "score_threshold": 0.45,   # emphasis score required to trigger a move
         "cut_bias": 0.15,          # extra score for moments right after a cut
+
+        # How the moves are chosen. "ladder" keeps a few depths and steps
+        # between them, so a strong line can push deeper than the one before it
+        # instead of every move being a return to where it started. "alternate"
+        # is the older in, out, in, out.
+        "strategy": "ladder",      # ladder | alternate
+        "levels": 3,               # depths between resting and the strongest
+        "punch_time": 0.32,        # a push in is quick, then it holds
+        "release_time": 0.8,       # coming back out is slower than going in
+        "drift_beat": 1.6,         # a line at least this long can drift instead
+        "max_consecutive": 2,      # pushes in a row before it has to come back
+        "hold_max": 5.0,           # held in longer than this and the next comes out
+        # Transitions live on the cuts. A move that starts on top of one fights
+        # with it, and both land as a single muddle rather than two ideas.
+        "transition_clearance": 0.35,
+        "alternate": True,         # only read when strategy is "alternate"
     },
 
     # Extra video layers pulled from your own library.

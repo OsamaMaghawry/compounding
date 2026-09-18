@@ -12,6 +12,11 @@ cuts:
   pad_before: 0.16
   pad_after: 0.2
 zoom:
+  levels: 2
+  max_consecutive: 1
+  drift_beat: 1.1
+  punch_time: 0.6
+  release_time: 1.2
   rate_per_min: 6.0
   max_factor: 1.1
   min_gap: 2.8

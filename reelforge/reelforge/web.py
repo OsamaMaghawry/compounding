@@ -147,6 +147,21 @@ LOOK_FIELDS: list[dict] = [
      "help": "How often the camera pushes in or pulls out."},
     {"group": "Motion", "key": "zoom.max_factor", "label": "Strongest punch",
      "type": "number", "min": 1.0, "max": 1.6, "step": 0.01},
+    {"group": "Motion", "key": "zoom.strategy", "label": "How it moves", "type": "select",
+     "help": "Layered steps between a few depths, so a strong line can go deeper "
+             "than the one before it. In and out returns to the wide shot every "
+             "other move.",
+     "options": [
+         ("ladder", "Layered — steps between depths"),
+         ("alternate", "In and out — one push, one return"),
+     ]},
+    {"group": "Motion", "key": "zoom.levels", "label": "How many depths",
+     "type": "number", "min": 1, "max": 5, "step": 1,
+     "help": "Framings between the wide shot and the strongest push. One is a "
+             "switch; three gives it somewhere to go."},
+    {"group": "Motion", "key": "zoom.max_consecutive", "label": "Pushes before it eases back",
+     "type": "number", "min": 1, "max": 4, "step": 1,
+     "help": "How far it may keep pushing in before it has to come back out."},
     {"group": "Motion", "key": "transitions.kind", "label": "Transition", "type": "select",
      "help": "What happens at a cut.",
      "options": [
@@ -2923,18 +2938,31 @@ function drawOverlay(out){
 // -- zooms and transitions ---------------------------------------------------
 function drawZoom(out){
   let factor=1, filter='';
-  for(const z of (P.plan.zooms||[])){
-    if(!z.enabled || out<z.out_start || out>z.out_end) continue;
-    const p=(out-z.out_start)/Math.max(0.001,z.out_end-z.out_start);
-    const eased=p*p*(3-2*p);                       // the renderer's smooth ease
-    factor=z.start_factor+(z.end_factor-z.start_factor)*eased;
+  const moves=(P.plan.zooms||[]).filter(z=>z.enabled);
+  // A move arrives somewhere and stays there until the next one. Only drawing
+  // it while the move itself was running made the preview drop back to the wide
+  // shot in between - so what played here was a blip on each move and nothing
+  // between them, while the export held the framing. The motion looked
+  // arbitrary because what you were watching was not the edit.
+  for(const z of moves){
+    if(out>=z.out_end){ factor=z.end_factor; continue; }
+    if(out>=z.out_start){
+      const p=(out-z.out_start)/Math.max(0.001,z.out_end-z.out_start);
+      factor=z.start_factor+(z.end_factor-z.start_factor)*(p*p*(3-2*p));
+    }
+    break;                                   // nothing later has started yet
   }
+  // The same punch the renderer will use: as big as the picture kept behind the
+  // frame allows, once the push-in being held has taken its share.
+  const budget=(P.plan.output&&P.plan.output.zoom_headroom)||1.35;
+  const deepest=moves.reduce((m,z)=>Math.max(m,z.end_factor,z.start_factor),1);
+  const amp=Math.max(0, Math.min(0.16, budget/Math.max(deepest,1e-6)-1));
   for(const t of (P.plan.transitions||[])){
     if(!t.enabled) continue;
     const p=(out-t.out_time)/Math.max(0.001,t.duration);
     if(p<0||p>1) continue;
     const fade=1-p;
-    if(t.kind==='punch') factor*=1+0.06*t.strength*fade;
+    if(t.kind==='punch') factor*=1+amp*t.strength*fade;
     else if(t.kind==='flash') filter=`brightness(${1+0.5*t.strength*fade})`;
     else if(t.kind==='blur') filter=`blur(${(4*t.strength*fade).toFixed(2)}px)`;
   }

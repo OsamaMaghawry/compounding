@@ -11,6 +11,11 @@ captions:
   emphasis_color: "#3DDC97"
   y_pct: 0.76
 zoom:
+  levels: 1
+  max_consecutive: 1
+  drift_beat: 1.2
+  punch_time: 0.7
+  release_time: 1.2
   rate_per_min: 5.0
   max_factor: 1.08
 transitions:

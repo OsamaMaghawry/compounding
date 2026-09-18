@@ -9,6 +9,8 @@ captions:
   pop_scale: 1.14
   emphasis_color: "#FFD24A"
 zoom:
+  levels: 3
+  max_consecutive: 2
   rate_per_min: 16.0
   max_factor: 1.22
 transitions:

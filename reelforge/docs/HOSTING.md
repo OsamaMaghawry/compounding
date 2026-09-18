@@ -174,6 +174,96 @@ identical, and Arabic shaping is exactly where they can differ. Use the live vie
 to judge timing, wording, framing and pacing - then **Render a real preview** to
 check the Arabic reads correctly before exporting.
 
+## How the camera moves
+
+The framing pushes in on the lines that carry the emphasis and eases back on the
+ones that do not. It does this by stepping between a few depths rather than
+switching between wide and close.
+
+That distinction is the whole of it. With one depth there are only two states, so
+every second move is a return to where it started whatever the line deserved -
+half the motion is then not about your video at all, which is what makes it feel
+arbitrary. With three depths a strong line can go deeper than the one before it,
+ease back a step without throwing the whole push away, and come to rest when the
+point is made.
+
+The moves it has:
+
+| | |
+|---|---|
+| **punch in** | a quick push from the wide shot, then it holds |
+| **step in** | deeper again, when the next line is as strong as the one that got it there |
+| **step out** | back one depth, keeping the moment |
+| **release** | back to the wide shot |
+| **drift in / drift out** | the same, taken slowly across a long unhurried line |
+
+A push is fast and then still. The stillness is what makes it read as a decision
+rather than a wobble, so the speed of the move and the length of the line are not
+the same thing.
+
+**Transitions and the framing stay out of each other's way.** Both want the
+moment just after a cut - a line there scores higher on purpose, and transitions
+sit on the cuts - so they used to land together and read as one muddle instead of
+two ideas. Now a move will not start within a third of a second of a transition.
+They also no longer fight for the same pixels: the frame is rendered from an
+oversized picture so a push-in has something real behind it, and a punch
+multiplies on top of whatever push is being held. Left alone the two together
+asked for more picture than was kept, and the punch - the moment meant to hit
+hardest - was the one that went soft. The punch is now sized to what is left.
+
+In the Look panel, under Motion: **How it moves** (layered or the older in and
+out), **How many depths**, **Pushes before it eases back**, **Moves per minute**
+and **Strongest punch**.
+
+### Yes, the style changes it
+
+Each template carries its own motion, and changing the style changes it
+completely. Over the same minute of speech:
+
+| Style | Moves | Depths | Deepest | Fastest move |
+|---|---|---|---|---|
+| viral | 20 | 4 | 1.26 | 0.26s |
+| word | 18 | 4 | 1.22 | 0.32s |
+| bold | 16 | 3 | 1.15 | 0.32s |
+| clean | 8 | 3 | 1.12 | 0.32s |
+| elegant | 6 | 3 | 1.10 | 0.60s |
+| news | 5 | 2 | 1.08 | 0.70s |
+
+`viral` is busy and pushes deep with fast punches; `news` moves five times a
+minute, barely leaves the wide shot, and takes a slow beat to do it. So if the
+motion is not what you want, the style is the first thing to change, not the
+numbers.
+
+## Quality: what you watch, and what you get
+
+They are not the same file, on purpose.
+
+**What plays in the page is deliberately small.** The browser streams a plain
+copy of your footage at 640 pixels tall, heavily compressed, and draws the
+captions, the framing and the b-roll over it live. That is what makes trimming
+and restyling something you watch rather than something you queue - but it is not
+what your export looks like. Judge the look, the timing and the words there;
+judge the picture on the download.
+
+**What you download** is re-encoded, not copied: 1080x1920 at 30 frames a second,
+H.264 at quality 20, audio AAC at 192 kbps. Those are the `output` settings in
+the profile - `width`, `height`, `fps`, `crf` and `audio_bitrate`.
+
+So:
+
+- Shot at 1080p: essentially the same picture, re-encoded once.
+- Shot at 4K: downscaled to 1080p. Reels are watched on phones at around that
+  size, and 4K costs minutes per export for something the app will not show.
+- A push-in still has real pixels behind it. Everything is rendered from a canvas
+  a third larger than the frame, so a 1.2x punch is a crop rather than a
+  blow-up.
+- Nothing is ever re-encoded twice at full quality. The joined timeline is an
+  intermediate at a higher quality than the export, and the export is made from
+  it once.
+
+Raise `output.height` and `output.width` if you want 1440 or 2160 out, and lower
+`output.crf` (17 or 18) for a bigger, cleaner file. Both cost render time.
+
 ## The b-roll library
 
 Your own clips and stills, kept in `<data>/broll` - beside your edits, not inside

@@ -395,6 +395,125 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(edl.zooms, [])
         self.assertAlmostEqual(edl.duration, analysis.duration, places=1)
 
+    def speech_minute(self):
+        """A minute of speech: lines of varying length, pace and loudness."""
+        import random
+        from reelforge.captions import CaptionLine
+        from reelforge.speech import Word
+        rng = random.Random(7)
+        lines, at = [], 0.0
+        while at < 60.0:
+            span = rng.choice([0.9, 1.3, 1.8, 2.4, 1.1, 0.7])
+            count = max(1, int(span * rng.choice([1.5, 2.2, 3.0])))
+            words = [Word(text="كلمة", start=at + i * span / count,
+                          end=at + (i + 1) * span / count) for i in range(count)]
+            lines.append(CaptionLine(words=words, start=at, end=at + span))
+            at += span + rng.choice([0.15, 0.3, 0.5])
+
+        cuts = [7.0, 19.0, 31.0, 44.0]
+
+        class Analysis:
+            duration, loudness_mean, loudness_peak = 60.0, -20.0, -8.0
+            def energy_range(self, a, b):
+                r = random.Random(int(a * 100))
+                return (-20.0 + r.uniform(-4, 6), -10.0 + r.uniform(-4, 6))
+            def nearest_scene(self, t): return None
+
+        class Line:
+            duration, cuts = 60.0, []
+            def to_src(self, t): return t
+            def to_out(self, t): return t
+            def cut_boundaries(self): return cuts
+
+        return lines, Analysis(), Line(), cuts
+
+    def test_the_framing_uses_more_than_in_and_out(self):
+        """The motion should have depths, not a switch.
+
+        With one depth, every second move is a return to where it started
+        whatever the line deserved - so half the motion is not about the video
+        at all, which is exactly what makes it read as arbitrary. Stepping
+        between a few depths means a strong line can go deeper than the one
+        before it instead of resetting.
+        """
+        from reelforge.brain import plan_zooms
+        lines, analysis, timeline, _ = self.speech_minute()
+        profile = self.profile()
+
+        moves = plan_zooms(lines, analysis, timeline, profile)
+        self.assertGreater(len(moves), 6, "hardly any moves to judge")
+
+        depths = {round(m.end_factor, 3) for m in moves}
+        self.assertGreaterEqual(len(depths), 3,
+                                f"only these depths are ever used: {sorted(depths)}")
+
+        # And it should not be in, out, in, out. Count how often a move that
+        # went in is followed by one that goes straight back to resting.
+        ends = [m.end_factor for m in moves]
+        bounces = sum(1 for a, b in zip(ends, ends[1:]) if a > 1.001 and b <= 1.001)
+        self.assertLess(bounces, 0.5 * (len(moves) - 1),
+                        f"still mostly in-then-out: {bounces} of {len(moves) - 1}")
+
+        # A push should be quick and a drift slow; one length for everything is
+        # what makes every move feel the same.
+        lengths = sorted(round(m.out_end - m.out_start, 2) for m in moves)
+        self.assertLess(lengths[0], 0.5, f"no quick moves at all: {lengths}")
+        self.assertGreater(lengths[-1], 1.0, f"no slow moves at all: {lengths}")
+
+    def test_the_framing_keeps_out_of_the_way_of_transitions(self):
+        """Both want the moment just after a cut. Only one may have it.
+
+        A beat right after a cut scores higher on purpose, and transitions sit
+        on the cuts - so the two were drawn to the same instants and landed on
+        top of each other, reading as one muddle instead of two ideas.
+        """
+        from reelforge.brain import plan_transitions, plan_zooms
+        from reelforge.edl import Transition
+        lines, analysis, timeline, cuts = self.speech_minute()
+        profile = self.profile()
+        clearance = float(profile.get("zoom.transition_clearance"))
+
+        transitions = [Transition(id=f"t{i}", out_time=at, kind="punch")
+                       for i, at in enumerate(cuts)]
+        moves = plan_zooms(lines, analysis, timeline, profile, transitions=transitions)
+        for move in moves:
+            for at in cuts:
+                self.assertGreaterEqual(
+                    abs(move.out_start - at), clearance,
+                    f"a move starts {abs(move.out_start - at):.2f}s from the transition at {at}s")
+
+        # Told about none, it is free to use those moments again.
+        free = plan_zooms(lines, analysis, timeline, profile, transitions=[])
+        self.assertGreaterEqual(len(free), len(moves))
+
+    def test_a_punch_never_asks_for_more_picture_than_was_kept(self):
+        """The two multiply, and the frame is only rendered so oversize.
+
+        A punch lands on top of whatever push-in is being held. Together they
+        could ask for more picture than the oversized canvas has, and then the
+        one moment meant to hit hardest is the one that goes soft.
+        """
+        from reelforge.edl import Transition, Zoom
+        from reelforge.render import max_punch_factor
+        budget = float(self.profile().get("output.zoom_headroom"))
+        deep = 1.22
+        punches = [Transition(id="t1", out_time=3.0, kind="punch", strength=1.0)]
+
+        room = max(0.0, budget / deep - 1.0)
+        self.assertLessEqual(deep * max_punch_factor(punches, max_amp=room), budget + 1e-6)
+        # And unclamped it really would have gone over, so this is not vacuous.
+        self.assertGreater(deep * max_punch_factor(punches), budget)
+
+    def test_the_older_in_and_out_is_still_available(self):
+        from reelforge.brain import plan_zooms
+        lines, analysis, timeline, _ = self.speech_minute()
+        profile = self.profile()
+        profile.set("zoom.strategy", "alternate")
+        moves = plan_zooms(lines, analysis, timeline, profile)
+        ends = [round(m.end_factor, 3) for m in moves]
+        self.assertTrue(any(e <= 1.001 for e in ends), ends)
+        self.assertTrue(any(e > 1.001 for e in ends), ends)
+
     def test_rule_score_is_bounded(self):
         profile = self.profile()
         for energy in (-20.0, 0.0, 20.0):
@@ -2504,6 +2623,57 @@ class WebAppTests(unittest.TestCase):
                               capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0,
                          f"the page will not parse:\n{proc.stderr[:600]}")
+
+    def test_the_preview_holds_the_framing_like_the_export_does(self):
+        """What plays here has to be the edit, not a sketch of it.
+
+        A move arrives somewhere and stays until the next one - that is what the
+        renderer does. The page only drew a move while the move itself was
+        running, so between moves it snapped back to the wide shot: a blip on
+        every move and nothing in between. The motion read as arbitrary because
+        what was on screen was not what would be exported.
+        """
+        import shutil as _shutil
+        import subprocess
+        if not _shutil.which("node"):
+            self.skipTest("node is needed to run the page's own code")
+        from reelforge.web import PAGE
+        script = PAGE[PAGE.index("<script>") + len("<script>"):PAGE.rindex("</script>")]
+        # Just the one function: the rest of the page talks to a browser.
+        begin = script.index("function drawZoom(")
+        end = script.index("\n}", begin) + 2
+        drawZoom = script[begin:end]
+        self.assertIn("out>=z.out_end", drawZoom, "the function was not sliced out whole")
+
+        harness = "let P;\n" + drawZoom + """
+// Two moves: in to 1.10 by 1s, then deeper to 1.20 between 4s and 4.4s.
+const el = {style:{}};
+P = {video: el, plan: {output:{zoom_headroom:1.35},
+  zooms:[{id:'z1',out_start:0.5,out_end:1.0,start_factor:1.0,end_factor:1.10,enabled:true},
+         {id:'z2',out_start:4.0,out_end:4.4,start_factor:1.10,end_factor:1.20,enabled:true}],
+  transitions:[{id:'t1',out_time:2.5,kind:'punch',duration:0.2,strength:1.0,enabled:true}]}};
+const at = t => { drawZoom(t); return parseFloat(P.video.style.transform.slice(6)); };
+console.log(JSON.stringify({
+  before: at(0.2), arrived: at(1.2), holding: at(3.5),
+  deeper: at(4.6), after: at(9.0), punch: at(2.5)}));
+"""
+        path = Path(self.tmp) / "zoomcheck.js"
+        path.write_text(harness, encoding="utf-8")
+        proc = subprocess.run(["node", str(path)], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr[:600])
+        got = json.loads(proc.stdout.strip().splitlines()[-1])
+
+        self.assertAlmostEqual(got["before"], 1.0, places=3)      # nothing yet
+        self.assertAlmostEqual(got["arrived"], 1.10, places=3)    # arrived, holding
+        self.assertAlmostEqual(got["holding"], 1.10, places=3,
+                               msg="it dropped back to the wide shot between moves")
+        self.assertAlmostEqual(got["deeper"], 1.20, places=3)
+        self.assertAlmostEqual(got["after"], 1.20, places=3,
+                               msg="the last move should hold to the end")
+        # The punch rides on the held framing, sized to the picture that is kept.
+        room = min(0.16, 1.35 / 1.20 - 1.0)
+        self.assertAlmostEqual(got["punch"], 1.10 * (1 + room), places=3)
+        self.assertLessEqual(got["punch"], 1.35 + 1e-6)
 
     def test_an_edit_with_broll_can_be_written_and_read_back(self):
         """Every kind of item, through to_dict and back.

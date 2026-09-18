@@ -88,18 +88,29 @@ def zoom_expression(zooms: list[Zoom], *, ease: str = "smooth", var: str = "in_t
     return expression
 
 
-def punch_expression(transitions: list[Transition], *, var: str = "in_time") -> str:
+PUNCH_AMPLITUDE = 0.16
+
+
+def punch_expression(transitions: list[Transition], *, var: str = "in_time",
+                     max_amp: float | None = None) -> str:
     """A multiplier that spikes on each punch transition and decays back to 1.
 
     Multiplying this into the zoom curve keeps the two independent: a punch lands
     on top of whatever framing the zoom happens to be holding.
+
+    `max_amp` is how much spike there is room for. The frame is rendered from an
+    oversized canvas so a push-in still has real pixels behind it, and a punch
+    multiplies on top of whatever push is already held - so the two together
+    could ask for more picture than was kept, and the punch would land soft
+    exactly when it is meant to hit. Given the room, it uses what there is.
     """
     punches = [t for t in transitions if t.enabled and t.kind == "punch" and t.duration > 0]
     if not punches:
         return ""
+    ceiling = PUNCH_AMPLITUDE if max_amp is None else max(0.0, min(PUNCH_AMPLITUDE, max_amp))
     expression = "1"
     for punch in sorted(punches, key=lambda t: t.out_time):
-        amp = 0.16 * max(0.0, min(1.0, punch.strength))
+        amp = ceiling * max(0.0, min(1.0, punch.strength))
         start, end = punch.out_time, punch.out_time + punch.duration
         decay = f"(1-(({var}-{start:.3f})/{punch.duration:.3f}))"
         expression = (f"if(between({var},{start:.3f},{end:.3f}),"
@@ -107,11 +118,12 @@ def punch_expression(transitions: list[Transition], *, var: str = "in_time") -> 
     return expression
 
 
-def max_punch_factor(transitions: list[Transition]) -> float:
+def max_punch_factor(transitions: list[Transition], *, max_amp: float | None = None) -> float:
     punches = [t for t in transitions if t.enabled and t.kind == "punch"]
     if not punches:
         return 1.0
-    return 1.0 + 0.16 * max(max(0.0, min(1.0, t.strength)) for t in punches)
+    ceiling = PUNCH_AMPLITUDE if max_amp is None else max(0.0, min(PUNCH_AMPLITUDE, max_amp))
+    return 1.0 + ceiling * max(max(0.0, min(1.0, t.strength)) for t in punches)
 
 
 def flash_expression(transitions: list[Transition]) -> str:
@@ -242,12 +254,16 @@ class Renderer:
         if preview:
             width, height = _even(width / 2), _even(height / 2)
 
-        headroom = float(self.profile.get("output.zoom_headroom"))
+        budget = float(self.profile.get("output.zoom_headroom"))
         zooms = edl.active_zooms()
         transitions = edl.active_transitions()
-        max_factor = max([z.end_factor for z in zooms] + [z.start_factor for z in zooms] + [1.0])
-        max_factor *= max_punch_factor(transitions)
-        headroom = max(1.0, min(headroom, max_factor)) if (zooms or transitions) else 1.0
+        held = max([z.end_factor for z in zooms] + [z.start_factor for z in zooms] + [1.0])
+        # What is left for a punch once the push-in has taken its share. Without
+        # this the two multiply past the picture that was kept, and the punch -
+        # the one moment meant to hit hardest - is the one that lands soft.
+        punch_room = max(0.0, budget / max(held, 1e-6) - 1.0)
+        max_factor = held * max_punch_factor(transitions, max_amp=punch_room)
+        headroom = max(1.0, min(budget, max_factor)) if (zooms or transitions) else 1.0
         canvas_w, canvas_h = _even(width * headroom), _even(height * headroom)
 
         args: list[str] = ["-i", str(source)]
@@ -324,7 +340,7 @@ class Renderer:
         graph.append(self._reframe("cvf", "canvas", canvas_w, canvas_h))
 
         # 3. Zoom curve, with any punch transitions multiplied on top of it.
-        punch = punch_expression(transitions)
+        punch = punch_expression(transitions, max_amp=punch_room)
         if zooms or punch:
             expression = zoom_expression(zooms, ease=self.profile.get("zoom.ease"))
             if punch:
