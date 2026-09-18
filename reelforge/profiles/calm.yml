@@ -1,0 +1,22 @@
+# Slower, more editorial pacing. Good for explainers and long-form cutdowns.
+name: calm
+description: Measured pacing, gentle moves, full-sentence captions.
+cuts:
+  min_silence: 0.55
+  pad_before: 0.16
+  pad_after: 0.20
+  max_gap_keep: 0.40
+zoom:
+  rate_per_min: 7.0
+  max_factor: 1.12
+  min_gap: 2.5
+  score_threshold: 0.62
+broll:
+  max_per_min: 3.0
+  min_duration: 1.4
+  max_duration: 3.2
+captions:
+  font_size: 80
+  max_words: 6
+  max_chars: 44
+  highlight: "#FFC24B"

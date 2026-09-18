@@ -1,0 +1,2 @@
+# Core. ffmpeg is the only other requirement and it is not a pip package.
+PyYAML>=6.0

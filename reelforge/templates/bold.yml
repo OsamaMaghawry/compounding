@@ -1,0 +1,18 @@
+name: bold
+description: Wide Alexandria with a pulse on every spoken word. Punchy without the boxes.
+captions:
+  style: pop
+  font: Alexandria
+  font_size: 104
+  max_words: 4
+  highlight: "#00E5FF"
+  pop_scale: 1.14
+  emphasis_color: "#FFD24A"
+zoom:
+  levels: 3
+  max_consecutive: 2
+  rate_per_min: 16.0
+  max_factor: 1.22
+transitions:
+  kind: punch
+  strength: 0.75

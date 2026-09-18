@@ -1,0 +1,21 @@
+# Fast, aggressive Reel style: tight cuts, frequent punch-ins, heavy b-roll.
+name: punchy
+description: High-energy talking head. Nothing sits still for long.
+cuts:
+  min_silence: 0.28
+  pad_before: 0.06
+  pad_after: 0.08
+  max_gap_keep: 0.16
+zoom:
+  rate_per_min: 20.0
+  max_factor: 1.28
+  min_gap: 0.85
+  score_threshold: 0.36
+broll:
+  max_per_min: 9.0
+  max_duration: 2.0
+captions:
+  font_size: 100
+  highlight: "#00E5FF"
+  highlight_scale: 1.08
+  max_words: 3

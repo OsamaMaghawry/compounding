@@ -1,0 +1,27 @@
+{
+  "name": "ReelForge",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "forwardPorts": [
+    8000
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "ReelForge",
+      "onAutoForward": "openBrowser",
+      "protocol": "http"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "REELFORGE_DATA": "/workspaces/data",
+    "HF_HOME": "/workspaces/models"
+  },
+  "postStartCommand": "bash .devcontainer/start.sh"
+}

@@ -1,0 +1,6 @@
+# Speech recognition. Install this to get real Arabic captions instead of placeholders.
+#
+# CPU only:  pip install -r requirements-asr.txt
+# NVIDIA GPU: also install CUDA-enabled torch/ctranslate2 per your driver version;
+#             faster-whisper picks the GPU up automatically.
+faster-whisper>=1.0.0
