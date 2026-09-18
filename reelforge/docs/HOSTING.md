@@ -249,17 +249,35 @@ judge the picture on the download.
 H.264 at quality 20, audio AAC at 192 kbps. Those are the `output` settings in
 the profile - `width`, `height`, `fps`, `crf` and `audio_bitrate`.
 
-So:
+### Where 4K loses its pixels
+
+Not at the end, and not all at once. Measured on a 2160x3840 phone take:
+
+| | Two or more takes | One take |
+|---|---|---|
+| What the edit works from | 1458x2592 | 2160x3840 |
+| What you download | 1080x1920 | 1080x1920 |
+
+With more than one take they are joined first, and the joined timeline is capped
+at **1.35 times the output height** - 2592 for a 1080x1920 Reel. That happens
+before any editing. With a single take there is nothing to join, so the full 4K
+goes all the way to the export and is scaled there instead.
+
+1.35 is not arbitrary and it is not a quality setting: it is exactly the picture
+the frame can use. Everything is rendered from a canvas a third larger than the
+frame so a push-in is a crop rather than a blow-up, and a full-strength push uses
+every pixel of it. Below that the frame would go soft at the deepest push; above
+it, the extra pixels are cropped away and never seen. So nothing the export could
+have shown is thrown away - only what it could not.
+
+The rest:
 
 - Shot at 1080p: essentially the same picture, re-encoded once.
-- Shot at 4K: downscaled to 1080p. Reels are watched on phones at around that
-  size, and 4K costs minutes per export for something the app will not show.
-- A push-in still has real pixels behind it. Everything is rendered from a canvas
-  a third larger than the frame, so a 1.2x punch is a crop rather than a
-  blow-up.
-- Nothing is ever re-encoded twice at full quality. The joined timeline is an
+- Nothing is ever encoded twice at full quality. The joined timeline is an
   intermediate at a higher quality than the export, and the export is made from
   it once.
+- Raising `output.height` raises the cap with it, so asking for a 2160-tall
+  export keeps 2916 through the edit rather than 2592.
 
 Raise `output.height` and `output.width` if you want 1440 or 2160 out, and lower
 `output.crf` (17 or 18) for a bigger, cleaner file. Both cost render time.
