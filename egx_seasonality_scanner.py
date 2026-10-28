@@ -93,6 +93,27 @@ CYCLE_HISTORY_FILE = "cycle_history.json"
 TICKER_CACHE_FILE = "ticker_names_cache.json"
 
 # ============================================
+# CYCLE PERFORMANCE REPORT (all cycles compounded vs EGX30)
+# ============================================
+# "cycle_end" -> included only in the email that closes a cycle and starts the next one
+# "daily"     -> included in every daily email (the running cycle is shown as "in progress")
+# "off"       -> never included
+PERFORMANCE_REPORT_MODE = "cycle_end"
+PERFORMANCE_CHART_PATH = "performance_chart.png"
+PERFORMANCE_HTML_OUTPUT = "performance_report.html"
+
+# Cycles that finished before cycle_history.json existed (final figures from the emailed reports).
+# Any cycle already saved in cycle_history.json takes priority over its entry here.
+PAST_CYCLES = [
+    {'cycle_start_date': '2026-04-29', 'cycle_exit_date': '2026-05-25', 'portfolio_pnl_pct': 2.46, 'benchmark_pnl_pct': 0.53, 'stopped_count': 1, 'num_stocks': 10},
+    {'cycle_start_date': '2026-05-25', 'cycle_exit_date': '2026-06-23', 'portfolio_pnl_pct': 8.72, 'benchmark_pnl_pct': -0.14, 'stopped_count': 1, 'num_stocks': 10},
+    {'cycle_start_date': '2026-06-24', 'cycle_exit_date': '2026-07-22', 'portfolio_pnl_pct': 21.32, 'benchmark_pnl_pct': 4.30, 'stopped_count': 0, 'num_stocks': 10},
+    {'cycle_start_date': '2026-07-26', 'cycle_exit_date': '2026-08-24', 'portfolio_pnl_pct': 15.16, 'benchmark_pnl_pct': 3.27, 'stopped_count': 1, 'num_stocks': 10},
+    {'cycle_start_date': '2026-08-26', 'cycle_exit_date': '2026-09-24', 'portfolio_pnl_pct': 1.50, 'benchmark_pnl_pct': -2.41, 'stopped_count': 4, 'num_stocks': 10},
+    {'cycle_start_date': '2026-09-26', 'cycle_exit_date': '2026-10-25', 'portfolio_pnl_pct': -3.58, 'benchmark_pnl_pct': -8.45, 'stopped_count': 8, 'num_stocks': 10},
+]
+
+# ============================================
 # PDF GENERATION CONFIGURATION
 # ============================================
 # Set to False to disable PDF generation
@@ -567,6 +588,177 @@ def archive_closed_cycle(closed: Dict):
         print(f"⚠️ Could not save cycle history: {e}")
 
 
+def load_cycle_history() -> List[Dict]:
+    """All finished cycles, oldest first: cycle_history.json plus any PAST_CYCLES it doesn't contain."""
+    history = []
+    if os.path.exists(CYCLE_HISTORY_FILE):
+        try:
+            with open(CYCLE_HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+        except Exception as e:
+            print(f"⚠️ Could not read cycle history: {e}")
+    saved_starts = {c['cycle_start_date'] for c in history}
+    history += [c for c in PAST_CYCLES if c['cycle_start_date'] not in saved_starts]
+    return sorted(history, key=lambda c: c['cycle_start_date'])
+
+
+def build_performance_rows(history: List[Dict], current: Optional[Dict] = None) -> List[Dict]:
+    """Compound each cycle's return on the hypothetical portfolio, for the portfolio and for EGX30."""
+    cycles = [dict(c, in_progress=False) for c in history]
+    if current:
+        cycles.append(dict(current, in_progress=True))
+
+    rows = []
+    value = HYPOTHETICAL_PORTFOLIO_SIZE
+    bench_value = HYPOTHETICAL_PORTFOLIO_SIZE
+    for i, c in enumerate(cycles, start=1):
+        value *= 1 + c['portfolio_pnl_pct'] / 100
+        bench_value *= 1 + c['benchmark_pnl_pct'] / 100
+        rows.append({
+            'cycle': i,
+            'start': c['cycle_start_date'],
+            'end': c['cycle_exit_date'],
+            'return_pct': c['portfolio_pnl_pct'],
+            'benchmark_pct': c['benchmark_pnl_pct'],
+            'value': value,
+            'cum_pct': (value / HYPOTHETICAL_PORTFOLIO_SIZE - 1) * 100,
+            'bench_cum_pct': (bench_value / HYPOTHETICAL_PORTFOLIO_SIZE - 1) * 100,
+            'in_progress': c['in_progress'],
+        })
+    return rows
+
+
+def generate_performance_chart(rows: List[Dict], save_path: str) -> str:
+    """Grouped bars: cumulative compounded return of the portfolio vs EGX30 after each cycle."""
+    if not rows:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    x = np.arange(len(rows))
+    width = 0.38
+    port = [r['cum_pct'] for r in rows]
+    bench = [r['bench_cum_pct'] for r in rows]
+    port_bars = ax.bar(x - width / 2, port, width, label='Portfolio', color='#1a5d7a')
+    bench_bars = ax.bar(x + width / 2, bench, width, label='EGX30 Benchmark', color='#9aa5b1')
+    ax.axhline(0, color='gray', linewidth=0.8)
+
+    for bars in (port_bars, bench_bars):
+        for bar in bars:
+            h = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2, h, f'{h:.1f}%', ha='center',
+                    va='bottom' if h >= 0 else 'top', fontsize=9)
+
+    labels = [f"Cycle {r['cycle']}\n({datetime.strptime(r['end'], '%Y-%m-%d'):%b %d}"
+              f"{', live' if r['in_progress'] else ''})" for r in rows]
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel('Cumulative Return (%)', fontsize=11)
+    ax.set_title(f'Portfolio vs. EGX30 - Compound Return ({HYPOTHETICAL_PORTFOLIO_SIZE:,.0f} EGP base)',
+                 fontsize=13, fontweight='bold')
+    ax.legend(loc='upper left', frameon=False)
+    ax.grid(axis='y', alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(save_path, format='png', dpi=120, bbox_inches='tight')
+    plt.close()
+    return save_path
+
+
+def generate_performance_html(rows: List[Dict], chart_cid: str) -> str:
+    """Performance section (cycle table, capital cards, chart vs EGX30) for the email body."""
+    if not rows:
+        return ""
+
+    def color(v):
+        return '#008000' if v >= 0 else '#cc0000'
+
+    def period(r):
+        s = datetime.strptime(r['start'], '%Y-%m-%d')
+        e = datetime.strptime(r['end'], '%Y-%m-%d')
+        return f"{s:%b %d} – {e:%b %d, %Y}"
+
+    table_rows = ""
+    for r in rows:
+        label = str(r['cycle'])
+        if r['in_progress']:
+            label += ' <span style="font-size: 10px; color: #888;">(in progress)</span>'
+        table_rows += f'''
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+            <td style="padding: 10px 8px; text-align: center;"><strong>{label}</strong></td>
+            <td style="padding: 10px 8px;">{period(r)}</td>
+            <td style="padding: 10px 8px; text-align: right; color: {color(r['return_pct'])};">{r['return_pct']:+.2f}%</td>
+            <td style="padding: 10px 8px; text-align: right; color: {color(r['benchmark_pct'])};">{r['benchmark_pct']:+.2f}%</td>
+            <td style="padding: 10px 8px; text-align: right;">{r['value']:,.0f} EGP</td>
+            <td style="padding: 10px 8px; text-align: right; color: {color(r['cum_pct'])};"><strong>{r['cum_pct']:+.2f}%</strong></td>
+        </tr>
+        '''
+
+    last = rows[-1]
+    profit = last['value'] - HYPOTHETICAL_PORTFOLIO_SIZE
+    as_of = datetime.strptime(last['end'], '%Y-%m-%d').strftime('%b %d, %Y')
+    completed = [r for r in rows if not r['in_progress']]
+    beat = sum(1 for r in completed if r['return_pct'] > r['benchmark_pct'])
+    gap = last['cum_pct'] - last['bench_cum_pct']
+    takeaway = (f"Portfolio beat the EGX30 benchmark in {beat} of {len(completed)} completed cycles. Cumulative: "
+                f"{last['cum_pct']:+.2f}% vs EGX30 {last['bench_cum_pct']:+.2f}% "
+                f"({gap:+.1f} points {'ahead' if gap >= 0 else 'behind'}).")
+
+    return f'''
+            <!-- Cycle Performance -->
+            <div style="margin: 20px;">
+                <h2 style="color: #1a4b64; font-size: 18px; margin: 0 0 8px 0;">📅 Hypothetical Portfolio Performance by Cycle</h2>
+                <p style="font-size: 11px; color: #666; margin: 0 0 12px 0;">Starting capital: {HYPOTHETICAL_PORTFOLIO_SIZE:,.0f} EGP · Returns compounded cycle to cycle · Data through {as_of}</p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 13px; border: 1px solid #e0e0e0;">
+                    <thead>
+                        <tr style="background-color: #f2f2f2;">
+                            <th style="padding: 12px 8px; text-align: center;">Cycle</th>
+                            <th style="padding: 12px 8px; text-align: left;">Period</th>
+                            <th style="padding: 12px 8px; text-align: right;">Cycle Return</th>
+                            <th style="padding: 12px 8px; text-align: right;">EGX30</th>
+                            <th style="padding: 12px 8px; text-align: right;">Portfolio Value</th>
+                            <th style="padding: 12px 8px; text-align: right;">Cumulative Return</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {table_rows}
+                    </tbody>
+                </table>
+
+                <table cellpadding="0" cellspacing="0" width="100%" style="margin-top: 16px;">
+                    <tr>
+                        <td width="33%" style="padding: 6px;">
+                            <table width="100%" cellpadding="12" style="background-color: #f5f7fa;">
+                                <tr><td style="font-size: 12px; color: #666;">STARTING CAPITAL</td></tr>
+                                <tr><td style="font-size: 22px; font-weight: bold; color: #1a5d7a;">{HYPOTHETICAL_PORTFOLIO_SIZE:,.0f} EGP</td></tr>
+                                <tr><td style="font-size: 11px; color: #888;">{len(rows)} cycles ago</td></tr>
+                            </table>
+                        </td>
+                        <td width="33%" style="padding: 6px;">
+                            <table width="100%" cellpadding="12" style="background-color: #f5f7fa;">
+                                <tr><td style="font-size: 12px; color: #666;">ENDING VALUE</td></tr>
+                                <tr><td style="font-size: 22px; font-weight: bold; color: #1a5d7a;">{last['value']:,.0f} EGP</td></tr>
+                                <tr><td style="font-size: 11px; color: #888;">as of {as_of}</td></tr>
+                            </table>
+                        </td>
+                        <td width="34%" style="padding: 6px;">
+                            <table width="100%" cellpadding="12" style="background-color: #f5f7fa;">
+                                <tr><td style="font-size: 12px; color: #666;">TOTAL PROFIT</td></tr>
+                                <tr><td style="font-size: 22px; font-weight: bold; color: {color(profit)};">{profit:+,.0f} EGP</td></tr>
+                                <tr><td style="font-size: 11px; color: #888;">{last['cum_pct']:+.2f}% cumulative</td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <div style="margin-top: 16px; text-align: center;">
+                    <img src="cid:{chart_cid}" alt="Portfolio vs EGX30 Chart" style="max-width: 100%; border: 1px solid #e0e0e0; border-radius: 8px;">
+                </div>
+                <p style="font-size: 13px; color: #333; margin: 12px 0 0 0;">{takeaway}</p>
+                <p style="font-size: 10px; color: #888; margin: 6px 0 0 0;">Hypothetical / simulated performance for illustrative purposes only. Not investment advice and not a guarantee of future results.</p>
+            </div>
+'''
+
+
 def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date: Optional[str] = None) -> List[Dict]:
     """
     Update saved stocks with CURRENT live prices (or the close on as_of_date) and recalculate P/L.
@@ -834,7 +1026,7 @@ def generate_pdf_from_html(html_path: str, pdf_path: str):
         return False
 
 
-def generate_email_html(summary: Dict, chart_cid: str) -> str:
+def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "") -> str:
     """Generate HTML with proper CID reference for chart."""
     stocks = summary['stocks']
     formatted_date = datetime.now().strftime('%d %B %Y')
@@ -853,7 +1045,6 @@ def generate_email_html(summary: Dict, chart_cid: str) -> str:
     cycle_start_date = summary['cycle_start_date']
 
     pnl_color = '#008000' if portfolio_pnl_pct >= 0 else '#cc0000'
-    pnl_symbol = '+' if portfolio_pnl_pct >= 0 else ''
 
     benchmark_pnl = summary['benchmark_pnl_pct']
     outperformance = portfolio_pnl_pct - benchmark_pnl
@@ -874,7 +1065,6 @@ def generate_email_html(summary: Dict, chart_cid: str) -> str:
     # Build table rows
     table_rows = ""
     for s in stocks:
-        pnl_symbol_s = '+' if s.get('current_pnl_pct', 0) >= 0 else ''
         status_text = s['status']
         status_color = '#27ae60' if status_text == 'Open' else '#c0392b'
         company_display = s['name'] if s['name'] != s['ticker'] else '—'
@@ -886,7 +1076,7 @@ def generate_email_html(summary: Dict, chart_cid: str) -> str:
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px;">{s['entry_date']}</td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px; text-align: right;">{s['entry_price']:,.2f}</td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px; text-align: right;">{s.get('current_price', s['entry_price']):,.2f}</td>
-            <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: right; color: {'#008000' if s.get('current_pnl_pct', 0) >= 0 else '#cc0000'};">{pnl_symbol_s}{s.get('current_pnl_pct', 0):+.2f}%</td>
+            <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: right; color: {'#008000' if s.get('current_pnl_pct', 0) >= 0 else '#cc0000'};">{s.get('current_pnl_pct', 0):+.2f}%</td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: center;"><span style="background: #f0f0f0; padding: 4px 8px;">{s['stop_loss_price']:,.2f}</span></td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: center;"><span style="background: {status_color}20; color: {status_color}; padding: 4px 10px;">{status_text}</span></td>
          </tr>
@@ -970,11 +1160,11 @@ def generate_email_html(summary: Dict, chart_cid: str) -> str:
                             <div style="font-size: 11px;">Per Stock</div>
                         </td>
                         <td align="center" style="color: #ffffff;">
-                            <div style="font-size: 22px; font-weight: bold; color: {pnl_color};">{pnl_symbol}{portfolio_pnl_pct:+.2f}%</div>
+                            <div style="font-size: 22px; font-weight: bold; color: {pnl_color};">{portfolio_pnl_pct:+.2f}%</div>
                             <div style="font-size: 11px;">Portfolio P/L</div>
                         </td>
                         <td align="center" style="color: #ffffff;">
-                            <div style="font-size: 22px; font-weight: bold; color: {pnl_color};">{pnl_symbol}{portfolio_pnl_egp:+,.0f} EGP</div>
+                            <div style="font-size: 22px; font-weight: bold; color: {pnl_color};">{portfolio_pnl_egp:+,.0f} EGP</div>
                             <div style="font-size: 11px;">Total P/L</div>
                         </td>
                      </tr>
@@ -1003,25 +1193,26 @@ def generate_email_html(summary: Dict, chart_cid: str) -> str:
 
                         <tr style="background-color: #e8f4f8; font-weight: bold; border-top: 2px solid #ccc;">
                             <td colspan="5" style="padding: 12px 8px; text-align: right;">Portfolio Weighted Average →</td>
-                            <td style="padding: 12px 8px; text-align: right; color: {pnl_color};">{pnl_symbol}{portfolio_pnl_pct:+.2f}%</td>
+                            <td style="padding: 12px 8px; text-align: right; color: {pnl_color};">{portfolio_pnl_pct:+.2f}%</td>
                             <td colspan="2" style="padding: 12px 8px; text-align: center;">vs {len(stocks)} stocks</td>
                          </tr>
 
                         <tr style="background-color: #f5f5f5;">
                             <td colspan="5" style="padding: 12px 8px; text-align: right;">EGX30 Benchmark (same period) →<br><span style="font-size: 10px; color: #888;">Entry: {summary['benchmark_entry_date']} | Last: {summary['benchmark_current_date']}</span></td>
-                            <td style="padding: 12px 8px; text-align: right; color: {'#008000' if benchmark_pnl >= 0 else '#cc0000'};">{'+' if benchmark_pnl >= 0 else ''}{benchmark_pnl:+.2f}%</td>
+                            <td style="padding: 12px 8px; text-align: right; color: {'#008000' if benchmark_pnl >= 0 else '#cc0000'};">{benchmark_pnl:+.2f}%</td>
                             <td colspan="2" style="padding: 12px 8px; text-align: center;">@{summary['benchmark_current_price'] or 0:,.2f} EGP</td>
                          </tr>
 
                         <tr style="background-color: #e8f5e9; font-weight: bold;">
                             <td colspan="5" style="padding: 12px 8px; text-align: right;">📈 Outperformance (Portfolio - EGX30) →</td>
-                            <td style="padding: 12px 8px; text-align: right; color: {outperformance_color};">{'+' if outperformance >= 0 else ''}{outperformance:+.2f}%</td>
+                            <td style="padding: 12px 8px; text-align: right; color: {outperformance_color};">{outperformance:+.2f}%</td>
                             <td colspan="2" style="padding: 12px 8px; text-align: center;">&nbsp;</td>
                          </tr>
                     </tbody>
                 </table>
             </div>
 
+{performance_html}
             <!-- Strategy Guide -->
             <div style="background-color: #fef9e6; margin: 20px; border-left: 4px solid #e67e22; padding: 16px 24px; text-align: left;">
                 <h3 style="color: #e67e22; font-size: 16px; margin: 0 0 12px 0;">📊 Trade Setup & Strategy Guide</h3>
@@ -1051,7 +1242,7 @@ def generate_email_html(summary: Dict, chart_cid: str) -> str:
 
 
 def send_email_report(html_content: str, chart_path: str, html_path: str = None, pdf_path: str = None,
-                      is_new_cycle: bool = False):
+                      is_new_cycle: bool = False, perf_chart_path: str = None, perf_html_path: str = None):
     """Send email with HTML content, chart image, HTML file attachment, and optional PDF attachment."""
     if not SEND_EMAIL_AUTOMATICALLY:
         print("📧 Email sending disabled")
@@ -1128,6 +1319,25 @@ Please view the HTML version or PDF attachment for complete details."""
             print(f"📎 HTML file attached: {html_path}")
         except Exception as e:
             print(f"⚠️ Could not attach HTML file: {e}")
+
+    # Performance report: chart embedded in the body, plus a standalone HTML copy to save or forward
+    if perf_chart_path and os.path.exists(perf_chart_path):
+        with open(perf_chart_path, 'rb') as f:
+            perf_img = f.read()
+        image = MIMEImage(perf_img, name=os.path.basename(perf_chart_path))
+        image.add_header('Content-ID', '<performance_chart>')
+        image.add_header('Content-Disposition', 'inline', filename=os.path.basename(perf_chart_path))
+        msg_related.attach(image)
+        if perf_html_path and os.path.exists(perf_html_path):
+            with open(perf_html_path, 'r', encoding='utf-8') as f:
+                perf_data = f.read().replace(
+                    'src="cid:performance_chart"',
+                    f'src="data:image/png;base64,{base64.b64encode(perf_img).decode("utf-8")}"'
+                )
+            perf_attachment = MIMEText(perf_data, 'html', 'utf-8')
+            perf_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(perf_html_path))
+            msg.attach(perf_attachment)
+        print(f"📈 Performance report attached: {perf_html_path}")
 
     # Attach PDF if it exists
     if pdf_path and os.path.exists(pdf_path):
@@ -1238,7 +1448,29 @@ def main():
     print(f"📊 Chart saved: {CHART_PATH}")
 
     # Generate HTML report
-    html_report = generate_email_html(summary, "expected_returns_chart")
+    # Cycle performance report (all cycles compounded vs EGX30)
+    performance_html = ""
+    if PERFORMANCE_REPORT_MODE == "daily" or (PERFORMANCE_REPORT_MODE == "cycle_end" and previous_cycle):
+        current = None
+        if PERFORMANCE_REPORT_MODE == "daily" and not is_new_cycle:
+            current = {
+                'cycle_start_date': cycle_start_date,
+                'cycle_exit_date': summary['latest_price_date'],
+                'portfolio_pnl_pct': summary['portfolio_pnl_pct'],
+                'benchmark_pnl_pct': summary['benchmark_pnl_pct'],
+            }
+        perf_rows = build_performance_rows(load_cycle_history(), current)
+        if perf_rows:
+            generate_performance_chart(perf_rows, PERFORMANCE_CHART_PATH)
+            performance_html = generate_performance_html(perf_rows, "performance_chart")
+            with open(PERFORMANCE_HTML_OUTPUT, 'w', encoding='utf-8') as f:
+                f.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n'
+                        '<title>Optvest EGX Seasonality Performance</title>\n</head>\n'
+                        '<body style="margin: 0 auto; max-width: 1100px; font-family: \'Segoe UI\', Arial, sans-serif;">'
+                        f'{performance_html}</body>\n</html>')
+            print(f"📈 Performance report saved: {PERFORMANCE_HTML_OUTPUT} ({len(perf_rows)} cycles)")
+
+    html_report = generate_email_html(summary, "expected_returns_chart", performance_html)
     with open(HTML_OUTPUT, 'w', encoding='utf-8') as f:
         f.write(html_report)
     print(f"\n📄 HTML report saved: {HTML_OUTPUT}")
@@ -1257,6 +1489,8 @@ def main():
         HTML_OUTPUT,
         PDF_OUTPUT if (GENERATE_PDF and pdf_generated) else None,
         is_new_cycle=is_new_cycle,
+        perf_chart_path=PERFORMANCE_CHART_PATH if performance_html else None,
+        perf_html_path=PERFORMANCE_HTML_OUTPUT if performance_html else None,
     )
     print("\n✨ Done.")
 
