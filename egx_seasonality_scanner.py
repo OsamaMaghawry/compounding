@@ -10,6 +10,99 @@ EGX Seasonality Live Scanner - Fully Automatic Cycle Rollover
 - Optional: CYCLE_ENTRY_DATE starts one cycle on a specific date (used once only).
 """
 
+# ============================================
+# CONFIGURATIONS - EDIT THESE VALUES ONCE
+# ============================================
+import os
+
+# ---------- ON / OFF SWITCHES (True = ON, False = OFF) ----------
+SEND_EMAIL_AUTOMATICALLY = True        # Send the report by email
+SEND_PERFORMANCE_REPORT_DAILY = True   # True:  performance table + chart vs EGX30 in EVERY daily email
+                                       # False: only in the email at the end of each cycle
+ATTACH_HTML_TO_EMAIL = True            # Attach the report as an HTML file as well
+GENERATE_PDF = False                   # Also create a PDF of the report
+
+# ---------- STRATEGY ----------
+NUM_STOCKS = 10
+HOLDING_DAYS = 21
+STOP_LOSS_PCT = 5.0
+HYPOTHETICAL_PORTFOLIO_SIZE = 100_000  # EGP
+
+# ENTRY DATE - OPTIONAL, normally leave as None.
+# None  -> fully automatic: a new cycle starts by itself every HOLDING_DAYS trading days.
+# "YYYY-MM-DD" -> start ONE cycle on that date (e.g. to back-date a cycle). It is applied
+#                 once and remembered in cycle_state.json, so you can leave it here and
+#                 the following cycles will still roll over automatically.
+CYCLE_ENTRY_DATE = None
+
+# ---------- EMAIL ----------
+EMAIL_CONFIG = {
+    "smtp_server": "smtp-relay.brevo.com",
+    "smtp_port": 587,
+    "sender_email": "osama@optvest.capital",
+    "sender_name": "Osama Safwat",
+    "smtp_login": os.environ.get("SMTP_LOGIN", "PUT_YOUR_SMTP_LOGIN_HERE"),
+    "smtp_password": os.environ.get("SMTP_PASSWORD", "PUT_YOUR_SMTP_PASSWORD_HERE"),
+    "recipient_emails": [
+        # "someone@example.com",
+    ]
+}
+
+# ---------- DATA API ----------
+EODHD_API_KEY = os.environ.get("EODHD_API_KEY", "PUT_YOUR_EODHD_API_KEY_HERE")
+EODHD_BASE_URL = "https://eodhd.com/api"
+BENCHMARK_SYMBOL = "EGX30.INDX"
+
+# ---------- FILTERS ----------
+MIN_CORRELATION = 0.4
+MIN_HISTORY_DAYS = 252
+MIN_LIQUIDITY = 2_000_000
+MAX_RETURN_THRESHOLD = 100
+
+# Month Filters
+MONTHS_TO_SKIP = {
+    'January': False, 'February': False, 'March': False,
+    'April': False, 'May': False, 'June': False,
+    'July': False, 'August': False, 'September': False,
+    'October': False, 'November': False, 'December': False,
+}
+
+RANKING_METHOD = "opportunity_score"
+
+YEAR_WEIGHTS = [
+    (3, 0.30), (5, 0.20), (7, 0.15), (10, 0.15), (15, 0.10), (20, 0.10),
+]
+
+# ---------- ADVANCED (normally no need to change) ----------
+EGX_WEEKMASK = "Sun Mon Tue Wed Thu"   # fallback trading week when the benchmark calendar is unavailable
+BATCH_SIZE = 5
+BATCH_DELAY = 0.3
+MAX_RETRIES = 3
+
+HTML_OUTPUT = "live_scan_report.html"
+PDF_OUTPUT = "live_scan_report.pdf"
+CHART_PATH = "expected_returns_chart.png"
+PERFORMANCE_CHART_PATH = "performance_chart.png"
+PERFORMANCE_HTML_OUTPUT = "performance_report.html"
+CYCLE_STATE_FILE = "cycle_state.json"
+CYCLE_HISTORY_FILE = "cycle_history.json"
+TICKER_CACHE_FILE = "ticker_names_cache.json"
+
+# Cycles that finished before cycle_history.json existed (final figures from the emailed reports).
+# Any cycle already saved in cycle_history.json takes priority over its entry here.
+PAST_CYCLES = [
+    {'cycle_start_date': '2026-04-29', 'cycle_exit_date': '2026-05-25', 'portfolio_pnl_pct': 2.46, 'benchmark_pnl_pct': 0.53, 'stopped_count': 1, 'num_stocks': 10},
+    {'cycle_start_date': '2026-05-25', 'cycle_exit_date': '2026-06-23', 'portfolio_pnl_pct': 8.72, 'benchmark_pnl_pct': -0.14, 'stopped_count': 1, 'num_stocks': 10},
+    {'cycle_start_date': '2026-06-24', 'cycle_exit_date': '2026-07-22', 'portfolio_pnl_pct': 21.32, 'benchmark_pnl_pct': 4.30, 'stopped_count': 0, 'num_stocks': 10},
+    {'cycle_start_date': '2026-07-26', 'cycle_exit_date': '2026-08-24', 'portfolio_pnl_pct': 15.16, 'benchmark_pnl_pct': 3.27, 'stopped_count': 1, 'num_stocks': 10},
+    {'cycle_start_date': '2026-08-26', 'cycle_exit_date': '2026-09-24', 'portfolio_pnl_pct': 1.50, 'benchmark_pnl_pct': -2.41, 'stopped_count': 4, 'num_stocks': 10},
+    {'cycle_start_date': '2026-09-26', 'cycle_exit_date': '2026-10-25', 'portfolio_pnl_pct': -3.58, 'benchmark_pnl_pct': -8.45, 'stopped_count': 8, 'num_stocks': 10},
+]
+
+# ============================================
+# END OF CONFIGURATIONS
+# ============================================
+
 import os
 import sys
 import json
@@ -35,114 +128,6 @@ import matplotlib.dates as mdates
 
 warnings.filterwarnings('ignore')
 
-# ============================================
-# CONFIGURATIONS - EDIT THESE VALUES ONCE
-# ============================================
-
-# EODHD API Configuration
-EODHD_API_KEY = os.environ.get("EODHD_API_KEY", "PUT_YOUR_EODHD_API_KEY_HERE")
-EODHD_BASE_URL = "https://eodhd.com/api"
-
-# Strategy Parameters
-NUM_STOCKS = 10
-HOLDING_DAYS = 21
-STOP_LOSS_PCT = 5.0
-
-# ENTRY DATE - OPTIONAL, normally leave as None.
-# None  -> fully automatic: a new cycle starts by itself every HOLDING_DAYS trading days.
-# "YYYY-MM-DD" -> start ONE cycle on that date (e.g. to back-date a cycle). It is applied
-#                 once and remembered in cycle_state.json, so you can leave it here and
-#                 the following cycles will still roll over automatically.
-CYCLE_ENTRY_DATE = None
-
-# EGX trading week (used only as a fallback when the benchmark calendar is unavailable)
-EGX_WEEKMASK = "Sun Mon Tue Wed Thu"
-
-# Hypothetical Portfolio Size (EGP)
-HYPOTHETICAL_PORTFOLIO_SIZE = 100_000
-
-# Filter Parameters
-MIN_CORRELATION = 0.4
-MIN_HISTORY_DAYS = 252
-MIN_LIQUIDITY = 2_000_000
-MAX_RETURN_THRESHOLD = 100
-
-# Month Filters
-MONTHS_TO_SKIP = {
-    'January': False, 'February': False, 'March': False,
-    'April': False, 'May': False, 'June': False,
-    'July': False, 'August': False, 'September': False,
-    'October': False, 'November': False, 'December': False,
-}
-
-RANKING_METHOD = "opportunity_score"
-
-YEAR_WEIGHTS = [
-    (3, 0.30), (5, 0.20), (7, 0.15), (10, 0.15), (15, 0.10), (20, 0.10),
-]
-
-BATCH_SIZE = 5
-BATCH_DELAY = 0.3
-MAX_RETRIES = 3
-
-HTML_OUTPUT = "live_scan_report.html"
-PDF_OUTPUT = "live_scan_report.pdf"
-CHART_PATH = "expected_returns_chart.png"
-CYCLE_STATE_FILE = "cycle_state.json"
-CYCLE_HISTORY_FILE = "cycle_history.json"
-TICKER_CACHE_FILE = "ticker_names_cache.json"
-
-PERFORMANCE_CHART_PATH = "performance_chart.png"
-PERFORMANCE_HTML_OUTPUT = "performance_report.html"
-
-# Cycles that finished before cycle_history.json existed (final figures from the emailed reports).
-# Any cycle already saved in cycle_history.json takes priority over its entry here.
-PAST_CYCLES = [
-    {'cycle_start_date': '2026-04-29', 'cycle_exit_date': '2026-05-25', 'portfolio_pnl_pct': 2.46, 'benchmark_pnl_pct': 0.53, 'stopped_count': 1, 'num_stocks': 10},
-    {'cycle_start_date': '2026-05-25', 'cycle_exit_date': '2026-06-23', 'portfolio_pnl_pct': 8.72, 'benchmark_pnl_pct': -0.14, 'stopped_count': 1, 'num_stocks': 10},
-    {'cycle_start_date': '2026-06-24', 'cycle_exit_date': '2026-07-22', 'portfolio_pnl_pct': 21.32, 'benchmark_pnl_pct': 4.30, 'stopped_count': 0, 'num_stocks': 10},
-    {'cycle_start_date': '2026-07-26', 'cycle_exit_date': '2026-08-24', 'portfolio_pnl_pct': 15.16, 'benchmark_pnl_pct': 3.27, 'stopped_count': 1, 'num_stocks': 10},
-    {'cycle_start_date': '2026-08-26', 'cycle_exit_date': '2026-09-24', 'portfolio_pnl_pct': 1.50, 'benchmark_pnl_pct': -2.41, 'stopped_count': 4, 'num_stocks': 10},
-    {'cycle_start_date': '2026-09-26', 'cycle_exit_date': '2026-10-25', 'portfolio_pnl_pct': -3.58, 'benchmark_pnl_pct': -8.45, 'stopped_count': 8, 'num_stocks': 10},
-]
-
-# ============================================
-# PDF GENERATION CONFIGURATION
-# ============================================
-# Set to False to disable PDF generation
-GENERATE_PDF = False  # <-- CHANGE THIS to False to disable PDF generation
-
-# ============================================
-# EMAIL CONFIGURATION
-# ============================================
-# Set to True to attach HTML file to email (in addition to email body)
-ATTACH_HTML_TO_EMAIL = True  # <-- CHANGE THIS to False to disable HTML attachment
-
-# PERFORMANCE REPORT (table of all cycles + chart vs EGX30, shown under the Current Cycle Tracker)
-# It is ALWAYS included in the email that ends a cycle and starts the next one.
-# True  = ALSO include it in every daily email (current cycle shown as "in progress")
-# False = include it only at the end of each cycle
-SEND_PERFORMANCE_REPORT_DAILY = True  # <-- CHANGE THIS to False to show it only at cycle end
-
-# Email Configuration
-EMAIL_CONFIG = {
-    "smtp_server": "smtp-relay.brevo.com",
-    "smtp_port": 587,
-    "sender_email": "osama@optvest.capital",
-    "sender_name": "Osama Safwat",
-    "smtp_login": os.environ.get("SMTP_LOGIN", "PUT_YOUR_SMTP_LOGIN_HERE"),
-    "smtp_password": os.environ.get("SMTP_PASSWORD", "PUT_YOUR_SMTP_PASSWORD_HERE"),
-    "recipient_emails": [
-        # "someone@example.com",
-    ]
-}
-
-SEND_EMAIL_AUTOMATICALLY = True
-BENCHMARK_SYMBOL = "EGX30.INDX"
-
-# ============================================
-# END OF CONFIGURATIONS
-# ============================================
 
 MONTH_NAME_TO_NUM = {
     'January': 1, 'February': 2, 'March': 3, 'April': 4,
