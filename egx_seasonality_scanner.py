@@ -92,13 +92,6 @@ CYCLE_STATE_FILE = "cycle_state.json"
 CYCLE_HISTORY_FILE = "cycle_history.json"
 TICKER_CACHE_FILE = "ticker_names_cache.json"
 
-# ============================================
-# CYCLE PERFORMANCE REPORT (all cycles compounded vs EGX30)
-# ============================================
-# "cycle_end" -> included only in the email that closes a cycle and starts the next one
-# "daily"     -> included in every daily email (the running cycle is shown as "in progress")
-# "off"       -> never included
-PERFORMANCE_REPORT_MODE = "cycle_end"
 PERFORMANCE_CHART_PATH = "performance_chart.png"
 PERFORMANCE_HTML_OUTPUT = "performance_report.html"
 
@@ -124,6 +117,12 @@ GENERATE_PDF = False  # <-- CHANGE THIS to False to disable PDF generation
 # ============================================
 # Set to True to attach HTML file to email (in addition to email body)
 ATTACH_HTML_TO_EMAIL = True  # <-- CHANGE THIS to False to disable HTML attachment
+
+# PERFORMANCE REPORT (table of all cycles + chart vs EGX30, shown under the Current Cycle Tracker)
+# It is ALWAYS included in the email that ends a cycle and starts the next one.
+# True  = ALSO include it in every daily email (current cycle shown as "in progress")
+# False = include it only at the end of each cycle
+SEND_PERFORMANCE_REPORT_DAILY = True  # <-- CHANGE THIS to False to show it only at cycle end
 
 # Email Configuration
 EMAIL_CONFIG = {
@@ -1382,6 +1381,7 @@ def main():
     print(f"   Email sending: {'ON' if SEND_EMAIL_AUTOMATICALLY else 'OFF'}")
     print(f"   PDF generation: {'ON' if GENERATE_PDF else 'OFF'}")
     print(f"   Attach HTML to email: {'ON' if ATTACH_HTML_TO_EMAIL else 'OFF'}")
+    print(f"   Performance report: {'EVERY DAY' if SEND_PERFORMANCE_REPORT_DAILY else 'END OF CYCLE ONLY'}")
     print("=" * 70)
 
     saved_cycle = load_saved_cycle()
@@ -1450,9 +1450,9 @@ def main():
     # Generate HTML report
     # Cycle performance report (all cycles compounded vs EGX30)
     performance_html = ""
-    if PERFORMANCE_REPORT_MODE == "daily" or (PERFORMANCE_REPORT_MODE == "cycle_end" and previous_cycle):
+    if SEND_PERFORMANCE_REPORT_DAILY or previous_cycle:
         current = None
-        if PERFORMANCE_REPORT_MODE == "daily" and not is_new_cycle:
+        if not is_new_cycle:
             current = {
                 'cycle_start_date': cycle_start_date,
                 'cycle_exit_date': summary['latest_price_date'],
