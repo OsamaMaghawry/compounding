@@ -77,6 +77,9 @@ STRATEGY = "TREND"                  # "TREND" = the EMA re-cross strategy above
 MR_BAND_STD = 2.0                   # "stretched" = a close beyond VWAP +/- this many standard deviations
 MR_FIRST_TARGET_STD = 0.0           # e.g. 1.0 = take FIRST_EXIT_FRACTION off at the 1-sigma band; 0 = all out at VWAP
 MR_STOP_BUFFER_PCT = 0.5            # stop this % beyond the extreme of the stretch (lowest low for longs)
+MR_FIXED_STOP_PCT = 0.0             # e.g. 1.0 = stop 1% from the entry price instead of beyond the stretch; 0 = off
+MR_MIN_REWARD_RISK = 0.0            # e.g. 1.5 = enter only if the distance to VWAP is at least 1.5x the distance
+                                    # to the stop; 0 = off
 MR_TIME_STOP_MINUTES = 0            # e.g. 45 = close the trade if VWAP is not reached within 45 minutes; 0 = off
 MR_FIRST_ENTRY_TIME = "10:00"       # no mean reversion entries before this time (VWAP needs time to settle)
 
@@ -513,12 +516,23 @@ def finish_trade(pos, trades):
     })
 
 
+def mr_stop_price(side, bar, entry_price):
+    """Mean reversion stop: a fixed % from entry, or just beyond the extreme of the stretch."""
+    if MR_FIXED_STOP_PCT:
+        return entry_price * (1 - MR_FIXED_STOP_PCT / 100) if side == "long" else entry_price * (1 + MR_FIXED_STOP_PCT / 100)
+    if side == "long":
+        extreme = min(bar["low"], bar["prev_stretch_low"]) if pd.notna(bar["prev_stretch_low"]) else bar["low"]
+        return extreme * (1 - MR_STOP_BUFFER_PCT / 100)
+    extreme = max(bar["high"], bar["prev_stretch_high"]) if pd.notna(bar["prev_stretch_high"]) else bar["high"]
+    return extreme * (1 + MR_STOP_BUFFER_PCT / 100)
+
+
 def manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all):
     """Exits for a mean reversion trade: stop, first target band, VWAP, time stop, end of day."""
     long = pos["side"] == "long"
     stop = pos["stop"]
     if (bar["low"] <= stop) if long else (bar["high"] >= stop):
-        close_part(pos, pos["shares_left"], min(bar["open"], stop) if long else max(bar["open"], stop), ts, "stop (beyond the stretch)")
+        close_part(pos, pos["shares_left"], min(bar["open"], stop) if long else max(bar["open"], stop), ts, f"stop {MR_FIXED_STOP_PCT:g}%" if MR_FIXED_STOP_PCT else "stop (beyond the stretch)")
         return
     if MR_FIRST_TARGET_STD and not pos["first_exit_done"]:
         target = bar["vwap"] - MR_FIRST_TARGET_STD * bar["vwap_std"] if long else bar["vwap"] + MR_FIRST_TARGET_STD * bar["vwap_std"]
@@ -621,6 +635,11 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             if len(open_positions) >= NUM_SLOTS:
                 break
             price = fill_price(bar["close"], side, "entry")
+            if STRATEGY == "MEAN_REVERSION" and MR_MIN_REWARD_RISK:
+                risk = abs(price - mr_stop_price(side, bar, price))
+                reward = (bar["vwap"] - price) if side == "long" else (price - bar["vwap"])
+                if risk <= 0 or reward < MR_MIN_REWARD_RISK * risk:
+                    continue   # not enough room to VWAP for the risk taken
             shares = slot_value / price
             shares = shares if (side == "long" and ALLOW_FRACTIONAL_SHARES) else int(shares)
             if shares <= 0:
@@ -631,12 +650,7 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
                 "shares_left": shares, "first_exit_done": False, "exits": [],
             }
             if STRATEGY == "MEAN_REVERSION":
-                if side == "long":
-                    extreme = min(bar["low"], bar["prev_stretch_low"]) if pd.notna(bar["prev_stretch_low"]) else bar["low"]
-                    open_positions[symbol]["stop"] = extreme * (1 - MR_STOP_BUFFER_PCT / 100)
-                else:
-                    extreme = max(bar["high"], bar["prev_stretch_high"]) if pd.notna(bar["prev_stretch_high"]) else bar["high"]
-                    open_positions[symbol]["stop"] = extreme * (1 + MR_STOP_BUFFER_PCT / 100)
+                open_positions[symbol]["stop"] = mr_stop_price(side, bar, price)
             entries_today[symbol] = entries_today.get(symbol, 0) + 1
 
     # Anything still open when the data ends (should not happen before EXIT_ALL_TIME)
