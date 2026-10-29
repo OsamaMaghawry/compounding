@@ -54,6 +54,7 @@ EMA_MID = 21
 MID_LINE = "EMA"                    # "EMA" = the EMA_MID (21) line; "VWAP" = the day's VWAP replaces it
                                     # (entry: EMA_FAST crosses back over the line; second exit: close crosses the line)
 EMA_SLOW = 200
+USE_SLOW_EMA_FILTER = False         # True = longs only above EMA_SLOW (200), shorts only below it; False = ignored
 ENABLE_LONGS = True
 ENABLE_SHORTS = True
 FIRST_EXIT_FRACTION = 0.5           # part sold at the EMA_FAST cross (0.5 = half)
@@ -393,15 +394,18 @@ def prepare_bars(minutes, day):
 
 def entry_signal(bar):
     """'long', 'short' or None for one closed bar."""
-    if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_fast"]):
-        return None  # 200 EMA not ready yet
+    warmup = EMA_SLOW if USE_SLOW_EMA_FILTER else EMA_MID
+    if bar["bars_seen"] < warmup or pd.isna(bar["prev_fast"]):
+        return None  # EMAs not ready yet
     crossed_up = bar["ema_fast"] > bar["ema_mid"] and bar["prev_fast"] <= bar["prev_mid"]
     crossed_down = bar["ema_fast"] < bar["ema_mid"] and bar["prev_fast"] >= bar["prev_mid"]
     if MIN_TREND_MINUTES and bar["trend_bars"] * BAR_MINUTES < MIN_TREND_MINUTES:
         return None  # no established trend before the dip
-    if ENABLE_LONGS and crossed_up and bar["close"] > bar["ema_mid"] and bar["close"] > bar["ema_slow"]:
+    above_slow = bar["close"] > bar["ema_slow"] or not USE_SLOW_EMA_FILTER
+    below_slow = bar["close"] < bar["ema_slow"] or not USE_SLOW_EMA_FILTER
+    if ENABLE_LONGS and crossed_up and bar["close"] > bar["ema_mid"] and above_slow:
         return "long"
-    if ENABLE_SHORTS and crossed_down and bar["close"] < bar["ema_mid"] and bar["close"] < bar["ema_slow"]:
+    if ENABLE_SHORTS and crossed_down and bar["close"] < bar["ema_mid"] and below_slow:
         return "short"
     return None
 
