@@ -66,6 +66,17 @@ EMA_WARMUP_DAYS = 2                 # previous trading days loaded so the 200 EM
                                     # (raised automatically for bigger bars, e.g. 5-minute bars need 4)
 EMA_INCLUDE_EXTENDED_HOURS = False  # True = pre/after-market bars count in the EMAs
 
+# ---------- STRATEGY TYPE ----------
+STRATEGY = "TREND"                  # "TREND" = the EMA re-cross strategy above
+                                    # "MEAN_REVERSION" = fade stretched moves back to VWAP (settings below)
+
+# ---------- MEAN REVERSION TO VWAP (used when STRATEGY = "MEAN_REVERSION") ----------
+MR_BAND_STD = 2.0                   # "stretched" = a close beyond VWAP +/- this many standard deviations
+MR_FIRST_TARGET_STD = 0.0           # e.g. 1.0 = take FIRST_EXIT_FRACTION off at the 1-sigma band; 0 = all out at VWAP
+MR_STOP_BUFFER_PCT = 0.5            # stop this % beyond the extreme of the stretch (lowest low for longs)
+MR_TIME_STOP_MINUTES = 0            # e.g. 45 = close the trade if VWAP is not reached within 45 minutes; 0 = off
+MR_FIRST_ENTRY_TIME = "10:00"       # no mean reversion entries before this time (VWAP needs time to settle)
+
 # ---------- FILTERS AGAINST WHIPSAWS (0 = off) ----------
 BAR_MINUTES = 1                     # chart timeframe: 1, 2, 5 ... minute bars (EMAs and signals use these bars)
 MAX_TRADES_PER_STOCK_PER_DAY = 0    # e.g. 2 = a stock can be entered at most twice a day; 0 = no limit
@@ -73,6 +84,7 @@ MIN_TREND_MINUTES = 0               # e.g. 15 = before the dip, EMA_FAST must ha
                                     # EMA_MID for at least 15 minutes (skips sideways stocks)
 EXIT_BUFFER_PCT = 0.0               # e.g. 0.2 = the EMA_MID exit needs a close 0.2% beyond EMA_MID, not just a touch
 MAX_WATCHLIST_PER_SCAN = 0          # e.g. 20 = only the 20 highest relative volume stocks of each scan; 0 = all
+MAX_RELATIVE_VOLUME = 0             # e.g. 3.0 = skip stocks above 3x relative volume (news-driven movers); 0 = no limit
 
 # ---------- CAPITAL ----------
 ACCOUNT_EQUITY = 100_000            # account equity ($)
@@ -338,6 +350,8 @@ def scan_day(day, prior_days, windows, filters):
         df["rvol"] = df["volume"] / df["avg_volume"]
         df = df[(df["rvol"] >= MIN_RELATIVE_VOLUME) & (df["price"] >= MIN_PRICE)
                 & (df["avg_daily_volume"] >= MIN_AVG_DAILY_VOLUME)]
+        if MAX_RELATIVE_VOLUME:
+            df = df[df["rvol"] <= MAX_RELATIVE_VOLUME]
         if MAX_WATCHLIST_PER_SCAN:
             df = df.sort_values("rvol", ascending=False).head(MAX_WATCHLIST_PER_SCAN)
         print(f"   🔎 {day} {scan}: {len(df)} stocks in play")
@@ -369,12 +383,26 @@ def prepare_bars(minutes, day):
                   .dropna(subset=["close"]))
         for name, span in (("ema_fast", EMA_FAST), ("ema_mid", EMA_MID), ("ema_slow", EMA_SLOW)):
             g[name] = g["close"].ewm(span=span, adjust=False).mean()
+        # Session VWAP and its standard deviation, restarting every day at the open
+        typical = (g["high"] + g["low"] + g["close"]) / 3
+        day_key = g.index.date
+        cum_vol = g["volume"].groupby(day_key).cumsum().replace(0, np.nan)
+        g["vwap"] = ((typical * g["volume"]).groupby(day_key).cumsum() / cum_vol).ffill()
+        variance = (typical ** 2 * g["volume"]).groupby(day_key).cumsum() / cum_vol - g["vwap"] ** 2
+        g["vwap_std"] = np.sqrt(variance.clip(lower=0)).ffill()
+        g["upper_band"] = g["vwap"] + MR_BAND_STD * g["vwap_std"]
+        g["lower_band"] = g["vwap"] - MR_BAND_STD * g["vwap_std"]
+        g["prev_upper"] = g["upper_band"].shift(1)
+        g["prev_lower"] = g["lower_band"].shift(1)
+        # Lowest low / highest high of the current run of closes beyond the band (the stretch)
+        below = g["close"] < g["lower_band"]
+        above_b = g["close"] > g["upper_band"]
+        g["stretch_low"] = g["low"].groupby((below != below.shift()).cumsum()).cummin().where(below)
+        g["stretch_high"] = g["high"].groupby((above_b != above_b.shift()).cumsum()).cummax().where(above_b)
+        g["prev_stretch_low"] = g["stretch_low"].shift(1)
+        g["prev_stretch_high"] = g["stretch_high"].shift(1)
         if MID_LINE.upper() == "VWAP":
-            # Session VWAP, restarting every day at the open (typical price x volume)
-            typical = (g["high"] + g["low"] + g["close"]) / 3
-            day_key = g.index.date
-            g["ema_mid"] = ((typical * g["volume"]).groupby(day_key).cumsum()
-                            / g["volume"].groupby(day_key).cumsum().replace(0, np.nan)).ffill()
+            g["ema_mid"] = g["vwap"]
         g["prev_close"] = g["close"].shift(1)
         g["prev_fast"] = g["ema_fast"].shift(1)
         g["prev_mid"] = g["ema_mid"].shift(1)
@@ -390,6 +418,17 @@ def prepare_bars(minutes, day):
         if not g.empty:
             out[symbol] = g
     return out
+
+
+def mr_entry_signal(bar, bar_close_time):
+    """Mean reversion: a close back inside the band after closing beyond it."""
+    if bar_close_time < dtime.fromisoformat(MR_FIRST_ENTRY_TIME) or not bar["vwap_std"] > 0 or pd.isna(bar["prev_lower"]):
+        return None
+    if ENABLE_LONGS and bar["prev_close"] < bar["prev_lower"] and bar["lower_band"] < bar["close"] < bar["vwap"]:
+        return "long"
+    if ENABLE_SHORTS and bar["prev_close"] > bar["prev_upper"] and bar["vwap"] < bar["close"] < bar["upper_band"]:
+        return "short"
+    return None
 
 
 def entry_signal(bar):
@@ -444,6 +483,30 @@ def finish_trade(pos, trades):
     })
 
 
+def manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all):
+    """Exits for a mean reversion trade: stop, first target band, VWAP, time stop, end of day."""
+    long = pos["side"] == "long"
+    stop = pos["stop"]
+    if (bar["low"] <= stop) if long else (bar["high"] >= stop):
+        close_part(pos, pos["shares_left"], min(bar["open"], stop) if long else max(bar["open"], stop), ts, "stop (beyond the stretch)")
+        return
+    if MR_FIRST_TARGET_STD and not pos["first_exit_done"]:
+        target = bar["vwap"] - MR_FIRST_TARGET_STD * bar["vwap_std"] if long else bar["vwap"] + MR_FIRST_TARGET_STD * bar["vwap_std"]
+        if (bar["high"] >= target) if long else (bar["low"] <= target):
+            part = pos["shares"] * FIRST_EXIT_FRACTION
+            part = part if (long and ALLOW_FRACTIONAL_SHARES) else max(1, int(part))
+            part = min(part, pos["shares_left"])
+            close_part(pos, part, max(bar["open"], target) if long else min(bar["open"], target), ts, f"{MR_FIRST_TARGET_STD:g}-sigma band")
+            pos["first_exit_done"] = True
+    if pos["shares_left"] > 0 and ((bar["high"] >= bar["vwap"]) if long else (bar["low"] <= bar["vwap"])):
+        close_part(pos, pos["shares_left"], max(bar["open"], bar["vwap"]) if long else min(bar["open"], bar["vwap"]), ts, "reached VWAP")
+    held = (ts + timedelta(minutes=BAR_MINUTES)) - pos["entry_time"]
+    if pos["shares_left"] > 0 and MR_TIME_STOP_MINUTES and held >= timedelta(minutes=MR_TIME_STOP_MINUTES):
+        close_part(pos, pos["shares_left"], bar["close"], ts, f"time stop {MR_TIME_STOP_MINUTES} min")
+    if pos["shares_left"] > 0 and bar_close_time >= exit_all:
+        close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
+
+
 def simulate_day(day, watchlist, bars, capital):
     """Replay one day minute by minute. Returns the closed trades."""
     slot_value = capital / NUM_SLOTS
@@ -472,7 +535,9 @@ def simulate_day(day, watchlist, bars, capital):
             bar, pos = g.loc[ts], open_positions[symbol]
             long = pos["side"] == "long"
 
-            if STOP_LOSS_PCT > 0:
+            if STRATEGY == "MEAN_REVERSION":
+                manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all)
+            elif STOP_LOSS_PCT > 0:
                 stop = pos["entry_price"] * (1 - STOP_LOSS_PCT / 100 if long else 1 + STOP_LOSS_PCT / 100)
                 hit = bar["low"] <= stop if long else bar["high"] >= stop
                 if hit:
@@ -480,7 +545,7 @@ def simulate_day(day, watchlist, bars, capital):
                     close_part(pos, pos["shares_left"], gap_px, ts, "stop loss")
             if pos["shares_left"] > 0 and bar_close_time >= exit_all:
                 close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
-            if pos["shares_left"] > 0:
+            if pos["shares_left"] > 0 and STRATEGY != "MEAN_REVERSION":
                 buffer = EXIT_BUFFER_PCT / 100
                 below_mid = (bar["close"] < bar["ema_mid"] * (1 - buffer)) if long else (bar["close"] > bar["ema_mid"] * (1 + buffer))
                 # the close crosses the fast EMA (it was on the trade's side of it one bar earlier)
@@ -515,7 +580,7 @@ def simulate_day(day, watchlist, bars, capital):
             if closed_at.get(symbol) == ts:
                 continue  # never re-enter on the bar that closed the trade
             bar = g.loc[ts]
-            side = entry_signal(bar)
+            side = mr_entry_signal(bar, bar_close_time) if STRATEGY == "MEAN_REVERSION" else entry_signal(bar)
             if side:
                 candidates.append((rvol[symbol], symbol, side, bar))
         for _, symbol, side, bar in sorted(candidates, key=lambda c: c[0], reverse=True):
@@ -531,6 +596,13 @@ def simulate_day(day, watchlist, bars, capital):
                 "entry_time": ts + timedelta(minutes=BAR_MINUTES), "entry_price": price, "shares": shares,
                 "shares_left": shares, "first_exit_done": False, "exits": [],
             }
+            if STRATEGY == "MEAN_REVERSION":
+                if side == "long":
+                    extreme = min(bar["low"], bar["prev_stretch_low"]) if pd.notna(bar["prev_stretch_low"]) else bar["low"]
+                    open_positions[symbol]["stop"] = extreme * (1 - MR_STOP_BUFFER_PCT / 100)
+                else:
+                    extreme = max(bar["high"], bar["prev_stretch_high"]) if pd.notna(bar["prev_stretch_high"]) else bar["high"]
+                    open_positions[symbol]["stop"] = extreme * (1 + MR_STOP_BUFFER_PCT / 100)
             entries_today[symbol] = entries_today.get(symbol, 0) + 1
 
     # Anything still open when the data ends (should not happen before EXIT_ALL_TIME)
