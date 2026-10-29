@@ -91,6 +91,7 @@ MIN_TREND_MINUTES = 0               # e.g. 15 = before the dip, EMA_FAST must ha
 EXIT_BUFFER_PCT = 0.0               # e.g. 0.2 = the EMA_MID exit needs a close 0.2% beyond EMA_MID, not just a touch
 MAX_WATCHLIST_PER_SCAN = 0          # e.g. 20 = only the 20 highest relative volume stocks of each scan; 0 = all
 MAX_RELATIVE_VOLUME = 0             # e.g. 3.0 = skip stocks above 3x relative volume (news-driven movers); 0 = no limit
+MAX_GAP_PCT = 0.0                   # e.g. 1.0 = skip stocks that opened more than 1% above or below the previous close; 0 = off
 MARKET_FILTER = False               # True = longs only while MARKET_SYMBOL is above its VWAP, shorts only while below
 MARKET_SYMBOL = "SPY"
 
@@ -765,18 +766,21 @@ def main():
         # 2. Stocks worth downloading: price and average daily volume before each test day
         print("\n📋 Building the stock list from daily data...")
         universe = get_universe()
-        filters, candidates = {}, set()
+        filters, candidates, candidates_by_day = {}, set(), {}
         for day in test_days:
             f = daily_filters(day, all_days, universe)
             filters[day] = f
             ok = f[(f["avg_daily_volume"] >= MIN_AVG_DAILY_VOLUME) & (f["prev_close"] >= MIN_PRICE * PREFILTER_PRICE_FACTOR)]
             candidates |= set(ok.index)
+            candidates_by_day[day] = set(ok.index)
             print(f"   {day}: {len(ok):,} of {len(universe):,} stocks pass price/volume before the open")
 
         # 3. 1-minute data needed (cached files are reused)
         days_back = max(RVOL_LOOKBACK_DAYS, warmup_days())
         chunks = date_chunks(test_days, all_days, days_back)
-        jobs = [(t, s, e) for s, e in chunks for t in sorted(candidates)]
+        # Only download a stock for a date range if it qualifies on a test day inside that range
+        jobs = [(t, s, e) for s, e in chunks
+                for t in sorted(set().union(*[candidates_by_day[d] for d in test_days if s <= d <= e]))]
         def already_have(ticker, start_day, end_day):
             if minutes_file(ticker, start_day, end_day).exists():
                 return True
@@ -819,10 +823,21 @@ def main():
             if watchlist.empty:
                 daily.append({"date": day, "watchlist": 0, "trades": 0, "pnl": 0.0, "capital": round(capital, 2)})
                 continue
-            watchlists.append(watchlist.assign(date=day))
-
             bar_days = all_days[max(0, idx - warmup_days()):idx + 1]
             minutes = pd.concat([load_minutes(s, chunks, bar_days) for s in watchlist["symbol"]], ignore_index=True)
+            if MAX_GAP_PCT and not minutes.empty:
+                # Gap = today's first regular-session open vs the previous day's last regular-session close
+                t = minutes["ts"].dt.time
+                rth = minutes[(t >= SESSION_OPEN) & (t < SESSION_CLOSE)]
+                d = rth["ts"].dt.strftime("%Y-%m-%d")
+                today_open = rth[d == day].groupby("symbol")["open"].first()
+                prev_close = rth[d < day].groupby("symbol")["close"].last()
+                gap = ((today_open - prev_close) / prev_close * 100).abs()
+                keep = set(gap[gap <= MAX_GAP_PCT].index)
+                print(f"   ↕ gap filter: {len(keep)} of {len(watchlist)} stocks opened within {MAX_GAP_PCT:g}% of the previous close")
+                watchlist = watchlist[watchlist["symbol"].isin(keep)].reset_index(drop=True)
+                minutes = minutes[minutes["symbol"].isin(keep)]
+            watchlists.append(watchlist.assign(date=day))
             bars = prepare_bars(minutes, day)
             market_above_vwap = None
             if MARKET_FILTER:
