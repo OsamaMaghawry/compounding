@@ -60,7 +60,16 @@ LAST_ENTRY_TIME = "15:30"           # no new entries after this time
 EXIT_ALL_TIME = "15:45"             # every open position is closed at this time
 ALLOW_REENTRY = True                # a stock can be traded again the same day after it is closed
 EMA_WARMUP_DAYS = 2                 # previous trading days loaded so the 200 EMA is ready at the open
+                                    # (raised automatically for bigger bars, e.g. 5-minute bars need 4)
 EMA_INCLUDE_EXTENDED_HOURS = False  # True = pre/after-market bars count in the EMAs
+
+# ---------- FILTERS AGAINST WHIPSAWS (0 = off) ----------
+BAR_MINUTES = 1                     # chart timeframe: 1, 2, 5 ... minute bars (EMAs and signals use these bars)
+MAX_TRADES_PER_STOCK_PER_DAY = 0    # e.g. 2 = a stock can be entered at most twice a day; 0 = no limit
+MIN_TREND_MINUTES = 0               # e.g. 15 = before the dip, EMA_FAST must have been on the trade's side of
+                                    # EMA_MID for at least 15 minutes (skips sideways stocks)
+EXIT_BUFFER_PCT = 0.0               # e.g. 0.2 = the EMA_MID exit needs a close 0.2% beyond EMA_MID, not just a touch
+MAX_WATCHLIST_PER_SCAN = 0          # e.g. 20 = only the 20 highest relative volume stocks of each scan; 0 = all
 
 # ---------- CAPITAL ----------
 ACCOUNT_EQUITY = 100_000            # account equity ($)
@@ -270,6 +279,11 @@ def date_chunks(test_days, all_days, days_back):
 # SCANNING - STOCKS IN PLAY
 # ============================================================================
 
+def warmup_days():
+    """Previous trading days needed so the slow EMA is ready at the open on the chosen bar size."""
+    return max(EMA_WARMUP_DAYS, int(np.ceil(EMA_SLOW * BAR_MINUTES / 390)) + 1)
+
+
 def enabled_scan_times():
     return sorted(t for t, on in SCAN_TIMES.items() if on)
 
@@ -317,6 +331,8 @@ def scan_day(day, prior_days, windows, filters):
         df["rvol"] = df["volume"] / df["avg_volume"]
         df = df[(df["rvol"] >= MIN_RELATIVE_VOLUME) & (df["price"] >= MIN_PRICE)
                 & (df["avg_daily_volume"] >= MIN_AVG_DAILY_VOLUME)]
+        if MAX_WATCHLIST_PER_SCAN:
+            df = df.sort_values("rvol", ascending=False).head(MAX_WATCHLIST_PER_SCAN)
         print(f"   🔎 {day} {scan}: {len(df)} stocks in play")
         found.append(df.reset_index().rename(columns={"volume": "today_volume"})
                      [["symbol", "scan_time", "rvol", "price", "today_volume", "avg_volume", "avg_daily_volume"]])
@@ -338,12 +354,24 @@ def prepare_bars(minutes, day):
     out = {}
     for symbol, g in minutes.sort_values("ts").groupby("symbol"):
         g = g.drop_duplicates("ts").set_index("ts")
+        if BAR_MINUTES > 1:
+            # N-minute bars aligned to the 9:30 open, built day by day
+            g = (g.groupby(g.index.date, group_keys=False)
+                  .apply(lambda d: d.resample(f"{BAR_MINUTES}min", origin=d.index[0].normalize() + pd.Timedelta(hours=9, minutes=30))
+                         .agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}))
+                  .dropna(subset=["close"]))
         for name, span in (("ema_fast", EMA_FAST), ("ema_mid", EMA_MID), ("ema_slow", EMA_SLOW)):
             g[name] = g["close"].ewm(span=span, adjust=False).mean()
         g["prev_close"] = g["close"].shift(1)
         g["prev_fast"] = g["ema_fast"].shift(1)
         g["prev_mid"] = g["ema_mid"].shift(1)
         g["bars_seen"] = np.arange(1, len(g) + 1)
+        # Length (in bars) of the EMA_FAST-vs-EMA_MID run two runs back: the trend before the dip
+        above = g["ema_fast"] > g["ema_mid"]
+        run_id = (above != above.shift()).cumsum()
+        run_len = run_id.map(run_id.value_counts())
+        lengths = run_len.groupby(run_id).first()
+        g["trend_bars"] = run_id.map(lambda r: lengths.get(r - 2, 0))
         g = g[(g.index.strftime("%Y-%m-%d") == day)
               & (g.index.time >= SESSION_OPEN) & (g.index.time < SESSION_CLOSE)]
         if not g.empty:
@@ -352,11 +380,13 @@ def prepare_bars(minutes, day):
 
 
 def entry_signal(bar):
-    """'long', 'short' or None for one closed 1-minute bar."""
+    """'long', 'short' or None for one closed bar."""
     if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_fast"]):
         return None  # 200 EMA not ready yet
     crossed_up = bar["ema_fast"] > bar["ema_mid"] and bar["prev_fast"] <= bar["prev_mid"]
     crossed_down = bar["ema_fast"] < bar["ema_mid"] and bar["prev_fast"] >= bar["prev_mid"]
+    if MIN_TREND_MINUTES and bar["trend_bars"] * BAR_MINUTES < MIN_TREND_MINUTES:
+        return None  # no established trend before the dip
     if ENABLE_LONGS and crossed_up and bar["close"] > bar["ema_mid"] and bar["close"] > bar["ema_slow"]:
         return "long"
     if ENABLE_SHORTS and crossed_down and bar["close"] < bar["ema_mid"] and bar["close"] < bar["ema_slow"]:
@@ -378,7 +408,7 @@ def close_part(pos, shares, price, ts, reason):
     exit_px = fill_price(price, pos["side"], "exit")
     direction = 1 if pos["side"] == "long" else -1
     pnl = (exit_px - pos["entry_price"]) * shares * direction - COMMISSION_PER_SHARE * shares
-    pos["exits"].append({"time": ts + timedelta(minutes=1), "shares": shares, "price": exit_px, "reason": reason, "pnl": pnl})
+    pos["exits"].append({"time": ts + timedelta(minutes=BAR_MINUTES), "shares": shares, "price": exit_px, "reason": reason, "pnl": pnl})
     pos["shares_left"] -= shares
 
 
@@ -411,9 +441,10 @@ def simulate_day(day, watchlist, bars, capital):
     by_symbol_time = {s: g for s, g in bars.items() if s in added_at}
     all_times = sorted(set().union(*[set(g.index) for g in by_symbol_time.values()])) if by_symbol_time else []
 
-    open_positions, trades, traded_today, closed_at = {}, [], set(), {}
+    open_positions, trades, closed_at = {}, [], {}
+    entries_today = {}
     for ts in all_times:
-        bar_close_time = (ts + timedelta(minutes=1)).time()   # decisions are made when the bar closes
+        bar_close_time = (ts + timedelta(minutes=BAR_MINUTES)).time()   # decisions are made when the bar closes
         if bar_close_time < first_scan:
             continue
 
@@ -434,7 +465,8 @@ def simulate_day(day, watchlist, bars, capital):
             if pos["shares_left"] > 0 and bar_close_time >= exit_all:
                 close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
             if pos["shares_left"] > 0:
-                below_mid = bar["close"] < bar["ema_mid"] if long else bar["close"] > bar["ema_mid"]
+                buffer = EXIT_BUFFER_PCT / 100
+                below_mid = (bar["close"] < bar["ema_mid"] * (1 - buffer)) if long else (bar["close"] > bar["ema_mid"] * (1 + buffer))
                 # the close crosses the fast EMA (it was on the trade's side of it one bar earlier)
                 if long:
                     below_fast = bar["close"] < bar["ema_fast"] and bar["prev_close"] >= bar["prev_fast"]
@@ -460,7 +492,9 @@ def simulate_day(day, watchlist, bars, capital):
         for symbol, g in by_symbol_time.items():
             if symbol in open_positions or ts not in g.index or bar_close_time < added_at[symbol]:
                 continue
-            if not ALLOW_REENTRY and symbol in traded_today:
+            if not ALLOW_REENTRY and entries_today.get(symbol, 0) > 0:
+                continue
+            if MAX_TRADES_PER_STOCK_PER_DAY and entries_today.get(symbol, 0) >= MAX_TRADES_PER_STOCK_PER_DAY:
                 continue
             if closed_at.get(symbol) == ts:
                 continue  # never re-enter on the bar that closed the trade
@@ -478,10 +512,10 @@ def simulate_day(day, watchlist, bars, capital):
                 continue
             open_positions[symbol] = {
                 "date": day, "symbol": symbol, "side": side, "scan_time": scan_of[symbol], "rvol": rvol[symbol],
-                "entry_time": ts + timedelta(minutes=1), "entry_price": price, "shares": shares,
+                "entry_time": ts + timedelta(minutes=BAR_MINUTES), "entry_price": price, "shares": shares,
                 "shares_left": shares, "first_exit_done": False, "exits": [],
             }
-            traded_today.add(symbol)
+            entries_today[symbol] = entries_today.get(symbol, 0) + 1
 
     # Anything still open when the data ends (should not happen before EXIT_ALL_TIME)
     for symbol, pos in open_positions.items():
@@ -601,7 +635,7 @@ def main():
             print(f"   {day}: {len(ok):,} of {len(universe):,} stocks pass price/volume before the open")
 
         # 3. 1-minute data needed (cached files are reused)
-        days_back = max(RVOL_LOOKBACK_DAYS, EMA_WARMUP_DAYS)
+        days_back = max(RVOL_LOOKBACK_DAYS, warmup_days())
         chunks = date_chunks(test_days, all_days, days_back)
         jobs = [(t, s, e) for s, e in chunks for t in sorted(candidates)]
         todo = [j for j in jobs if not minutes_file(*j).exists()]
@@ -641,7 +675,7 @@ def main():
                 continue
             watchlists.append(watchlist.assign(date=day))
 
-            bar_days = all_days[max(0, idx - EMA_WARMUP_DAYS):idx + 1]
+            bar_days = all_days[max(0, idx - warmup_days()):idx + 1]
             minutes = pd.concat([load_minutes(s, chunks, bar_days) for s in watchlist["symbol"]], ignore_index=True)
             bars = prepare_bars(minutes, day)
             day_trades = simulate_day(day, watchlist, bars, capital)
