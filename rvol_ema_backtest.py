@@ -75,6 +75,9 @@ STRATEGY = "TREND"                  # "TREND" = the EMA re-cross strategy above
 
 # ---------- MEAN REVERSION TO VWAP (used when STRATEGY = "MEAN_REVERSION") ----------
 MR_BAND_STD = 2.0                   # "stretched" = a close beyond VWAP +/- this many standard deviations
+MR_ENTRY = "BAND"                   # "BAND" = enter on the first close back inside the band
+                                    # "EMA_CROSS" = enter when the close crosses back over EMA_FAST (9) after a stretch
+MR_SETUP_MINUTES = 60               # EMA_CROSS: the stretch must have happened within this many minutes before the cross
 MR_FIRST_TARGET_STD = 0.0           # e.g. 1.0 = take FIRST_EXIT_FRACTION off at the 1-sigma band; 0 = all out at VWAP
 MR_STOP_BUFFER_PCT = 0.5            # stop this % beyond the extreme of the stretch (lowest low for longs)
 MR_FIXED_STOP_PCT = 0.0             # e.g. 1.0 = stop 1% from the entry price instead of beyond the stretch; 0 = off
@@ -435,6 +438,12 @@ def prepare_bars(minutes, day):
         g["stretch_high"] = g["high"].groupby((above_b != above_b.shift()).cumsum()).cummax().where(above_b)
         g["prev_stretch_low"] = g["stretch_low"].shift(1)
         g["prev_stretch_high"] = g["stretch_high"].shift(1)
+        # For EMA_CROSS entries: was there a close beyond the band in the last MR_SETUP_MINUTES, and the extreme since
+        setup_bars = max(1, int(MR_SETUP_MINUTES / BAR_MINUTES))
+        g["recent_below"] = below.astype(int).groupby(day_key).transform(lambda x: x.shift(1).rolling(setup_bars, min_periods=1).max()).fillna(0) > 0
+        g["recent_above"] = above_b.astype(int).groupby(day_key).transform(lambda x: x.shift(1).rolling(setup_bars, min_periods=1).max()).fillna(0) > 0
+        g["recent_low"] = g["low"].groupby(day_key).transform(lambda x: x.rolling(setup_bars + 1, min_periods=1).min())
+        g["recent_high"] = g["high"].groupby(day_key).transform(lambda x: x.rolling(setup_bars + 1, min_periods=1).max())
         if MID_LINE.upper() == "VWAP":
             g["ema_mid"] = g["vwap"]
         g["prev_close"] = g["close"].shift(1)
@@ -457,6 +466,14 @@ def prepare_bars(minutes, day):
 def mr_entry_signal(bar, bar_close_time):
     """Mean reversion: a close back inside the band after closing beyond it."""
     if bar_close_time < dtime.fromisoformat(MR_FIRST_ENTRY_TIME) or not bar["vwap_std"] > 0 or pd.isna(bar["prev_lower"]):
+        return None
+    if MR_ENTRY == "EMA_CROSS":
+        crossed_up = bar["close"] > bar["ema_fast"] and bar["prev_close"] <= bar["prev_fast"]
+        crossed_down = bar["close"] < bar["ema_fast"] and bar["prev_close"] >= bar["prev_fast"]
+        if ENABLE_LONGS and crossed_up and bar["recent_below"] and bar["close"] < bar["vwap"]:
+            return "long"
+        if ENABLE_SHORTS and crossed_down and bar["recent_above"] and bar["close"] > bar["vwap"]:
+            return "short"
         return None
     if ENABLE_LONGS and bar["prev_close"] < bar["prev_lower"] and bar["lower_band"] < bar["close"] < bar["vwap"]:
         return "long"
@@ -521,6 +538,9 @@ def mr_stop_price(side, bar, entry_price):
     """Mean reversion stop: a fixed % from entry, or just beyond the extreme of the stretch."""
     if MR_FIXED_STOP_PCT:
         return entry_price * (1 - MR_FIXED_STOP_PCT / 100) if side == "long" else entry_price * (1 + MR_FIXED_STOP_PCT / 100)
+    if MR_ENTRY == "EMA_CROSS":
+        # lowest low / highest high since the stretch window began
+        return bar["recent_low"] * (1 - MR_STOP_BUFFER_PCT / 100) if side == "long" else bar["recent_high"] * (1 + MR_STOP_BUFFER_PCT / 100)
     if side == "long":
         extreme = min(bar["low"], bar["prev_stretch_low"]) if pd.notna(bar["prev_stretch_low"]) else bar["low"]
         return extreme * (1 - MR_STOP_BUFFER_PCT / 100)
