@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RVOL + EMA Intraday Backtest (Databento data)
+RVOL + EMA Intraday Backtest (EODHD data)
 
 How a test day is replayed:
 1. SCANS (only at the scan times switched on below): find "stocks in play" by relative
@@ -18,7 +18,7 @@ How a test day is replayed:
    - SHORT      : the mirror image (switch with ENABLE_SHORTS).
 3. CAPITAL: ACCOUNT_EQUITY x ALLOCATION_PCT is split into NUM_SLOTS equal positions.
 
-Install:  pip install databento pandas numpy matplotlib
+Install:  pip install pandas numpy requests matplotlib
 Run:      python rvol_ema_backtest.py
 """
 
@@ -73,13 +73,17 @@ ALLOW_FRACTIONAL_SHARES = False     # longs only; shorts always use whole shares
 SLIPPAGE_PCT = 0.02                 # % worse than the signal bar's close, on every fill
 COMMISSION_PER_SHARE = 0.0          # $ per share, each side
 
-# ---------- DATABENTO ----------
-DATABENTO_API_KEY = "PUT_YOUR_DATABENTO_API_KEY_HERE"   # or set the DATABENTO_API_KEY environment variable
-MINUTE_DATASET = "EQUS.MINI"        # 1-minute bars for the whole US market
-DAILY_DATASET = "EQUS.SUMMARY"      # daily bars (consolidated volume) for the average daily volume filter
-CACHE_DIR = "databento_cache"       # downloaded data is kept here, so re-running the same days costs nothing
-MAX_COST_USD = 25.0                 # stop before any download that would push this run's Databento cost above this
-ESTIMATE_COST_ONLY = False          # True = only print what the market-wide downloads would cost, download nothing
+# ---------- EODHD DATA ----------
+EODHD_API_KEY = "PUT_YOUR_EODHD_API_KEY_HERE"   # or set the EODHD_API_KEY environment variable
+EXCLUDED_EXCHANGES = ["OTC", "PINK", "NMFQS"]   # venues whose name contains any of these are left out (OTC, pink sheets, mutual funds)
+INCLUDE_ETFS = False                # True = ETFs can be stocks in play too
+INCLUDE_DELISTED = True             # True = stocks delisted since then are included (avoids survivorship bias)
+PREFILTER_PRICE_FACTOR = 0.7        # 1-minute data is only downloaded for stocks whose previous close was
+                                    # at least MIN_PRICE x this (the exact price check happens at scan time)
+CACHE_DIR = "eodhd_cache"           # downloaded data is kept here, so re-running the same days costs nothing
+DOWNLOAD_THREADS = 8                # parallel downloads (EODHD allows about 1,000 requests a minute)
+MAX_API_CALLS = 60_000              # stop before a run would use more EODHD calls than this (your plan: 100,000/day)
+ESTIMATE_CALLS_ONLY = False         # True = only print how many EODHD calls the run needs, download nothing
 
 # ---------- OUTPUT ----------
 RESULTS_DIR = "backtest_results"
@@ -88,115 +92,174 @@ RESULTS_DIR = "backtest_results"
 # END OF SETTINGS
 # ============================================================================
 
+
+import gzip
+import json
 import os
 import random
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, time as dtime
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 
 TZ = "America/New_York"
 SESSION_OPEN = dtime(9, 30)
 SESSION_CLOSE = dtime(16, 0)
+EODHD_URL = "https://eodhd.com/api"
+CALL_COST = {"eod": 1, "list": 1, "bulk": 100, "intraday": 5}   # EODHD API calls per request
+MAX_DAYS_PER_REQUEST = 115           # EODHD gives at most 120 days of 1-minute bars per request
 
-_client = None
-_spent_usd = 0.0
-_estimated_usd = 0.0
+_calls_used = 0
+_calls_lock = threading.Lock()
 
 
-class CostLimitReached(Exception):
+class CallLimitReached(Exception):
     pass
 
 
 # ============================================================================
-# DATABENTO DATA (with local cache)
+# EODHD DATA (with local cache)
 # ============================================================================
 
-def get_client():
-    global _client
-    if _client is None:
-        import databento as db
-        key = os.environ.get("DATABENTO_API_KEY") or DATABENTO_API_KEY
-        if not key or key.startswith("PUT_YOUR"):
-            raise SystemExit("Set DATABENTO_API_KEY at the top of the file (or as an environment variable).")
-        _client = db.Historical(key)
-    return _client
+def api_key():
+    key = os.environ.get("EODHD_API_KEY") or EODHD_API_KEY
+    if not key or key.startswith("PUT_YOUR"):
+        raise SystemExit("Set EODHD_API_KEY at the top of the file (or as an environment variable).")
+    return key
 
 
-def to_utc_iso(day, hhmm):
-    ts = pd.Timestamp(f"{day} {hhmm}", tz=TZ)
-    return ts.tz_convert("UTC").isoformat()
+def eodhd_get(path, params, kind):
+    """One EODHD request, counted against MAX_API_CALLS, retried when rate-limited."""
+    global _calls_used
+    with _calls_lock:
+        if _calls_used + CALL_COST[kind] > MAX_API_CALLS:
+            raise CallLimitReached(f"This run reached MAX_API_CALLS ({MAX_API_CALLS:,} EODHD calls).")
+        _calls_used += CALL_COST[kind]
+    for attempt in range(6):
+        try:
+            r = requests.get(f"{EODHD_URL}/{path}", params={**params, "api_token": api_key(), "fmt": "json"}, timeout=90)
+        except requests.RequestException:
+            time.sleep(2 * (attempt + 1))
+            continue
+        if r.status_code == 429:
+            time.sleep(5 * (attempt + 1))
+            continue
+        if r.status_code == 404:
+            return []
+        if r.status_code == 402:
+            raise CallLimitReached("EODHD says today's API limit is used up.")
+        if r.status_code in (401, 403):
+            raise SystemExit(f"EODHD refused the request ({r.status_code}): check the API key and that your plan includes {path.split('/')[0]}.")
+        r.raise_for_status()
+        return r.json()
+    raise RuntimeError(f"EODHD request kept failing: {path}")
 
 
-def fetch(dataset, schema, start, end, symbols, tag):
-    """Download (or load from cache) one Databento request and return it as a DataFrame."""
-    global _spent_usd, _estimated_usd
-    import databento as db
+def cache_path(*parts):
+    p = Path(CACHE_DIR).joinpath(*parts)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
 
-    Path(CACHE_DIR).mkdir(exist_ok=True)
-    cache_file = Path(CACHE_DIR) / f"{dataset}_{schema}_{tag}.dbn.zst"
-    if not cache_file.exists():
-        client = get_client()
-        cost = client.metadata.get_cost(dataset=dataset, schema=schema, start=start, end=end,
-                                        symbols=symbols, stype_in="raw_symbol")
-        if ESTIMATE_COST_ONLY:
-            _estimated_usd += cost
-            print(f"   [estimate] {tag}: ${cost:.2f}")
-            return None
-        if _spent_usd + cost > MAX_COST_USD:
-            raise CostLimitReached(f"Downloading {tag} (${cost:.2f}) would take this run over "
-                                   f"MAX_COST_USD (${MAX_COST_USD:.2f}); ${_spent_usd:.2f} spent so far.")
-        print(f"   ⬇ {tag} (${cost:.2f})")
-        client.timeseries.get_range(dataset=dataset, schema=schema, start=start, end=end,
-                                    symbols=symbols, stype_in="raw_symbol", path=str(cache_file))
-        _spent_usd += cost
 
-    store = db.DBNStore.from_file(str(cache_file))
-    df = store.to_df(tz=TZ)
-    if df.empty:
-        return df
-    df = df.reset_index()
-    ts_col = "ts_event" if "ts_event" in df.columns else df.columns[0]
-    return df.rename(columns={ts_col: "ts"})[["ts", "symbol", "open", "high", "low", "close", "volume"]]
+def cached_json(name, path, params, kind):
+    file = cache_path("json", f"{name}.json.gz")
+    if file.exists():
+        with gzip.open(file, "rt") as f:
+            return json.load(f)
+    data = eodhd_get(path, params, kind)
+    with gzip.open(file, "wt") as f:
+        json.dump(data, f)
+    return data
 
 
 def get_trading_days(start_date, end_date):
     """Trading days in a range, taken from SPY daily bars."""
-    end = (pd.Timestamp(end_date) + timedelta(days=1)).strftime("%Y-%m-%d")
-    df = fetch(DAILY_DATASET, "ohlcv-1d", start_date, end, ["SPY"], f"SPY_{start_date}_{end_date}")
-    if df is None:
-        return []
-    return sorted({d.strftime("%Y-%m-%d") for d in df["ts"]})
+    data = cached_json(f"SPY_{start_date}_{end_date}", "eod/SPY.US", {"from": start_date, "to": end_date}, "eod")
+    return sorted(row["date"] for row in data)
 
 
-def get_daily_bars(before_day):
-    """Daily bars for every stock over the ~2 months before a test day."""
-    start = (pd.Timestamp(before_day) - timedelta(days=60)).strftime("%Y-%m-%d")
-    return fetch(DAILY_DATASET, "ohlcv-1d", start, before_day, "ALL_SYMBOLS", f"ALL_{start}_{before_day}")
+def get_universe():
+    """US stock tickers, without OTC/pink-sheet venues (plus delisted ones if switched on)."""
+    month = datetime.now().strftime("%Y-%m")
+    rows = cached_json(f"symbols_US_{month}", "exchange-symbol-list/US", {}, "list")
+    if INCLUDE_DELISTED:
+        rows = rows + cached_json(f"symbols_US_delisted_{month}", "exchange-symbol-list/US", {"delisted": 1}, "list")
+    types = {"Common Stock"} | ({"ETF"} if INCLUDE_ETFS else set())
+    def listed(exchange):
+        exchange = str(exchange or "").upper()
+        return not any(x.upper() in exchange for x in EXCLUDED_EXCHANGES)
+    return {r["Code"] for r in rows if r.get("Type") in types and listed(r.get("Exchange"))}
 
 
-def get_market_minutes(day, start_hhmm, end_hhmm):
-    """1-minute bars for every stock between two times of one day."""
-    tag = f"ALL_{day}_{start_hhmm.replace(':', '')}-{end_hhmm.replace(':', '')}"
-    return fetch(MINUTE_DATASET, "ohlcv-1m", to_utc_iso(day, start_hhmm), to_utc_iso(day, end_hhmm),
-                 "ALL_SYMBOLS", tag)
+def get_bulk_day(day):
+    """Daily bars for every US ticker on one day (close and volume)."""
+    rows = cached_json(f"bulk_US_{day}", "eod-bulk-last-day/US", {"date": day}, "bulk")
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame(columns=["code", "close", "volume"])
+    return df[["code", "close", "volume"]]
 
 
-def get_symbol_minutes(symbols, start_day, end_day):
-    """1-minute bars (including extended hours) for a few symbols over several days."""
-    if not symbols:
-        return pd.DataFrame(columns=["ts", "symbol", "open", "high", "low", "close", "volume"])
+def minutes_file(ticker, start_day, end_day):
+    return cache_path("minutes", f"{start_day}_{end_day}", f"{ticker.replace('/', '_')}.csv.gz")
+
+
+def download_minutes(ticker, start_day, end_day):
+    """1-minute bars (incl. pre/after-market) for one ticker over one date range, saved to the cache."""
+    file = minutes_file(ticker, start_day, end_day)
+    if file.exists():
+        return
+    start = int(pd.Timestamp(start_day, tz=TZ).timestamp())
+    end = int((pd.Timestamp(end_day, tz=TZ) + timedelta(days=1)).timestamp())
+    rows = eodhd_get(f"intraday/{ticker}.US", {"interval": "1m", "from": start, "to": end}, "intraday")
+    df = pd.DataFrame(rows if isinstance(rows, list) else [])
+    cols = ["timestamp", "open", "high", "low", "close", "volume"]
+    df = df[cols].dropna() if not df.empty else pd.DataFrame(columns=cols)
+    df.to_csv(file, index=False, compression="gzip")
+
+
+def load_minutes(ticker, chunks, days):
+    """Cached 1-minute bars of one ticker for the given trading days (Eastern Time)."""
     frames = []
-    symbols = sorted(symbols)
-    for i in range(0, len(symbols), 200):
-        chunk = symbols[i:i + 200]
-        tag = f"SYM_{start_day}_{end_day}_{abs(hash(tuple(chunk))) % 10**10}"
-        end = (pd.Timestamp(end_day) + timedelta(days=1)).strftime("%Y-%m-%d")
-        df = fetch(MINUTE_DATASET, "ohlcv-1m", start_day, end, chunk, tag)
-        if df is not None and not df.empty:
-            frames.append(df)
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    for start_day, end_day in chunks:
+        file = minutes_file(ticker, start_day, end_day)
+        if file.exists() and any(start_day <= d <= end_day for d in days):
+            frames.append(pd.read_csv(file))
+    if not frames:
+        return pd.DataFrame(columns=["ts", "symbol", "open", "high", "low", "close", "volume"])
+    df = pd.concat(frames, ignore_index=True).drop_duplicates("timestamp")
+    df["ts"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(TZ)
+    df = df[df["ts"].dt.strftime("%Y-%m-%d").isin(set(days))]
+    df["symbol"] = ticker
+    return df[["ts", "symbol", "open", "high", "low", "close", "volume"]].sort_values("ts")
+
+
+def date_chunks(test_days, all_days, days_back):
+    """Date ranges of 1-minute data needed: each test day plus the days before it, merged, <= 115 days each."""
+    ranges = []
+    for day in test_days:
+        idx = all_days.index(day)
+        ranges.append([all_days[max(0, idx - days_back)], day])
+    ranges.sort()
+    merged = []
+    for start, end in ranges:
+        if merged and pd.Timestamp(start) <= pd.Timestamp(merged[-1][1]) + timedelta(days=7):
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    chunks = []
+    for start, end in merged:
+        s = pd.Timestamp(start)
+        while s <= pd.Timestamp(end):
+            e = min(s + timedelta(days=MAX_DAYS_PER_REQUEST - 1), pd.Timestamp(end))
+            chunks.append((s.strftime("%Y-%m-%d"), e.strftime("%Y-%m-%d")))
+            s = e + timedelta(days=1)
+    return chunks
 
 
 # ============================================================================
@@ -207,52 +270,54 @@ def enabled_scan_times():
     return sorted(t for t, on in SCAN_TIMES.items() if on)
 
 
-def window_volume(minutes, scan_hhmm):
-    """Volume per symbol from the open up to (not including) the scan time."""
-    t = minutes["ts"].dt.time
-    mask = (t >= SESSION_OPEN) & (t < dtime.fromisoformat(scan_hhmm))
-    return minutes[mask].groupby("symbol")["volume"].sum()
+def daily_filters(day, all_days, universe):
+    """Average daily volume and previous close before a test day, for the stocks in the universe."""
+    idx = all_days.index(day)
+    days = all_days[max(0, idx - AVG_VOLUME_DAYS):idx]
+    frames = [get_bulk_day(d).assign(day=d) for d in days]
+    df = pd.concat(frames, ignore_index=True)
+    df = df[df["code"].isin(universe)].sort_values("day")
+    g = df.groupby("code")
+    return pd.DataFrame({"avg_daily_volume": g["volume"].mean(), "prev_close": g["close"].last()})
 
 
-def scan_day(day, prior_days, daily_bars):
-    """Run every enabled scan for one day. Returns today's market minutes and the watchlist."""
-    scans = enabled_scan_times()
-    last_scan = scans[-1]
-    today = get_market_minutes(day, "09:30", last_scan)
-    prior = {d: get_market_minutes(d, "09:30", last_scan) for d in prior_days}
-    if ESTIMATE_COST_ONLY or today is None or today.empty:
-        return pd.DataFrame()
-
-    # Average daily volume before the test day
-    daily = daily_bars[daily_bars["ts"].dt.strftime("%Y-%m-%d") < day]
-    daily = daily.sort_values("ts").groupby("symbol").tail(AVG_VOLUME_DAYS)
-    avg_daily_volume = daily.groupby("symbol")["volume"].mean()
-
+def scan_windows(ticker, chunks, days):
+    """For one ticker: volume from the open to each scan time, and the last price before it, per day."""
+    df = load_minutes(ticker, chunks, days)
+    if df.empty:
+        return []
+    t = df["ts"].dt.time
+    df = df[(t >= SESSION_OPEN) & (t < SESSION_CLOSE)]
+    df["day"] = df["ts"].dt.strftime("%Y-%m-%d")
     rows = []
-    for scan in scans:
-        today_vol = window_volume(today, scan)
-        hist = pd.DataFrame({d: window_volume(m, scan) for d, m in prior.items() if m is not None and not m.empty})
-        hist_days = hist.notna().sum(axis=1)
-        hist_avg = hist.mean(axis=1)
+    for scan in enabled_scan_times():
+        upto = df[df["ts"].dt.time < dtime.fromisoformat(scan)]
+        if upto.empty:
+            continue
+        g = upto.groupby("day")
+        for day, vol, price in zip(g.size().index, g["volume"].sum(), g["close"].last()):
+            rows.append((ticker, day, scan, float(vol), float(price)))
+    return rows
 
-        upto = today[today["ts"].dt.time < dtime.fromisoformat(scan)]
-        last_price = upto.sort_values("ts").groupby("symbol")["close"].last()
 
-        df = pd.DataFrame({"today_volume": today_vol, "avg_volume": hist_avg, "history_days": hist_days,
-                           "price": last_price, "avg_daily_volume": avg_daily_volume}).dropna()
+def scan_day(day, prior_days, windows, filters):
+    """Run every enabled scan for one day. Returns the watchlist (first scan that found each stock)."""
+    found = []
+    for scan in enabled_scan_times():
+        w = windows[windows["scan_time"] == scan]
+        today = w[w["date"] == day].set_index("symbol")
+        hist = w[w["date"].isin(prior_days)].groupby("symbol")["volume"]
+        df = today.join(pd.DataFrame({"avg_volume": hist.mean(), "history_days": hist.count()}), how="inner")
+        df = df.join(filters, how="inner")
         df = df[(df["history_days"] >= MIN_RVOL_HISTORY_DAYS) & (df["avg_volume"] > 0)]
-        df["rvol"] = df["today_volume"] / df["avg_volume"]
+        df["rvol"] = df["volume"] / df["avg_volume"]
         df = df[(df["rvol"] >= MIN_RELATIVE_VOLUME) & (df["price"] >= MIN_PRICE)
                 & (df["avg_daily_volume"] >= MIN_AVG_DAILY_VOLUME)]
-        df["scan_time"] = scan
-        rows.append(df.reset_index().rename(columns={"index": "symbol"}))
         print(f"   🔎 {day} {scan}: {len(df)} stocks in play")
-
-    found = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
-    if found.empty:
-        return found
-    # A stock stays on the list from the first scan that found it
-    return found.sort_values("scan_time").drop_duplicates("symbol", keep="first").reset_index(drop=True)
+        found.append(df.reset_index().rename(columns={"volume": "today_volume"})
+                     [["symbol", "scan_time", "rvol", "price", "today_volume", "avg_volume", "avg_daily_volume"]])
+    watchlist = pd.concat(found, ignore_index=True)
+    return watchlist.sort_values("scan_time").drop_duplicates("symbol", keep="first").reset_index(drop=True)
 
 
 # ============================================================================
@@ -494,13 +559,6 @@ def write_report(trades, daily, out_dir, start_capital):
 # MAIN
 # ============================================================================
 
-def pick_test_days():
-    days = get_trading_days(TEST_START_DATE, TEST_END_DATE)
-    if RANDOM_DAYS and len(days) > RANDOM_DAYS:
-        days = sorted(random.Random(RANDOM_SEED).sample(days, RANDOM_DAYS))
-    return days
-
-
 def main():
     if not enabled_scan_times():
         raise SystemExit("Switch on at least one scan time in SCAN_TIMES.")
@@ -508,36 +566,79 @@ def main():
     capital = ACCOUNT_EQUITY * ALLOCATION_PCT / 100
     start_capital = capital
     print("=" * 64)
-    print("RVOL + EMA INTRADAY BACKTEST")
+    print("RVOL + EMA INTRADAY BACKTEST (EODHD data)")
     print(f"Allocated: ${capital:,.0f} ({ALLOCATION_PCT}% of ${ACCOUNT_EQUITY:,.0f}) in {NUM_SLOTS} slots")
     print(f"Scans: {', '.join(enabled_scan_times())} | RVOL >= {MIN_RELATIVE_VOLUME} | EMAs {EMA_FAST}/{EMA_MID}/{EMA_SLOW}")
     print(f"Longs {'ON' if ENABLE_LONGS else 'OFF'} | Shorts {'ON' if ENABLE_SHORTS else 'OFF'} | Stop {STOP_LOSS_PCT}% | Exit all {EXIT_ALL_TIME}")
     print("=" * 64)
 
-    all_days = get_trading_days(
-        (pd.Timestamp(TEST_START_DATE) - timedelta(days=45)).strftime("%Y-%m-%d"), TEST_END_DATE)
-    test_days = pick_test_days()
-    print(f"\nTest days: {', '.join(test_days) if test_days else '(none)'}")
-
     out_dir = Path(RESULTS_DIR) / datetime.now().strftime("run_%Y%m%d_%H%M%S")
     trades, daily, watchlists = [], [], []
     try:
+        # 1. Trading days and the test days
+        lookback_start = (pd.Timestamp(TEST_START_DATE) - timedelta(days=70)).strftime("%Y-%m-%d")
+        all_days = get_trading_days(lookback_start, TEST_END_DATE)
+        in_range = [d for d in all_days if TEST_START_DATE <= d <= TEST_END_DATE]
+        test_days = sorted(random.Random(RANDOM_SEED).sample(in_range, RANDOM_DAYS)) \
+            if RANDOM_DAYS and len(in_range) > RANDOM_DAYS else in_range
+        print(f"\nTest days: {', '.join(test_days) if test_days else '(none)'}")
+        if not test_days:
+            return
+
+        # 2. Stocks worth downloading: price and average daily volume before each test day
+        print("\n📋 Building the stock list from daily data...")
+        universe = get_universe()
+        filters, candidates = {}, set()
+        for day in test_days:
+            f = daily_filters(day, all_days, universe)
+            filters[day] = f
+            ok = f[(f["avg_daily_volume"] >= MIN_AVG_DAILY_VOLUME) & (f["prev_close"] >= MIN_PRICE * PREFILTER_PRICE_FACTOR)]
+            candidates |= set(ok.index)
+            print(f"   {day}: {len(ok):,} of {len(universe):,} stocks pass price/volume before the open")
+
+        # 3. 1-minute data needed (cached files are reused)
+        days_back = max(RVOL_LOOKBACK_DAYS, EMA_WARMUP_DAYS)
+        chunks = date_chunks(test_days, all_days, days_back)
+        jobs = [(t, s, e) for s, e in chunks for t in sorted(candidates)]
+        todo = [j for j in jobs if not minutes_file(*j).exists()]
+        print(f"\n⬇ 1-minute data: {len(jobs):,} ticker-ranges, {len(todo):,} not cached yet "
+              f"= {len(todo) * CALL_COST['intraday']:,} EODHD calls (plus {_calls_used:,} used for daily data)")
+        if ESTIMATE_CALLS_ONLY:
+            print("ESTIMATE_CALLS_ONLY is on - nothing else downloaded.")
+            return
+
+        done = 0
+        with ThreadPoolExecutor(max_workers=DOWNLOAD_THREADS) as pool:
+            futures = [pool.submit(download_minutes, *j) for j in todo]
+            for fut in as_completed(futures):
+                fut.result()
+                done += 1
+                if done % 250 == 0 or done == len(todo):
+                    print(f"   {done:,}/{len(todo):,} downloaded")
+
+        # 4. Opening-window volume per stock and day, for the relative volume scans
+        print("\n📊 Measuring volume at the scan times...")
+        needed_days = sorted({d for day in test_days
+                              for d in all_days[max(0, all_days.index(day) - RVOL_LOOKBACK_DAYS):all_days.index(day) + 1]})
+        rows = []
+        with ThreadPoolExecutor(max_workers=DOWNLOAD_THREADS) as pool:
+            for result in pool.map(lambda t: scan_windows(t, chunks, needed_days), sorted(candidates)):
+                rows += result
+        windows = pd.DataFrame(rows, columns=["symbol", "date", "scan_time", "volume", "price"])
+
+        # 5. Replay each test day
         for day in test_days:
             print(f"\n📅 {day}")
             idx = all_days.index(day)
             prior_days = all_days[max(0, idx - RVOL_LOOKBACK_DAYS):idx]
-            warmup_days = all_days[max(0, idx - EMA_WARMUP_DAYS):idx]
-
-            daily_bars = get_daily_bars(day)
-            watchlist = scan_day(day, prior_days, daily_bars)
-            if ESTIMATE_COST_ONLY:
-                continue
+            watchlist = scan_day(day, prior_days, windows, filters[day])
             if watchlist.empty:
                 daily.append({"date": day, "watchlist": 0, "trades": 0, "pnl": 0.0, "capital": round(capital, 2)})
                 continue
             watchlists.append(watchlist.assign(date=day))
 
-            minutes = get_symbol_minutes(list(watchlist["symbol"]), warmup_days[0] if warmup_days else day, day)
+            bar_days = all_days[max(0, idx - EMA_WARMUP_DAYS):idx + 1]
+            minutes = pd.concat([load_minutes(s, chunks, bar_days) for s in watchlist["symbol"]], ignore_index=True)
             bars = prepare_bars(minutes, day)
             day_trades = simulate_day(day, watchlist, bars, capital)
             day_pnl = sum(t["pnl"] for t in day_trades)
@@ -547,19 +648,14 @@ def main():
                           "pnl": round(day_pnl, 2), "capital": round(capital + day_pnl, 2)})
             if COMPOUND_DAILY:
                 capital += day_pnl
-    except CostLimitReached as e:
-        print(f"\n⛔ {e}\n   Raise MAX_COST_USD or test fewer days. Results so far are below.")
-
-    if ESTIMATE_COST_ONLY:
-        print(f"\nEstimated cost of the market-wide downloads: ${_estimated_usd:.2f} "
-              f"(plus a little for the watchlist stocks' full-day bars). Nothing was downloaded.")
-        return
+    except CallLimitReached as e:
+        print(f"\n⛔ {e}\n   Raise MAX_API_CALLS or test fewer days; downloads so far are cached. Results so far are below.")
 
     if watchlists:
         out_dir.mkdir(parents=True, exist_ok=True)
         pd.concat(watchlists).to_csv(out_dir / "watchlist.csv", index=False)
     write_report(trades, daily, out_dir, start_capital)
-    print(f"\nDatabento spend this run: ${_spent_usd:.2f}")
+    print(f"\nEODHD calls used this run: {_calls_used:,}")
 
 
 if __name__ == "__main__":
