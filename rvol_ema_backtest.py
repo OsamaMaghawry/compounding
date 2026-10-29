@@ -76,8 +76,8 @@ COMMISSION_PER_SHARE = 0.0          # $ per share, each side
 # ---------- EODHD DATA ----------
 EODHD_API_KEY = "PUT_YOUR_EODHD_API_KEY_HERE"   # or set the EODHD_API_KEY environment variable
 EXCLUDED_EXCHANGES = ["OTC", "PINK", "NMFQS"]   # venues whose name contains any of these are left out (OTC, pink sheets, mutual funds)
-INCLUDE_ETFS = False                # True = ETFs can be stocks in play too
-INCLUDE_DELISTED = True             # True = stocks delisted since then are included (avoids survivorship bias)
+INCLUDE_ETFS = False                # False = stocks only; True = ETFs can be stocks in play too
+INCLUDE_DELISTED = False            # False = only stocks listed today; True = also stocks delisted since then
 PREFILTER_PRICE_FACTOR = 0.7        # 1-minute data is only downloaded for stocks whose previous close was
                                     # at least MIN_PRICE x this (the exact price check happens at scan time)
 CACHE_DIR = "eodhd_cache"           # downloaded data is kept here, so re-running the same days costs nothing
