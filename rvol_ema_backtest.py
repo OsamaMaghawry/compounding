@@ -80,6 +80,7 @@ MR_ENTRY = "BAND"                   # "BAND" = enter on the first close back ins
 MR_SETUP_MINUTES = 60               # EMA_CROSS: the stretch must have happened within this many minutes before the cross
 MR_FIRST_TARGET_STD = 0.0           # e.g. 1.0 = take FIRST_EXIT_FRACTION off at the 1-sigma band; 0 = all out at VWAP
 MR_STOP_BUFFER_PCT = 0.5            # stop this % beyond the extreme of the stretch (lowest low for longs)
+MR_MAX_LOSS_PCT = 0.0               # e.g. 2.0 = never risk more than 2% from entry, even if the stretch stop is further
 MR_FIXED_STOP_PCT = 0.0             # e.g. 1.0 = stop 1% from the entry price instead of beyond the stretch; 0 = off
 MR_MIN_REWARD_RISK = 0.0            # e.g. 1.5 = enter only if the distance to VWAP is at least 1.5x the distance
                                     # to the stop; 0 = off
@@ -535,6 +536,17 @@ def finish_trade(pos, trades):
 
 
 def mr_stop_price(side, bar, entry_price):
+    """Mean reversion stop, capped at MR_MAX_LOSS_PCT from entry when that is set."""
+    stop = mr_structure_stop(side, bar, entry_price)
+    if MR_MAX_LOSS_PCT:
+        if side == "long":
+            stop = max(stop, entry_price * (1 - MR_MAX_LOSS_PCT / 100))
+        else:
+            stop = min(stop, entry_price * (1 + MR_MAX_LOSS_PCT / 100))
+    return stop
+
+
+def mr_structure_stop(side, bar, entry_price):
     """Mean reversion stop: a fixed % from entry, or just beyond the extreme of the stretch."""
     if MR_FIXED_STOP_PCT:
         return entry_price * (1 - MR_FIXED_STOP_PCT / 100) if side == "long" else entry_price * (1 + MR_FIXED_STOP_PCT / 100)
