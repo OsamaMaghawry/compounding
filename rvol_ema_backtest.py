@@ -31,6 +31,9 @@ TEST_START_DATE = "2026-05-01"      # first date of the range (YYYY-MM-DD)
 TEST_END_DATE = "2026-10-30"        # last date of the range (YYYY-MM-DD)
 RANDOM_DAYS = 2                     # 0 = test every trading day in the range; N = pick N random trading days
 RANDOM_SEED = None                  # None = different random days each run; a number (e.g. 7) = same days every run
+TEST_DAYS = []                      # e.g. ["2026-04-28", "2026-09-10"] = test exactly these days (overrides the above)
+REUSE_CACHED_DATA = True            # True = a test day already inside downloaded data is not downloaded again,
+                                    # as long as at least MIN_RVOL_HISTORY_DAYS earlier days are there too
 
 # ---------- SCAN TIMES (Eastern Time) - True = ON, False = OFF ----------
 SCAN_TIMES = {
@@ -251,12 +254,33 @@ def download_minutes(ticker, start_day, end_day):
     df.to_csv(file, index=False, compression="gzip")
 
 
+def cached_ranges(ticker):
+    """(start, end, file) of every downloaded date range holding this ticker."""
+    out = []
+    for folder in cache_path("minutes", "x").parent.glob("*_*"):
+        file = folder / f"{ticker.replace('/', '_')}.csv.gz"
+        if file.exists():
+            start_day, end_day = folder.name.split("_")
+            out.append((start_day, end_day, file))
+    return out
+
+
+def covered_by_cache(ticker, day, all_days):
+    """True if downloaded data already holds this day and enough trading days before it."""
+    idx = all_days.index(day)
+    for start_day, end_day, _ in cached_ranges(ticker):
+        if start_day <= day <= end_day:
+            earlier = [d for d in all_days[:idx] if d >= start_day]
+            if len(earlier) >= max(MIN_RVOL_HISTORY_DAYS, warmup_days()):
+                return True
+    return False
+
+
 def load_minutes(ticker, chunks, days):
-    """Cached 1-minute bars of one ticker for the given trading days (Eastern Time)."""
+    """Cached 1-minute bars of one ticker for the given trading days (Eastern Time), from any downloaded range."""
     frames = []
-    for start_day, end_day in chunks:
-        file = minutes_file(ticker, start_day, end_day)
-        if file.exists() and any(start_day <= d <= end_day for d in days):
+    for start_day, end_day, file in cached_ranges(ticker):
+        if any(start_day <= d <= end_day for d in days):
             frames.append(pd.read_csv(file))
     if not frames:
         return pd.DataFrame(columns=["ts", "symbol", "open", "high", "low", "close", "volume"])
@@ -311,6 +335,10 @@ def daily_filters(day, all_days, universe):
     """Average daily volume and previous close before a test day, for the stocks in the universe."""
     idx = all_days.index(day)
     days = all_days[max(0, idx - AVG_VOLUME_DAYS):idx]
+    if REUSE_CACHED_DATA:
+        have = [d for d in days if cache_path("json", f"bulk_US_{d}.json.gz").exists()]
+        if len(have) >= MIN_RVOL_HISTORY_DAYS:
+            days = have   # enough daily data already downloaded - no new calls
     frames = [get_bulk_day(d).assign(day=d) for d in days]
     df = pd.concat(frames, ignore_index=True)
     df = df[df["code"].isin(universe)].sort_values("day")
@@ -702,11 +730,14 @@ def main():
     trades, daily, watchlists = [], [], []
     try:
         # 1. Trading days and the test days
-        lookback_start = (pd.Timestamp(TEST_START_DATE) - timedelta(days=70)).strftime("%Y-%m-%d")
+        first_day = min([TEST_START_DATE] + list(TEST_DAYS))
+        lookback_start = (pd.Timestamp(first_day) - timedelta(days=70)).strftime("%Y-%m-%d")
         all_days = get_trading_days(lookback_start, TEST_END_DATE)
         in_range = [d for d in all_days if TEST_START_DATE <= d <= TEST_END_DATE]
         test_days = sorted(random.Random(RANDOM_SEED).sample(in_range, RANDOM_DAYS)) \
             if RANDOM_DAYS and len(in_range) > RANDOM_DAYS else in_range
+        if TEST_DAYS:
+            test_days = sorted(d for d in TEST_DAYS if d in all_days)
         print(f"\nTest days: {', '.join(test_days) if test_days else '(none)'}")
         if not test_days:
             return
@@ -726,7 +757,12 @@ def main():
         days_back = max(RVOL_LOOKBACK_DAYS, warmup_days())
         chunks = date_chunks(test_days, all_days, days_back)
         jobs = [(t, s, e) for s, e in chunks for t in sorted(candidates)]
-        todo = [j for j in jobs if not minutes_file(*j).exists()]
+        def already_have(ticker, start_day, end_day):
+            if minutes_file(ticker, start_day, end_day).exists():
+                return True
+            days_in_chunk = [d for d in test_days if start_day <= d <= end_day]
+            return REUSE_CACHED_DATA and all(covered_by_cache(ticker, d, all_days) for d in days_in_chunk)
+        todo = [j for j in jobs if not already_have(*j)]
         print(f"\n⬇ 1-minute data: {len(jobs):,} ticker-ranges, {len(todo):,} not cached yet "
               f"= {len(todo) * CALL_COST['intraday']:,} EODHD calls (plus {_calls_used:,} used for daily data)")
         if ESTIMATE_CALLS_ONLY:
