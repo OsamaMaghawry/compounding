@@ -10,10 +10,10 @@ How a test day is replayed:
    stays there for the rest of the day.
 2. MONITORING (every minute, from the first scan until EXIT_ALL_TIME): checks exits on
    open positions and entries on every watchlist stock, on 1-minute bars.
-   - LONG entry : close above EMA_SLOW (200) and EMA_MID (21), and EMA_FAST (9) crosses
-                  back above EMA_MID (21) after dipping below it.
+   - LONG entry : close above EMA_SLOW (200) and the mid line - EMA_MID (21) or VWAP (MID_LINE) -
+                  and EMA_FAST (9) crosses back above the mid line after dipping below it.
    - LONG exit  : first half when the close crosses below EMA_FAST (9), the rest when it
-                  crosses below EMA_MID (21); STOP_LOSS_PCT stop; everything closed at
+                  crosses below the mid line; STOP_LOSS_PCT stop; everything closed at
                   EXIT_ALL_TIME.
    - SHORT      : the mirror image (switch with ENABLE_SHORTS).
 3. CAPITAL: ACCOUNT_EQUITY x ALLOCATION_PCT is split into NUM_SLOTS equal positions.
@@ -51,6 +51,8 @@ AVG_VOLUME_DAYS = 20
 # ---------- STRATEGY ----------
 EMA_FAST = 9
 EMA_MID = 21
+MID_LINE = "EMA"                    # "EMA" = the EMA_MID (21) line; "VWAP" = the day's VWAP replaces it
+                                    # (entry: EMA_FAST crosses back over the line; second exit: close crosses the line)
 EMA_SLOW = 200
 ENABLE_LONGS = True
 ENABLE_SHORTS = True
@@ -279,6 +281,10 @@ def date_chunks(test_days, all_days, days_back):
 # SCANNING - STOCKS IN PLAY
 # ============================================================================
 
+def mid_label():
+    return "VWAP" if MID_LINE.upper() == "VWAP" else f"EMA {EMA_MID}"
+
+
 def warmup_days():
     """Previous trading days needed so the slow EMA is ready at the open on the chosen bar size."""
     return max(EMA_WARMUP_DAYS, int(np.ceil(EMA_SLOW * BAR_MINUTES / 390)) + 1)
@@ -362,6 +368,12 @@ def prepare_bars(minutes, day):
                   .dropna(subset=["close"]))
         for name, span in (("ema_fast", EMA_FAST), ("ema_mid", EMA_MID), ("ema_slow", EMA_SLOW)):
             g[name] = g["close"].ewm(span=span, adjust=False).mean()
+        if MID_LINE.upper() == "VWAP":
+            # Session VWAP, restarting every day at the open (typical price x volume)
+            typical = (g["high"] + g["low"] + g["close"]) / 3
+            day_key = g.index.date
+            g["ema_mid"] = ((typical * g["volume"]).groupby(day_key).cumsum()
+                            / g["volume"].groupby(day_key).cumsum().replace(0, np.nan)).ffill()
         g["prev_close"] = g["close"].shift(1)
         g["prev_fast"] = g["ema_fast"].shift(1)
         g["prev_mid"] = g["ema_mid"].shift(1)
@@ -473,7 +485,7 @@ def simulate_day(day, watchlist, bars, capital):
                 else:
                     below_fast = bar["close"] > bar["ema_fast"] and bar["prev_close"] <= bar["prev_fast"]
                 if below_mid:
-                    close_part(pos, pos["shares_left"], bar["close"], ts, f"crossed EMA {EMA_MID}")
+                    close_part(pos, pos["shares_left"], bar["close"], ts, f"crossed {mid_label()}")
                 elif below_fast and not pos["first_exit_done"]:
                     part = pos["shares"] * FIRST_EXIT_FRACTION
                     part = part if (long and ALLOW_FRACTIONAL_SHARES) else max(1, int(part))
@@ -606,7 +618,7 @@ def main():
     print("=" * 64)
     print("RVOL + EMA INTRADAY BACKTEST (EODHD data)")
     print(f"Allocated: ${capital:,.0f} ({ALLOCATION_PCT}% of ${ACCOUNT_EQUITY:,.0f}) in {NUM_SLOTS} slots")
-    print(f"Scans: {', '.join(enabled_scan_times())} | RVOL >= {MIN_RELATIVE_VOLUME} | EMAs {EMA_FAST}/{EMA_MID}/{EMA_SLOW}")
+    print(f"Scans: {', '.join(enabled_scan_times())} | RVOL >= {MIN_RELATIVE_VOLUME} | EMA {EMA_FAST} / {mid_label()} / EMA {EMA_SLOW} | {BAR_MINUTES}-min bars")
     print(f"Longs {'ON' if ENABLE_LONGS else 'OFF'} | Shorts {'ON' if ENABLE_SHORTS else 'OFF'} | Stop {STOP_LOSS_PCT}% | Exit all {EXIT_ALL_TIME}")
     print("=" * 64)
 
