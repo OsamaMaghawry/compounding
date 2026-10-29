@@ -88,6 +88,8 @@ MIN_TREND_MINUTES = 0               # e.g. 15 = before the dip, EMA_FAST must ha
 EXIT_BUFFER_PCT = 0.0               # e.g. 0.2 = the EMA_MID exit needs a close 0.2% beyond EMA_MID, not just a touch
 MAX_WATCHLIST_PER_SCAN = 0          # e.g. 20 = only the 20 highest relative volume stocks of each scan; 0 = all
 MAX_RELATIVE_VOLUME = 0             # e.g. 3.0 = skip stocks above 3x relative volume (news-driven movers); 0 = no limit
+MARKET_FILTER = False               # True = longs only while MARKET_SYMBOL is above its VWAP, shorts only while below
+MARKET_SYMBOL = "SPY"
 
 # ---------- CAPITAL ----------
 ACCOUNT_EQUITY = 100_000            # account equity ($)
@@ -535,7 +537,7 @@ def manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all):
         close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
 
 
-def simulate_day(day, watchlist, bars, capital):
+def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
     """Replay one day minute by minute. Returns the closed trades."""
     slot_value = capital / NUM_SLOTS
     first_scan = dtime.fromisoformat(enabled_scan_times()[0])
@@ -609,6 +611,10 @@ def simulate_day(day, watchlist, bars, capital):
                 continue  # never re-enter on the bar that closed the trade
             bar = g.loc[ts]
             side = mr_entry_signal(bar, bar_close_time) if STRATEGY == "MEAN_REVERSION" else entry_signal(bar)
+            if side and MARKET_FILTER and market_above_vwap is not None:
+                market_up = market_above_vwap.asof(ts)
+                if pd.isna(market_up) or (side == "long" and not market_up) or (side == "short" and market_up):
+                    side = None   # trade only in the market's direction
             if side:
                 candidates.append((rvol[symbol], symbol, side, bar))
         for _, symbol, side, bar in sorted(candidates, key=lambda c: c[0], reverse=True):
@@ -762,6 +768,8 @@ def main():
                 return True
             days_in_chunk = [d for d in test_days if start_day <= d <= end_day]
             return REUSE_CACHED_DATA and all(covered_by_cache(ticker, d, all_days) for d in days_in_chunk)
+        if MARKET_FILTER:
+            jobs += [(MARKET_SYMBOL, s, e) for s, e in chunks]
         todo = [j for j in jobs if not already_have(*j)]
         print(f"\n⬇ 1-minute data: {len(jobs):,} ticker-ranges, {len(todo):,} not cached yet "
               f"= {len(todo) * CALL_COST['intraday']:,} EODHD calls (plus {_calls_used:,} used for daily data)")
@@ -802,7 +810,14 @@ def main():
             bar_days = all_days[max(0, idx - warmup_days()):idx + 1]
             minutes = pd.concat([load_minutes(s, chunks, bar_days) for s in watchlist["symbol"]], ignore_index=True)
             bars = prepare_bars(minutes, day)
-            day_trades = simulate_day(day, watchlist, bars, capital)
+            market_above_vwap = None
+            if MARKET_FILTER:
+                market = prepare_bars(load_minutes(MARKET_SYMBOL, chunks, bar_days), day).get(MARKET_SYMBOL)
+                if market is not None:
+                    market_above_vwap = market["close"] > market["vwap"]
+                else:
+                    print(f"   ⚠️ No {MARKET_SYMBOL} data - market filter skipped today")
+            day_trades = simulate_day(day, watchlist, bars, capital, market_above_vwap)
             day_pnl = sum(t["pnl"] for t in day_trades)
             trades += day_trades
             print(f"   💰 {len(day_trades)} trades, P&L ${day_pnl:,.2f}")
