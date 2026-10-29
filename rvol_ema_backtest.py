@@ -79,6 +79,11 @@ MR_ENTRY = "BAND"                   # "BAND" = enter on the first close back ins
                                     # "EMA_CROSS" = enter when the close crosses back over EMA_FAST (9) after a stretch
 MR_SETUP_MINUTES = 60               # EMA_CROSS: the stretch must have happened within this many minutes before the cross
 MR_FIRST_TARGET_STD = 0.0           # e.g. 1.0 = take FIRST_EXIT_FRACTION off at the 1-sigma band; 0 = all out at VWAP
+MR_RUNNER = "NONE"                  # "NONE" = all out at VWAP; "VWAP_PLUS_STD" = FIRST_EXIT_FRACTION at VWAP, rest at
+                                    # VWAP + MR_RUNNER_STD sigma; "EMA_TRAIL" = part at VWAP, rest when a close falls below EMA_FAST
+MR_RUNNER_STD = 1.0
+MR_MIN_VWAP_DIST_PCT = 0.0          # e.g. 0.6 = enter only if VWAP is at least 0.6% away from the entry price
+MR_MIN_BAND_WIDTH_PCT = 0.0         # e.g. 0.7 = trade only stocks whose 1-sigma VWAP band is at least 0.7% of the price
 MR_STOP_BUFFER_PCT = 0.5            # stop this % beyond the extreme of the stretch (lowest low for longs)
 MR_MAX_LOSS_PCT = 0.0               # e.g. 2.0 = never risk more than 2% from entry, even if the stretch stop is further
 MR_FIXED_STOP_PCT = 0.0             # e.g. 1.0 = stop 1% from the entry price instead of beyond the stretch; 0 = off
@@ -575,10 +580,26 @@ def manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all):
             part = min(part, pos["shares_left"])
             close_part(pos, part, max(bar["open"], target) if long else min(bar["open"], target), ts, f"{MR_FIRST_TARGET_STD:g}-sigma band")
             pos["first_exit_done"] = True
-    if pos["shares_left"] > 0 and ((bar["high"] >= bar["vwap"]) if long else (bar["low"] <= bar["vwap"])):
-        close_part(pos, pos["shares_left"], max(bar["open"], bar["vwap"]) if long else min(bar["open"], bar["vwap"]), ts, "reached VWAP")
+    reached_vwap = (bar["high"] >= bar["vwap"]) if long else (bar["low"] <= bar["vwap"])
+    if MR_RUNNER == "NONE":
+        if pos["shares_left"] > 0 and reached_vwap:
+            close_part(pos, pos["shares_left"], max(bar["open"], bar["vwap"]) if long else min(bar["open"], bar["vwap"]), ts, "reached VWAP")
+    elif not pos.get("runner") and pos["shares_left"] > 0 and reached_vwap:
+        part = pos["shares_left"] * FIRST_EXIT_FRACTION
+        part = part if (long and ALLOW_FRACTIONAL_SHARES) else max(1, int(part))
+        part = min(part, pos["shares_left"])
+        close_part(pos, part, max(bar["open"], bar["vwap"]) if long else min(bar["open"], bar["vwap"]), ts, "reached VWAP")
+        pos["runner"] = True
+    elif pos.get("runner") and pos["shares_left"] > 0:
+        if MR_RUNNER == "VWAP_PLUS_STD":
+            target = bar["vwap"] + MR_RUNNER_STD * bar["vwap_std"] if long else bar["vwap"] - MR_RUNNER_STD * bar["vwap_std"]
+            if (bar["high"] >= target) if long else (bar["low"] <= target):
+                close_part(pos, pos["shares_left"], max(bar["open"], target) if long else min(bar["open"], target), ts, f"VWAP+{MR_RUNNER_STD:g} sigma")
+        elif MR_RUNNER == "EMA_TRAIL":
+            if (bar["close"] < bar["ema_fast"]) if long else (bar["close"] > bar["ema_fast"]):
+                close_part(pos, pos["shares_left"], bar["close"], ts, f"runner: close below EMA {EMA_FAST}")
     held = (ts + timedelta(minutes=BAR_MINUTES)) - pos["entry_time"]
-    if pos["shares_left"] > 0 and MR_TIME_STOP_MINUTES and held >= timedelta(minutes=MR_TIME_STOP_MINUTES):
+    if pos["shares_left"] > 0 and MR_TIME_STOP_MINUTES and not pos.get("runner") and held >= timedelta(minutes=MR_TIME_STOP_MINUTES):
         close_part(pos, pos["shares_left"], bar["close"], ts, f"time stop {MR_TIME_STOP_MINUTES} min")
     if pos["shares_left"] > 0 and bar_close_time >= exit_all:
         close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
@@ -668,6 +689,10 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             if len(open_positions) >= NUM_SLOTS:
                 break
             price = fill_price(bar["close"], side, "entry")
+            if STRATEGY == "MEAN_REVERSION" and (MR_MIN_VWAP_DIST_PCT or MR_MIN_BAND_WIDTH_PCT):
+                room = ((bar["vwap"] - price) if side == "long" else (price - bar["vwap"])) / price * 100
+                if room < MR_MIN_VWAP_DIST_PCT or bar["vwap_std"] / price * 100 < MR_MIN_BAND_WIDTH_PCT:
+                    continue   # too little room to VWAP, or the stock moves too little
             if STRATEGY == "MEAN_REVERSION" and MR_MIN_REWARD_RISK:
                 risk = abs(price - mr_stop_price(side, bar, price))
                 reward = (bar["vwap"] - price) if side == "long" else (price - bar["vwap"])
