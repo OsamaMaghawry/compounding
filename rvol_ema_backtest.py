@@ -220,6 +220,10 @@ def download_minutes(ticker, start_day, end_day):
     df = pd.DataFrame(rows if isinstance(rows, list) else [])
     cols = ["timestamp", "open", "high", "low", "close", "volume"]
     df = df[cols].dropna() if not df.empty else pd.DataFrame(columns=cols)
+    if not EMA_INCLUDE_EXTENDED_HOURS and not df.empty:
+        # Only regular-session bars are used, so only those are kept on disk
+        t = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(TZ).dt.time
+        df = df[(t >= SESSION_OPEN) & (t < SESSION_CLOSE)]
     df.to_csv(file, index=False, compression="gzip")
 
 
