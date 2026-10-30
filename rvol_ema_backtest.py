@@ -107,6 +107,9 @@ PB_STOP_MODE = "SWING_LOW"          # "SWING_LOW" = just below the pullback's lo
                                     # "FIXED" = PB_MAX_STOP_PCT below the entry
 PB_MAX_STOP_PCT = 3.5
 PB_STOP_BUFFER_PCT = 0.1            # how far below the pullback low the stop sits
+ATR_PERIOD = 14                     # ATR on the strategy's bars (Wilder smoothing)
+PB_TP_ATR = 0.0                     # e.g. 2.5 = take profit at entry + 2.5 x ATR (overrides PB_TAKE_PROFIT_PCT)
+PB_SL_ATR = 0.0                     # e.g. 0.75 = stop at entry - 0.75 x ATR (overrides PB_STOP_MODE)
 PB_TAKE_PROFIT_PCT = 0.0            # e.g. 2.0 = sell everything at +2% (or on the EMA cross / stop, whichever comes first)
 PB_ABOVE_VWAP = False               # True = the buying bar must close above VWAP
 PB_MIN_ENTRY_BAR_PCT = 0.0          # e.g. 0.5 = the buying bar must close at least 0.5% above its own open
@@ -477,6 +480,9 @@ def prepare_bars(minutes, day):
         above_b = g["close"] > g["upper_band"]
         g["stretch_low"] = g["low"].groupby((below != below.shift()).cumsum()).cummin().where(below)
         g["stretch_high"] = g["high"].groupby((above_b != above_b.shift()).cumsum()).cummax().where(above_b)
+        prev_c = g["close"].shift(1)
+        true_range = pd.concat([g["high"] - g["low"], (g["high"] - prev_c).abs(), (g["low"] - prev_c).abs()], axis=1).max(axis=1)
+        g["atr"] = true_range.ewm(alpha=1 / ATR_PERIOD, adjust=False).mean()
         g["ema_trig"] = g["close"].ewm(span=EMA_TRIGGER, adjust=False).mean()
         g["prev_same_day"] = pd.Series(day_key, index=g.index).shift(1).eq(pd.Series(day_key, index=g.index)).values
         g["prev_trig"] = g["ema_trig"].shift(1)
@@ -721,11 +727,12 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             long = pos["side"] == "long"
 
             if STRATEGY == "PULLBACK":
-                target = pos["entry_price"] * (1 + PB_TAKE_PROFIT_PCT / 100) if PB_TAKE_PROFIT_PCT else None
+                target = pos.get("target") or (pos["entry_price"] * (1 + PB_TAKE_PROFIT_PCT / 100) if PB_TAKE_PROFIT_PCT else None)
                 if bar["low"] <= pos["stop"]:
                     close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]), ts, "stop")
                 elif target and bar["high"] >= target:
-                    close_part(pos, pos["shares_left"], max(bar["open"], target), ts, f"take profit +{PB_TAKE_PROFIT_PCT:g}%")
+                    close_part(pos, pos["shares_left"], max(bar["open"], target), ts,
+                               f"take profit {PB_TP_ATR:g} ATR" if PB_TP_ATR else f"take profit +{PB_TAKE_PROFIT_PCT:g}%")
                 elif bar["ema_trig"] < bar["ema_fast"] and bar["prev_trig"] >= bar["prev_fast"]:
                     close_part(pos, pos["shares_left"], bar["close"], ts, f"EMA {EMA_TRIGGER} crossed below EMA {EMA_FAST}")
                 elif bar_close_time >= exit_all:
@@ -819,6 +826,15 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             }
             if STRATEGY == "MEAN_REVERSION":
                 open_positions[symbol]["stop"] = mr_stop_price(side, bar, price)
+            elif STRATEGY == "PULLBACK" and (PB_SL_ATR or PB_TP_ATR):
+                pos_ = open_positions[symbol]
+                if PB_TP_ATR:
+                    pos_["target"] = price + PB_TP_ATR * bar["atr"]
+                if PB_SL_ATR:
+                    pos_["stop"] = price - PB_SL_ATR * bar["atr"]
+                else:
+                    swing = min(bar["low"], bar["prev_pullback_low"]) if pd.notna(bar["prev_pullback_low"]) else bar["low"]
+                    pos_["stop"] = max(swing * (1 - PB_STOP_BUFFER_PCT / 100), price * (1 - PB_MAX_STOP_PCT / 100))
             elif STRATEGY == "PULLBACK":
                 max_stop = price * (1 - PB_MAX_STOP_PCT / 100)
                 if PB_STOP_MODE == "SWING_LOW":
