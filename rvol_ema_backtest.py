@@ -106,6 +106,10 @@ PB_STOP_MODE = "SWING_LOW"          # "SWING_LOW" = just below the pullback's lo
 PB_MAX_STOP_PCT = 3.5
 PB_STOP_BUFFER_PCT = 0.1            # how far below the pullback low the stop sits
 PB_ABOVE_VWAP = False               # True = the buying bar must close above VWAP
+PB_MIN_ENTRY_BAR_PCT = 0.0          # e.g. 0.5 = the buying bar must close at least 0.5% above its own open
+PB_MIN_EMA_SPREAD_PCT = 0.0         # e.g. 1.0 = EMA_TRIGGER must be at least 1% above EMA_FAST
+PB_MAX_FROM_OPEN_PCT = 0.0          # e.g. 8 = skip if the price is already more than 8% above the day's open
+PB_MAX_ABOVE_VWAP_PCT = 0.0         # e.g. 3 = skip if the price is more than 3% above VWAP
 PB_MIN_VOLUME_ENGULF = 0.0          # e.g. 0.9 = the buying bar's volume must be at least 90% of the pullback bars' total
 
 # ---------- GAP RECLAIM (used when STRATEGY = "GAP_RECLAIM") ----------
@@ -512,6 +516,14 @@ def pullback_signal(bar, bar_close_time):
     reclaim = bar["prev_close"] < bar["prev_trig"] and bar["close"] > bar["ema_trig"]
     if PB_ABOVE_VWAP and not bar["close"] > bar["vwap"]:
         return None
+    if PB_MIN_ENTRY_BAR_PCT and (bar["close"] / bar["open"] - 1) * 100 < PB_MIN_ENTRY_BAR_PCT:
+        return None   # weak buying bar
+    if PB_MIN_EMA_SPREAD_PCT and (bar["ema_trig"] / bar["ema_fast"] - 1) * 100 < PB_MIN_EMA_SPREAD_PCT:
+        return None   # EMAs barely stacked
+    if PB_MAX_FROM_OPEN_PCT and (bar["close"] / bar["day_open"] - 1) * 100 > PB_MAX_FROM_OPEN_PCT:
+        return None   # already ran too far from the open
+    if PB_MAX_ABOVE_VWAP_PCT and (bar["close"] / bar["vwap"] - 1) * 100 > PB_MAX_ABOVE_VWAP_PCT:
+        return None   # too stretched above VWAP
     if PB_MIN_VOLUME_ENGULF and not bar["volume"] >= PB_MIN_VOLUME_ENGULF * bar["prev_pullback_volume"]:
         return None
     return "long" if stacked and reclaim else None
