@@ -32,6 +32,8 @@ TEST_END_DATE = "2026-10-30"        # last date of the range (YYYY-MM-DD)
 RANDOM_DAYS = 2                     # 0 = test every trading day in the range; N = pick N random trading days
 RANDOM_SEED = None                  # None = different random days each run; a number (e.g. 7) = same days every run
 TEST_DAYS = []                      # e.g. ["2026-04-28", "2026-09-10"] = test exactly these days (overrides the above)
+DOWNLOAD_WINDOW = None              # e.g. ("2026-07-01", "2026-10-23") = download 1-minute data for this whole range
+                                    # (max 115 days) in one request per stock, so later test days inside it are free
 REUSE_CACHED_DATA = True            # True = a test day already inside downloaded data is not downloaded again,
                                     # as long as at least MIN_RVOL_HISTORY_DAYS earlier days are there too
 
@@ -835,12 +837,19 @@ def main():
         # 3. 1-minute data needed (cached files are reused)
         days_back = max(RVOL_LOOKBACK_DAYS, warmup_days())
         chunks = date_chunks(test_days, all_days, days_back)
+        if DOWNLOAD_WINDOW:
+            w_start, w_end = DOWNLOAD_WINDOW
+            inside = [d for d in test_days if w_start <= d <= w_end]
+            if inside:
+                chunks = [c for c in chunks if not any(c[0] <= d <= c[1] for d in inside)] + [(w_start, w_end)]
         # Only download a stock for a date range if it qualifies on a test day inside that range
         jobs = [(t, s, e) for s, e in chunks
                 for t in sorted(set().union(*[candidates_by_day[d] for d in test_days if s <= d <= e]))]
         def already_have(ticker, start_day, end_day):
             if minutes_file(ticker, start_day, end_day).exists():
                 return True
+            if DOWNLOAD_WINDOW and (start_day, end_day) == tuple(DOWNLOAD_WINDOW):
+                return False   # the whole window is wanted, even if parts of it are already on disk
             days_in_chunk = [d for d in test_days if start_day <= d <= end_day]
             return REUSE_CACHED_DATA and all(covered_by_cache(ticker, d, all_days) for d in days_in_chunk)
         if MARKET_FILTER:
