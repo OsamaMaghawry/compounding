@@ -73,6 +73,7 @@ EMA_INCLUDE_EXTENDED_HOURS = False  # True = pre/after-market bars count in the 
 
 # ---------- STRATEGY TYPE ----------
 STRATEGY = "TREND"                  # "TREND" = the EMA re-cross strategy above
+                                    # "GAP_RECLAIM" = gapped-up stock closes back above VWAP; hold to EXIT_ALL_TIME
                                     # "MEAN_REVERSION" = fade stretched moves back to VWAP (settings below)
 
 # ---------- MEAN REVERSION TO VWAP (used when STRATEGY = "MEAN_REVERSION") ----------
@@ -93,6 +94,15 @@ MR_MIN_REWARD_RISK = 0.0            # e.g. 1.5 = enter only if the distance to V
                                     # to the stop; 0 = off
 MR_TIME_STOP_MINUTES = 0            # e.g. 45 = close the trade if VWAP is not reached within 45 minutes; 0 = off
 MR_FIRST_ENTRY_TIME = "10:00"       # no mean reversion entries before this time (VWAP needs time to settle)
+MR_STRONG_DAY_ONLY = False          # True = longs only while the price is above the day's open and the previous close
+                                    # (shorts: below both) - buy dips only in stocks having a strong day
+
+# ---------- GAP RECLAIM (used when STRATEGY = "GAP_RECLAIM") ----------
+MIN_GAP_PCT = 0.0                   # e.g. 3.0 = only stocks that opened at least 3% above the previous close
+GR_FIRST_ENTRY_TIME = "09:45"
+GR_LAST_ENTRY_TIME = "12:00"
+GR_STOP_BUFFER_PCT = 0.5            # stop this % below the day's low so far
+GR_MAX_LOSS_PCT = 3.0               # ...but never more than this % below the entry
 
 # ---------- FILTERS AGAINST WHIPSAWS (0 = off) ----------
 BAR_MINUTES = 1                     # chart timeframe: 1, 2, 5 ... minute bars (EMAs and signals use these bars)
@@ -444,6 +454,11 @@ def prepare_bars(minutes, day):
         above_b = g["close"] > g["upper_band"]
         g["stretch_low"] = g["low"].groupby((below != below.shift()).cumsum()).cummin().where(below)
         g["stretch_high"] = g["high"].groupby((above_b != above_b.shift()).cumsum()).cummax().where(above_b)
+        g["day_open"] = g["open"].groupby(day_key).transform("first")
+        last_close = g["close"].groupby(day_key).last()
+        g["prev_day_close"] = pd.Series(day_key, index=g.index).map(last_close.shift(1))
+        g["low_so_far"] = g["low"].groupby(day_key).cummin()
+        g["prev_vwap"] = g["vwap"].shift(1)
         g["prev_stretch_low"] = g["stretch_low"].shift(1)
         g["prev_stretch_high"] = g["stretch_high"].shift(1)
         # For EMA_CROSS entries: was there a close beyond the band in the last MR_SETUP_MINUTES, and the extreme since
@@ -469,6 +484,23 @@ def prepare_bars(minutes, day):
         if not g.empty:
             out[symbol] = g
     return out
+
+
+def gap_reclaim_signal(bar, bar_close_time):
+    """Gap reclaim: a close back above VWAP after being below it, in the entry window."""
+    if not (dtime.fromisoformat(GR_FIRST_ENTRY_TIME) <= bar_close_time <= dtime.fromisoformat(GR_LAST_ENTRY_TIME)):
+        return None
+    if ENABLE_LONGS and bar["prev_close"] <= bar["prev_vwap"] and bar["close"] > bar["vwap"]:
+        return "long"
+    return None
+
+
+def strong_day_ok(bar, side):
+    if not MR_STRONG_DAY_ONLY or pd.isna(bar["prev_day_close"]):
+        return True
+    if side == "long":
+        return bar["close"] > bar["day_open"] and bar["close"] > bar["prev_day_close"]
+    return bar["close"] < bar["day_open"] and bar["close"] < bar["prev_day_close"]
 
 
 def mr_entry_signal(bar, bar_close_time):
@@ -635,7 +667,12 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             bar, pos = g.loc[ts], open_positions[symbol]
             long = pos["side"] == "long"
 
-            if STRATEGY == "MEAN_REVERSION":
+            if STRATEGY == "GAP_RECLAIM":
+                if bar["low"] <= pos["stop"]:
+                    close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]), ts, "stop below the day's low")
+                elif bar_close_time >= exit_all:
+                    close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
+            elif STRATEGY == "MEAN_REVERSION":
                 manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all)
             elif STOP_LOSS_PCT > 0:
                 stop = pos["entry_price"] * (1 - STOP_LOSS_PCT / 100 if long else 1 + STOP_LOSS_PCT / 100)
@@ -680,7 +717,13 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             if closed_at.get(symbol) == ts:
                 continue  # never re-enter on the bar that closed the trade
             bar = g.loc[ts]
-            side = mr_entry_signal(bar, bar_close_time) if STRATEGY == "MEAN_REVERSION" else entry_signal(bar)
+            if STRATEGY == "MEAN_REVERSION":
+                side = mr_entry_signal(bar, bar_close_time)
+                side = side if side and strong_day_ok(bar, side) else None
+            elif STRATEGY == "GAP_RECLAIM":
+                side = gap_reclaim_signal(bar, bar_close_time)
+            else:
+                side = entry_signal(bar)
             if side and MARKET_FILTER and market_above_vwap is not None:
                 market_up = market_above_vwap.asof(ts)
                 if pd.isna(market_up) or (side == "long" and not market_up) or (side == "short" and market_up):
@@ -711,6 +754,9 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             }
             if STRATEGY == "MEAN_REVERSION":
                 open_positions[symbol]["stop"] = mr_stop_price(side, bar, price)
+            elif STRATEGY == "GAP_RECLAIM":
+                open_positions[symbol]["stop"] = max(bar["low_so_far"] * (1 - GR_STOP_BUFFER_PCT / 100),
+                                                     price * (1 - GR_MAX_LOSS_PCT / 100))
             entries_today[symbol] = entries_today.get(symbol, 0) + 1
 
     # Anything still open when the data ends (should not happen before EXIT_ALL_TIME)
@@ -891,7 +937,7 @@ def main():
                 continue
             bar_days = all_days[max(0, idx - warmup_days()):idx + 1]
             minutes = pd.concat([load_minutes(s, chunks, bar_days) for s in watchlist["symbol"]], ignore_index=True)
-            if MAX_GAP_PCT and not minutes.empty:
+            if (MAX_GAP_PCT or MIN_GAP_PCT) and not minutes.empty:
                 # Gap = today's first regular-session open vs the previous day's last regular-session close
                 t = minutes["ts"].dt.time
                 rth = minutes[(t >= SESSION_OPEN) & (t < SESSION_CLOSE)]
@@ -899,8 +945,13 @@ def main():
                 today_open = rth[d == day].groupby("symbol")["open"].first()
                 prev_close = rth[d < day].groupby("symbol")["close"].last()
                 gap = ((today_open - prev_close) / prev_close * 100).abs()
-                keep = set(gap[gap <= MAX_GAP_PCT].index)
-                print(f"   ↕ gap filter: {len(keep)} of {len(watchlist)} stocks opened within {MAX_GAP_PCT:g}% of the previous close")
+                signed_gap = (today_open - prev_close) / prev_close * 100
+                keep = set(gap.index)
+                if MAX_GAP_PCT:
+                    keep &= set(gap[gap <= MAX_GAP_PCT].index)
+                if MIN_GAP_PCT:
+                    keep &= set(signed_gap[signed_gap >= MIN_GAP_PCT].index)
+                print(f"   ↕ gap filter: {len(keep)} of {len(watchlist)} stocks pass (gap between {MIN_GAP_PCT or '-'}% and {MAX_GAP_PCT or '-'}%)")
                 watchlist = watchlist[watchlist["symbol"].isin(keep)].reset_index(drop=True)
                 minutes = minutes[minutes["symbol"].isin(keep)]
             watchlists.append(watchlist.assign(date=day))
