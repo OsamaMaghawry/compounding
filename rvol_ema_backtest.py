@@ -107,6 +107,7 @@ PB_STOP_MODE = "SWING_LOW"          # "SWING_LOW" = just below the pullback's lo
                                     # "FIXED" = PB_MAX_STOP_PCT below the entry
 PB_MAX_STOP_PCT = 3.5
 PB_STOP_BUFFER_PCT = 0.1            # how far below the pullback low the stop sits
+PB_TAKE_PROFIT_PCT = 0.0            # e.g. 2.0 = sell everything at +2% (or on the EMA cross / stop, whichever comes first)
 PB_ABOVE_VWAP = False               # True = the buying bar must close above VWAP
 PB_MIN_ENTRY_BAR_PCT = 0.0          # e.g. 0.5 = the buying bar must close at least 0.5% above its own open
 PB_MIN_EMA_SPREAD_PCT = 0.0         # e.g. 1.0 = EMA_TRIGGER must be at least 1% above EMA_FAST
@@ -720,8 +721,11 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             long = pos["side"] == "long"
 
             if STRATEGY == "PULLBACK":
+                target = pos["entry_price"] * (1 + PB_TAKE_PROFIT_PCT / 100) if PB_TAKE_PROFIT_PCT else None
                 if bar["low"] <= pos["stop"]:
                     close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]), ts, "stop")
+                elif target and bar["high"] >= target:
+                    close_part(pos, pos["shares_left"], max(bar["open"], target), ts, f"take profit +{PB_TAKE_PROFIT_PCT:g}%")
                 elif bar["ema_trig"] < bar["ema_fast"] and bar["prev_trig"] >= bar["prev_fast"]:
                     close_part(pos, pos["shares_left"], bar["close"], ts, f"EMA {EMA_TRIGGER} crossed below EMA {EMA_FAST}")
                 elif bar_close_time >= exit_all:
