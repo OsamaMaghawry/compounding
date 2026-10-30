@@ -524,25 +524,34 @@ def prepare_bars(minutes, day):
 
 
 def pullback_signal(bar, bar_close_time):
-    """EMA_TRIGGER > EMA_FAST > EMA_SLOW, and the close comes back above EMA_TRIGGER after closing below it."""
-    if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_trig"]) or not ENABLE_LONGS:
-        return None
-    stacked = bar["ema_trig"] > bar["ema_fast"] > bar["ema_slow"]
-    # the pullback bar must be from today - yesterday's last bar before the overnight gap does not count
-    reclaim = bar["prev_same_day"] and bar["prev_close"] < bar["prev_trig"] and bar["close"] > bar["ema_trig"]
-    if PB_ABOVE_VWAP and not bar["close"] > bar["vwap"]:
-        return None
-    if PB_MIN_ENTRY_BAR_PCT and (bar["close"] / bar["open"] - 1) * 100 < PB_MIN_ENTRY_BAR_PCT:
-        return None   # weak buying bar
-    if PB_MIN_EMA_SPREAD_PCT and (bar["ema_trig"] / bar["ema_fast"] - 1) * 100 < PB_MIN_EMA_SPREAD_PCT:
-        return None   # EMAs barely stacked
-    if PB_MAX_FROM_OPEN_PCT and (bar["close"] / bar["day_open"] - 1) * 100 > PB_MAX_FROM_OPEN_PCT:
-        return None   # already ran too far from the open
-    if PB_MAX_ABOVE_VWAP_PCT and (bar["close"] / bar["vwap"] - 1) * 100 > PB_MAX_ABOVE_VWAP_PCT:
-        return None   # too stretched above VWAP
-    if PB_MIN_VOLUME_ENGULF and not bar["volume"] >= PB_MIN_VOLUME_ENGULF * bar["prev_pullback_volume"]:
-        return None
-    return "long" if stacked and reclaim else None
+    """Long: EMA_TRIGGER > EMA_FAST > EMA_SLOW and the close comes back above EMA_TRIGGER after closing below it.
+    Short (ENABLE_SHORTS): the exact mirror. With MIN_GAP_PCT, longs need a gap up and shorts a gap down of that size."""
+    if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_trig"]) or not bar["prev_same_day"]:
+        return None   # the pullback bar must be from today, not yesterday's last bar before the gap
+    gap = (bar["day_open"] / bar["prev_day_close"] - 1) * 100 if pd.notna(bar["prev_day_close"]) else 0.0
+    for side, d in (("long", 1), ("short", -1)):
+        if (side == "long" and not ENABLE_LONGS) or (side == "short" and not ENABLE_SHORTS):
+            continue
+        if MIN_GAP_PCT and d * gap < MIN_GAP_PCT:
+            continue   # longs need a gap up, shorts a gap down
+        stacked = (d * (bar["ema_trig"] - bar["ema_fast"]) > 0) and (d * (bar["ema_fast"] - bar["ema_slow"]) > 0)
+        reclaim = d * (bar["prev_close"] - bar["prev_trig"]) < 0 and d * (bar["close"] - bar["ema_trig"]) > 0
+        if not (stacked and reclaim):
+            continue
+        if PB_ABOVE_VWAP and not d * (bar["close"] - bar["vwap"]) > 0:
+            continue   # longs above VWAP, shorts below
+        if PB_MIN_ENTRY_BAR_PCT and d * (bar["close"] / bar["open"] - 1) * 100 < PB_MIN_ENTRY_BAR_PCT:
+            continue   # weak entry bar
+        if PB_MIN_EMA_SPREAD_PCT and d * (bar["ema_trig"] / bar["ema_fast"] - 1) * 100 < PB_MIN_EMA_SPREAD_PCT:
+            continue   # EMAs barely stacked
+        if PB_MAX_FROM_OPEN_PCT and d * (bar["close"] / bar["day_open"] - 1) * 100 > PB_MAX_FROM_OPEN_PCT:
+            continue   # already ran too far from the open
+        if PB_MAX_ABOVE_VWAP_PCT and d * (bar["close"] / bar["vwap"] - 1) * 100 > PB_MAX_ABOVE_VWAP_PCT:
+            continue   # too stretched from VWAP
+        if PB_MIN_VOLUME_ENGULF and not bar["volume"] >= PB_MIN_VOLUME_ENGULF * bar["prev_pullback_volume"]:
+            continue
+        return side
+    return None
 
 
 def gap_reclaim_signal(bar, bar_close_time):
@@ -727,14 +736,18 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             long = pos["side"] == "long"
 
             if STRATEGY == "PULLBACK":
-                target = pos.get("target") or (pos["entry_price"] * (1 + PB_TAKE_PROFIT_PCT / 100) if PB_TAKE_PROFIT_PCT else None)
-                if bar["low"] <= pos["stop"]:
-                    close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]), ts, "stop")
-                elif target and bar["high"] >= target:
-                    close_part(pos, pos["shares_left"], max(bar["open"], target), ts,
-                               f"take profit {PB_TP_ATR:g} ATR" if PB_TP_ATR else f"take profit +{PB_TAKE_PROFIT_PCT:g}%")
-                elif bar["ema_trig"] < bar["ema_fast"] and bar["prev_trig"] >= bar["prev_fast"]:
-                    close_part(pos, pos["shares_left"], bar["close"], ts, f"EMA {EMA_TRIGGER} crossed below EMA {EMA_FAST}")
+                d = 1 if long else -1
+                target = pos.get("target") or (pos["entry_price"] * (1 + d * PB_TAKE_PROFIT_PCT / 100) if PB_TAKE_PROFIT_PCT else None)
+                stop_hit = bar["low"] <= pos["stop"] if long else bar["high"] >= pos["stop"]
+                target_hit = target and (bar["high"] >= target if long else bar["low"] <= target)
+                ema_cross = d * (bar["ema_trig"] - bar["ema_fast"]) < 0 and d * (bar["prev_trig"] - bar["prev_fast"]) >= 0
+                if stop_hit:
+                    close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]) if long else max(bar["open"], pos["stop"]), ts, "stop")
+                elif target_hit:
+                    close_part(pos, pos["shares_left"], max(bar["open"], target) if long else min(bar["open"], target), ts,
+                               f"take profit {PB_TP_ATR:g} ATR" if PB_TP_ATR else f"take profit {PB_TAKE_PROFIT_PCT:g}%")
+                elif ema_cross:
+                    close_part(pos, pos["shares_left"], bar["close"], ts, f"EMA {EMA_TRIGGER} crossed {'below' if long else 'above'} EMA {EMA_FAST}")
                 elif bar_close_time >= exit_all:
                     close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
             elif STRATEGY == "GAP_RECLAIM":
@@ -828,10 +841,11 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
                 open_positions[symbol]["stop"] = mr_stop_price(side, bar, price)
             elif STRATEGY == "PULLBACK" and (PB_SL_ATR or PB_TP_ATR):
                 pos_ = open_positions[symbol]
+                d = 1 if side == "long" else -1
                 if PB_TP_ATR:
-                    pos_["target"] = price + PB_TP_ATR * bar["atr"]
+                    pos_["target"] = price + d * PB_TP_ATR * bar["atr"]
                 if PB_SL_ATR:
-                    pos_["stop"] = price - PB_SL_ATR * bar["atr"]
+                    pos_["stop"] = price - d * PB_SL_ATR * bar["atr"]
                 else:
                     swing = min(bar["low"], bar["prev_pullback_low"]) if pd.notna(bar["prev_pullback_low"]) else bar["low"]
                     pos_["stop"] = max(swing * (1 - PB_STOP_BUFFER_PCT / 100), price * (1 - PB_MAX_STOP_PCT / 100))
@@ -1040,7 +1054,8 @@ def main():
                 if MAX_GAP_PCT:
                     keep &= set(gap[gap <= MAX_GAP_PCT].index)
                 if MIN_GAP_PCT:
-                    keep &= set(signed_gap[signed_gap >= MIN_GAP_PCT].index)
+                    big_gap = signed_gap.abs() if ENABLE_SHORTS else signed_gap   # with shorts, gap downs qualify too
+                    keep &= set(big_gap[big_gap >= MIN_GAP_PCT].index)
                 print(f"   ↕ gap filter: {len(keep)} of {len(watchlist)} stocks pass (gap between {MIN_GAP_PCT or '-'}% and {MAX_GAP_PCT or '-'}%)")
                 watchlist = watchlist[watchlist["symbol"].isin(keep)].reset_index(drop=True)
                 minutes = minutes[minutes["symbol"].isin(keep)]
