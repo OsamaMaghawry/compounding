@@ -34,6 +34,8 @@ RANDOM_SEED = None                  # None = different random days each run; a n
 TEST_DAYS = []                      # e.g. ["2026-04-28", "2026-09-10"] = test exactly these days (overrides the above)
 DOWNLOAD_WINDOW = None              # e.g. ("2026-07-01", "2026-10-23") = download 1-minute data for this whole range
                                     # (max 115 days) in one request per stock, so later test days inside it are free
+OFFLINE_ONLY = False                # True = never call EODHD: only data already downloaded is used (stocks or daily data
+                                    # that are missing are simply left out)
 REUSE_CACHED_DATA = True            # True = a test day already inside downloaded data is not downloaded again,
                                     # as long as at least MIN_RVOL_HISTORY_DAYS earlier days are there too
 
@@ -377,7 +379,12 @@ def daily_filters(day, all_days, universe):
     """Average daily volume and previous close before a test day, for the stocks in the universe."""
     idx = all_days.index(day)
     days = all_days[max(0, idx - AVG_VOLUME_DAYS):idx]
-    if REUSE_CACHED_DATA:
+    if OFFLINE_ONLY:
+        earlier = all_days[max(0, idx - AVG_VOLUME_DAYS * 3):idx]
+        days = [d for d in earlier if cache_path("json", f"bulk_US_{d}.json.gz").exists()][-AVG_VOLUME_DAYS:]
+        if not days:
+            raise SystemExit(f"OFFLINE_ONLY: no daily data on disk before {day}")
+    elif REUSE_CACHED_DATA:
         have = [d for d in days if cache_path("json", f"bulk_US_{d}.json.gz").exists()]
         if len(have) >= MIN_RVOL_HISTORY_DAYS:
             days = have   # enough daily data already downloaded - no new calls
@@ -960,6 +967,8 @@ def main():
         if MARKET_FILTER:
             jobs += [(MARKET_SYMBOL, s, e) for s, e in chunks]
         todo = [j for j in jobs if not already_have(*j)]
+        if OFFLINE_ONLY:
+            todo = []   # stocks not downloaded yet are left out
         print(f"\n⬇ 1-minute data: {len(jobs):,} ticker-ranges, {len(todo):,} not cached yet "
               f"= {len(todo) * CALL_COST['intraday']:,} EODHD calls (plus {_calls_used:,} used for daily data)")
         if ESTIMATE_CALLS_ONLY:
