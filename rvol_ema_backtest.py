@@ -105,6 +105,8 @@ PB_STOP_MODE = "SWING_LOW"          # "SWING_LOW" = just below the pullback's lo
                                     # "FIXED" = PB_MAX_STOP_PCT below the entry
 PB_MAX_STOP_PCT = 3.5
 PB_STOP_BUFFER_PCT = 0.1            # how far below the pullback low the stop sits
+PB_ABOVE_VWAP = False               # True = the buying bar must close above VWAP
+PB_MIN_VOLUME_ENGULF = 0.0          # e.g. 0.9 = the buying bar's volume must be at least 90% of the pullback bars' total
 
 # ---------- GAP RECLAIM (used when STRATEGY = "GAP_RECLAIM") ----------
 MIN_GAP_PCT = 0.0                   # e.g. 3.0 = only stocks that opened at least 3% above the previous close
@@ -468,6 +470,8 @@ def prepare_bars(minutes, day):
         below_trig = g["close"] < g["ema_trig"]
         g["pullback_low"] = g["low"].groupby((below_trig != below_trig.shift()).cumsum()).cummin().where(below_trig)
         g["prev_pullback_low"] = g["pullback_low"].shift(1)
+        g["pullback_volume"] = g["volume"].groupby((below_trig != below_trig.shift()).cumsum()).cumsum().where(below_trig)
+        g["prev_pullback_volume"] = g["pullback_volume"].shift(1)
         g["day_open"] = g["open"].groupby(day_key).transform("first")
         last_close = g["close"].groupby(day_key).last()
         g["prev_day_close"] = pd.Series(day_key, index=g.index).map(last_close.shift(1))
@@ -506,6 +510,10 @@ def pullback_signal(bar, bar_close_time):
         return None
     stacked = bar["ema_trig"] > bar["ema_fast"] > bar["ema_slow"]
     reclaim = bar["prev_close"] < bar["prev_trig"] and bar["close"] > bar["ema_trig"]
+    if PB_ABOVE_VWAP and not bar["close"] > bar["vwap"]:
+        return None
+    if PB_MIN_VOLUME_ENGULF and not bar["volume"] >= PB_MIN_VOLUME_ENGULF * bar["prev_pullback_volume"]:
+        return None
     return "long" if stacked and reclaim else None
 
 
