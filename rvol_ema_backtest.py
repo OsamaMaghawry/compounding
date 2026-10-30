@@ -477,6 +477,7 @@ def prepare_bars(minutes, day):
         g["stretch_low"] = g["low"].groupby((below != below.shift()).cumsum()).cummin().where(below)
         g["stretch_high"] = g["high"].groupby((above_b != above_b.shift()).cumsum()).cummax().where(above_b)
         g["ema_trig"] = g["close"].ewm(span=EMA_TRIGGER, adjust=False).mean()
+        g["prev_same_day"] = pd.Series(day_key, index=g.index).shift(1).eq(pd.Series(day_key, index=g.index)).values
         g["prev_trig"] = g["ema_trig"].shift(1)
         below_trig = g["close"] < g["ema_trig"]
         g["pullback_low"] = g["low"].groupby((below_trig != below_trig.shift()).cumsum()).cummin().where(below_trig)
@@ -520,7 +521,8 @@ def pullback_signal(bar, bar_close_time):
     if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_trig"]) or not ENABLE_LONGS:
         return None
     stacked = bar["ema_trig"] > bar["ema_fast"] > bar["ema_slow"]
-    reclaim = bar["prev_close"] < bar["prev_trig"] and bar["close"] > bar["ema_trig"]
+    # the pullback bar must be from today - yesterday's last bar before the overnight gap does not count
+    reclaim = bar["prev_same_day"] and bar["prev_close"] < bar["prev_trig"] and bar["close"] > bar["ema_trig"]
     if PB_ABOVE_VWAP and not bar["close"] > bar["vwap"]:
         return None
     if PB_MIN_ENTRY_BAR_PCT and (bar["close"] / bar["open"] - 1) * 100 < PB_MIN_ENTRY_BAR_PCT:
