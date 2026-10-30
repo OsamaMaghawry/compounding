@@ -682,7 +682,7 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
                     close_part(pos, pos["shares_left"], gap_px, ts, "stop loss")
             if pos["shares_left"] > 0 and bar_close_time >= exit_all:
                 close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
-            if pos["shares_left"] > 0 and STRATEGY != "MEAN_REVERSION":
+            if pos["shares_left"] > 0 and STRATEGY == "TREND":
                 buffer = EXIT_BUFFER_PCT / 100
                 below_mid = (bar["close"] < bar["ema_mid"] * (1 - buffer)) if long else (bar["close"] > bar["ema_mid"] * (1 + buffer))
                 # the close crosses the fast EMA (it was on the trade's side of it one bar earlier)
