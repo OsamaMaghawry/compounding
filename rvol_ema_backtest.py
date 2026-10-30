@@ -74,6 +74,8 @@ EMA_INCLUDE_EXTENDED_HOURS = False  # True = pre/after-market bars count in the 
 # ---------- STRATEGY TYPE ----------
 STRATEGY = "TREND"                  # "TREND" = the EMA re-cross strategy above
                                     # "GAP_RECLAIM" = gapped-up stock closes back above VWAP; hold to EXIT_ALL_TIME
+                                    # "PULLBACK" = EMA_TRIGGER > EMA_FAST > EMA_SLOW; buy a close back above EMA_TRIGGER
+                                    #   after a close below it; sell when EMA_TRIGGER crosses below EMA_FAST
                                     # "MEAN_REVERSION" = fade stretched moves back to VWAP (settings below)
 
 # ---------- MEAN REVERSION TO VWAP (used when STRATEGY = "MEAN_REVERSION") ----------
@@ -96,6 +98,13 @@ MR_TIME_STOP_MINUTES = 0            # e.g. 45 = close the trade if VWAP is not r
 MR_FIRST_ENTRY_TIME = "10:00"       # no mean reversion entries before this time (VWAP needs time to settle)
 MR_STRONG_DAY_ONLY = False          # True = longs only while the price is above the day's open and the previous close
                                     # (shorts: below both) - buy dips only in stocks having a strong day
+
+# ---------- PULLBACK (used when STRATEGY = "PULLBACK") ----------
+EMA_TRIGGER = 3
+PB_STOP_MODE = "SWING_LOW"          # "SWING_LOW" = just below the pullback's lowest low (never more than PB_MAX_STOP_PCT)
+                                    # "FIXED" = PB_MAX_STOP_PCT below the entry
+PB_MAX_STOP_PCT = 3.5
+PB_STOP_BUFFER_PCT = 0.1            # how far below the pullback low the stop sits
 
 # ---------- GAP RECLAIM (used when STRATEGY = "GAP_RECLAIM") ----------
 MIN_GAP_PCT = 0.0                   # e.g. 3.0 = only stocks that opened at least 3% above the previous close
@@ -454,6 +463,11 @@ def prepare_bars(minutes, day):
         above_b = g["close"] > g["upper_band"]
         g["stretch_low"] = g["low"].groupby((below != below.shift()).cumsum()).cummin().where(below)
         g["stretch_high"] = g["high"].groupby((above_b != above_b.shift()).cumsum()).cummax().where(above_b)
+        g["ema_trig"] = g["close"].ewm(span=EMA_TRIGGER, adjust=False).mean()
+        g["prev_trig"] = g["ema_trig"].shift(1)
+        below_trig = g["close"] < g["ema_trig"]
+        g["pullback_low"] = g["low"].groupby((below_trig != below_trig.shift()).cumsum()).cummin().where(below_trig)
+        g["prev_pullback_low"] = g["pullback_low"].shift(1)
         g["day_open"] = g["open"].groupby(day_key).transform("first")
         last_close = g["close"].groupby(day_key).last()
         g["prev_day_close"] = pd.Series(day_key, index=g.index).map(last_close.shift(1))
@@ -484,6 +498,15 @@ def prepare_bars(minutes, day):
         if not g.empty:
             out[symbol] = g
     return out
+
+
+def pullback_signal(bar, bar_close_time):
+    """EMA_TRIGGER > EMA_FAST > EMA_SLOW, and the close comes back above EMA_TRIGGER after closing below it."""
+    if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_trig"]) or not ENABLE_LONGS:
+        return None
+    stacked = bar["ema_trig"] > bar["ema_fast"] > bar["ema_slow"]
+    reclaim = bar["prev_close"] < bar["prev_trig"] and bar["close"] > bar["ema_trig"]
+    return "long" if stacked and reclaim else None
 
 
 def gap_reclaim_signal(bar, bar_close_time):
@@ -667,7 +690,14 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             bar, pos = g.loc[ts], open_positions[symbol]
             long = pos["side"] == "long"
 
-            if STRATEGY == "GAP_RECLAIM":
+            if STRATEGY == "PULLBACK":
+                if bar["low"] <= pos["stop"]:
+                    close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]), ts, "stop")
+                elif bar["ema_trig"] < bar["ema_fast"] and bar["prev_trig"] >= bar["prev_fast"]:
+                    close_part(pos, pos["shares_left"], bar["close"], ts, f"EMA {EMA_TRIGGER} crossed below EMA {EMA_FAST}")
+                elif bar_close_time >= exit_all:
+                    close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
+            elif STRATEGY == "GAP_RECLAIM":
                 if bar["low"] <= pos["stop"]:
                     close_part(pos, pos["shares_left"], min(bar["open"], pos["stop"]), ts, "stop below the day's low")
                 elif bar_close_time >= exit_all:
@@ -722,6 +752,8 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
                 side = side if side and strong_day_ok(bar, side) else None
             elif STRATEGY == "GAP_RECLAIM":
                 side = gap_reclaim_signal(bar, bar_close_time)
+            elif STRATEGY == "PULLBACK":
+                side = pullback_signal(bar, bar_close_time)
             else:
                 side = entry_signal(bar)
             if side and MARKET_FILTER and market_above_vwap is not None:
@@ -754,6 +786,13 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
             }
             if STRATEGY == "MEAN_REVERSION":
                 open_positions[symbol]["stop"] = mr_stop_price(side, bar, price)
+            elif STRATEGY == "PULLBACK":
+                max_stop = price * (1 - PB_MAX_STOP_PCT / 100)
+                if PB_STOP_MODE == "SWING_LOW":
+                    swing = min(bar["low"], bar["prev_pullback_low"]) if pd.notna(bar["prev_pullback_low"]) else bar["low"]
+                    open_positions[symbol]["stop"] = max(swing * (1 - PB_STOP_BUFFER_PCT / 100), max_stop)
+                else:
+                    open_positions[symbol]["stop"] = max_stop
             elif STRATEGY == "GAP_RECLAIM":
                 open_positions[symbol]["stop"] = max(bar["low_so_far"] * (1 - GR_STOP_BUFFER_PCT / 100),
                                                      price * (1 - GR_MAX_LOSS_PCT / 100))
