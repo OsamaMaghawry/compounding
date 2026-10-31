@@ -134,6 +134,9 @@ EXIT_BUFFER_PCT = 0.0               # e.g. 0.2 = the EMA_MID exit needs a close 
 MAX_WATCHLIST_PER_SCAN = 0          # e.g. 20 = only the 20 highest relative volume stocks of each scan; 0 = all
 MAX_RELATIVE_VOLUME = 0             # e.g. 3.0 = skip stocks above 3x relative volume (news-driven movers); 0 = no limit
 MAX_GAP_PCT = 0.0                   # e.g. 1.0 = skip stocks that opened more than 1% above or below the previous close; 0 = off
+NEWS_REQUIRED = False               # True = a stock joins the watchlist only with company news (EODHD) published
+                                    # between the previous close (16:00) and the first scan time - a catalyst
+SHORT_MAX_MARKET_UP_PCT = 0.0       # e.g. 0.4 = no new shorts while MARKET_SYMBOL is up more than 0.4% from its open
 MARKET_FILTER = False               # True = longs only while MARKET_SYMBOL is above its VWAP, shorts only while below
 MARKET_SYMBOL = "SPY"
 
@@ -707,7 +710,7 @@ def manage_mean_reversion(pos, bar, ts, bar_close_time, exit_all):
         close_part(pos, pos["shares_left"], bar["close"], ts, f"end of day {EXIT_ALL_TIME}")
 
 
-def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
+def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_change=None):
     """Replay one day minute by minute. Returns the closed trades."""
     slot_value = capital / NUM_SLOTS
     first_scan = dtime.fromisoformat(enabled_scan_times()[0])
@@ -809,6 +812,10 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None):
                 side = pullback_signal(bar, bar_close_time)
             else:
                 side = entry_signal(bar)
+            if side == "short" and SHORT_MAX_MARKET_UP_PCT and market_change is not None:
+                chg = market_change.asof(ts)
+                if pd.notna(chg) and chg > SHORT_MAX_MARKET_UP_PCT:
+                    side = None   # the market is rallying - no new shorts
             if side and MARKET_FILTER and market_above_vwap is not None:
                 market_up = market_above_vwap.asof(ts)
                 if pd.isna(market_up) or (side == "long" and not market_up) or (side == "short" and market_up):
@@ -1059,16 +1066,28 @@ def main():
                 print(f"   ↕ gap filter: {len(keep)} of {len(watchlist)} stocks pass (gap between {MIN_GAP_PCT or '-'}% and {MAX_GAP_PCT or '-'}%)")
                 watchlist = watchlist[watchlist["symbol"].isin(keep)].reset_index(drop=True)
                 minutes = minutes[minutes["symbol"].isin(keep)]
+            if NEWS_REQUIRED and not watchlist.empty:
+                prev_day = all_days[idx - 1]
+                lo = pd.Timestamp(f"{prev_day} 16:00", tz=TZ)
+                hi = pd.Timestamp(f"{day} {enabled_scan_times()[0]}", tz=TZ)
+                def has_catalyst(sym):
+                    items = cached_json(f"news_{sym}_{day}", "news", {"s": f"{sym}.US", "from": prev_day, "to": day, "limit": 50}, "intraday")
+                    return any(lo <= pd.Timestamp(n["date"]).tz_convert(TZ) <= hi for n in items if isinstance(n, dict) and n.get("date"))
+                keep = {sym for sym in watchlist["symbol"] if has_catalyst(sym)}
+                print(f"   📰 news filter: {len(keep)} of {len(watchlist)} stocks have news since the previous close")
+                watchlist = watchlist[watchlist["symbol"].isin(keep)].reset_index(drop=True)
+                minutes = minutes[minutes["symbol"].isin(keep)]
             watchlists.append(watchlist.assign(date=day))
             bars = prepare_bars(minutes, day)
-            market_above_vwap = None
-            if MARKET_FILTER:
+            market_above_vwap = market_change = None
+            if MARKET_FILTER or SHORT_MAX_MARKET_UP_PCT:
                 market = prepare_bars(load_minutes(MARKET_SYMBOL, chunks, bar_days), day).get(MARKET_SYMBOL)
                 if market is not None:
                     market_above_vwap = market["close"] > market["vwap"]
+                    market_change = (market["close"] / market["day_open"] - 1) * 100
                 else:
                     print(f"   ⚠️ No {MARKET_SYMBOL} data - market filter skipped today")
-            day_trades = simulate_day(day, watchlist, bars, capital, market_above_vwap)
+            day_trades = simulate_day(day, watchlist, bars, capital, market_above_vwap, market_change)
             day_pnl = sum(t["pnl"] for t in day_trades)
             trades += day_trades
             print(f"   💰 {len(day_trades)} trades, P&L ${day_pnl:,.2f}")
