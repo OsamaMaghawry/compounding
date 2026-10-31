@@ -117,6 +117,8 @@ PB_MIN_EMA_SPREAD_PCT = 0.0         # e.g. 1.0 = EMA_TRIGGER must be at least 1%
 PB_MAX_FROM_OPEN_PCT = 0.0          # e.g. 8 = skip if the price is already more than 8% above the day's open
 PB_MAX_ABOVE_VWAP_PCT = 0.0         # e.g. 3 = skip if the price is more than 3% above VWAP
 PB_MIN_VOLUME_ENGULF = 0.0          # e.g. 0.9 = the buying bar's volume must be at least 90% of the pullback bars' total
+PB_USE_EMA200 = True                # True = EMA_TRIGGER > EMA_FAST > EMA_SLOW (200) for longs (mirror for shorts);
+                                    # False = only EMA_TRIGGER > EMA_FAST, the 200 EMA is ignored
 PB_CONFIRM_ATR = 0.0                # e.g. 0.25 = don't enter at the signal bar's close: place a buy stop 0.25 x ATR above it
                                     # (sell stop below it for shorts); 0 = enter at the signal bar's close
 PB_CONFIRM_BARS = 3                 # the confirmation order is cancelled if not filled within this many bars
@@ -533,7 +535,7 @@ def prepare_bars(minutes, day):
 def pullback_signal(bar, bar_close_time):
     """Long: EMA_TRIGGER > EMA_FAST > EMA_SLOW and the close comes back above EMA_TRIGGER after closing below it.
     Short (ENABLE_SHORTS): the exact mirror. With MIN_GAP_PCT, longs need a gap up and shorts a gap down of that size."""
-    if bar["bars_seen"] < EMA_SLOW or pd.isna(bar["prev_trig"]) or not bar["prev_same_day"]:
+    if (PB_USE_EMA200 and bar["bars_seen"] < EMA_SLOW) or pd.isna(bar["prev_trig"]) or not bar["prev_same_day"]:
         return None   # the pullback bar must be from today, not yesterday's last bar before the gap
     gap = (bar["day_open"] / bar["prev_day_close"] - 1) * 100 if pd.notna(bar["prev_day_close"]) else 0.0
     for side, d in (("long", 1), ("short", -1)):
@@ -541,7 +543,7 @@ def pullback_signal(bar, bar_close_time):
             continue
         if MIN_GAP_PCT and d * gap < MIN_GAP_PCT:
             continue   # longs need a gap up, shorts a gap down
-        stacked = (d * (bar["ema_trig"] - bar["ema_fast"]) > 0) and (d * (bar["ema_fast"] - bar["ema_slow"]) > 0)
+        stacked = (d * (bar["ema_trig"] - bar["ema_fast"]) > 0) and (not PB_USE_EMA200 or d * (bar["ema_fast"] - bar["ema_slow"]) > 0)
         reclaim = d * (bar["prev_close"] - bar["prev_trig"]) < 0 and d * (bar["close"] - bar["ema_trig"]) > 0
         if not (stacked and reclaim):
             continue
