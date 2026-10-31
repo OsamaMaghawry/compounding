@@ -117,6 +117,9 @@ PB_MIN_EMA_SPREAD_PCT = 0.0         # e.g. 1.0 = EMA_TRIGGER must be at least 1%
 PB_MAX_FROM_OPEN_PCT = 0.0          # e.g. 8 = skip if the price is already more than 8% above the day's open
 PB_MAX_ABOVE_VWAP_PCT = 0.0         # e.g. 3 = skip if the price is more than 3% above VWAP
 PB_MIN_VOLUME_ENGULF = 0.0          # e.g. 0.9 = the buying bar's volume must be at least 90% of the pullback bars' total
+PB_CONFIRM_ATR = 0.0                # e.g. 0.25 = don't enter at the signal bar's close: place a buy stop 0.25 x ATR above it
+                                    # (sell stop below it for shorts); 0 = enter at the signal bar's close
+PB_CONFIRM_BARS = 3                 # the confirmation order is cancelled if not filled within this many bars
 
 # ---------- GAP RECLAIM (used when STRATEGY = "GAP_RECLAIM") ----------
 MIN_GAP_PCT = 0.0                   # e.g. 3.0 = only stocks that opened at least 3% above the previous close
@@ -726,6 +729,8 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
 
     open_positions, trades, closed_at = {}, [], {}
     entries_today = {}
+    pending = {}   # confirmation orders (PB_CONFIRM_ATR)
+    confirm = STRATEGY == "PULLBACK" and PB_CONFIRM_ATR > 0 and PB_SL_ATR > 0
     for ts in all_times:
         bar_close_time = (ts + timedelta(minutes=BAR_MINUTES)).time()   # decisions are made when the bar closes
         if bar_close_time < first_scan:
@@ -790,12 +795,46 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
                 closed_at[symbol] = ts
                 del open_positions[symbol]
 
+        # 2a. Confirmation orders waiting above/below the signal bar
+        for symbol in list(pending):
+            g = by_symbol_time[symbol]
+            if ts not in g.index:
+                continue
+            p_, bar = pending[symbol], g.loc[ts]
+            long = p_["side"] == "long"
+            p_["bars_left"] -= 1
+            touched = bar["high"] >= p_["trigger"] if long else bar["low"] <= p_["trigger"]
+            if touched and len(open_positions) < NUM_SLOTS and symbol not in open_positions:
+                del pending[symbol]
+                raw = max(bar["open"], p_["trigger"]) if long else min(bar["open"], p_["trigger"])
+                price = fill_price(raw, p_["side"], "entry")
+                shares = slot_value / price
+                shares = shares if (long and ALLOW_FRACTIONAL_SHARES) else int(shares)
+                if shares <= 0:
+                    continue
+                d = 1 if long else -1
+                pos_ = {"date": day, "symbol": symbol, "side": p_["side"], "scan_time": scan_of[symbol], "rvol": rvol[symbol],
+                        "entry_time": ts + timedelta(minutes=BAR_MINUTES), "entry_price": price, "shares": shares,
+                        "shares_left": shares, "first_exit_done": False, "exits": [],
+                        "target": price + d * PB_TP_ATR * p_["atr"] if PB_TP_ATR else None,
+                        "stop": price - d * PB_SL_ATR * p_["atr"]}
+                entries_today[symbol] = entries_today.get(symbol, 0) + 1
+                # the fill bar already went through the stop: count it as stopped (we can't tell the order inside the bar)
+                if (bar["low"] <= pos_["stop"]) if long else (bar["high"] >= pos_["stop"]):
+                    close_part(pos_, shares, pos_["stop"], ts, "stop")
+                    finish_trade(pos_, trades)
+                    closed_at[symbol] = ts
+                else:
+                    open_positions[symbol] = pos_
+            elif p_["bars_left"] <= 0:
+                del pending[symbol]
+
         # 2. Entries - highest relative volume first
         if bar_close_time > last_entry or len(open_positions) >= NUM_SLOTS:
             continue
         candidates = []
         for symbol, g in by_symbol_time.items():
-            if symbol in open_positions or ts not in g.index or bar_close_time < added_at[symbol]:
+            if symbol in open_positions or symbol in pending or ts not in g.index or bar_close_time < added_at[symbol]:
                 continue
             if not ALLOW_REENTRY and entries_today.get(symbol, 0) > 0:
                 continue
@@ -828,6 +867,11 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
         for _, symbol, side, bar in sorted(candidates, key=lambda c: c[0], reverse=True):
             if len(open_positions) >= NUM_SLOTS:
                 break
+            if confirm:
+                d = 1 if side == "long" else -1
+                pending[symbol] = {"side": side, "trigger": bar["close"] + d * PB_CONFIRM_ATR * bar["atr"],
+                                   "atr": bar["atr"], "bars_left": PB_CONFIRM_BARS}
+                continue
             price = fill_price(bar["close"], side, "entry")
             if STRATEGY == "MEAN_REVERSION" and (MR_MIN_VWAP_DIST_PCT or MR_MIN_BAND_WIDTH_PCT):
                 room = ((bar["vwap"] - price) if side == "long" else (price - bar["vwap"])) / price * 100
