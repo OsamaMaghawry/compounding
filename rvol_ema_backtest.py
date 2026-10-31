@@ -1128,6 +1128,9 @@ def main():
                 watchlist = watchlist[watchlist["symbol"].isin(keep)].reset_index(drop=True)
                 minutes = minutes[minutes["symbol"].isin(keep)]
             news_symbols = set()
+            short_ok = None   # stocks that can be shorted today (gapped down enough) - only these need the news check
+            if NEWS_REQUIRED == "shorts" and MIN_GAP_PCT and not minutes.empty:
+                short_ok = set(signed_gap[signed_gap <= -MIN_GAP_PCT].index)
             if NEWS_REQUIRED and not watchlist.empty:
                 prev_day = all_days[idx - 1]
                 lo = pd.Timestamp(f"{prev_day} 16:00", tz=TZ)
@@ -1135,7 +1138,8 @@ def main():
                 def has_catalyst(sym):
                     items = cached_json(f"news_{sym}_{day}", "news", {"s": f"{sym}.US", "from": prev_day, "to": day, "limit": 50}, "intraday")
                     return any(lo <= pd.Timestamp(n["date"]).tz_convert(TZ) <= hi for n in items if isinstance(n, dict) and n.get("date"))
-                keep = {sym for sym in watchlist["symbol"] if has_catalyst(sym)}
+                check = [sym for sym in watchlist["symbol"] if short_ok is None or sym in short_ok]
+                keep = {sym for sym in check if has_catalyst(sym)}
                 print(f"   📰 news filter: {len(keep)} of {len(watchlist)} stocks have news since the previous close")
                 if NEWS_REQUIRED == "shorts":
                     news_symbols = keep
