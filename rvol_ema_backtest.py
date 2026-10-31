@@ -117,6 +117,8 @@ PB_MIN_EMA_SPREAD_PCT = 0.0         # e.g. 1.0 = EMA_TRIGGER must be at least 1%
 PB_MAX_FROM_OPEN_PCT = 0.0          # e.g. 8 = skip if the price is already more than 8% above the day's open
 PB_MAX_ABOVE_VWAP_PCT = 0.0         # e.g. 3 = skip if the price is more than 3% above VWAP
 PB_MIN_VOLUME_ENGULF = 0.0          # e.g. 0.9 = the buying bar's volume must be at least 90% of the pullback bars' total
+ENTRY_PRIORITY = "RVOL"             # when more signals than free slots: "RVOL" = highest relative volume first,
+                                    # "GAP" = biggest opening gap first
 PB_USE_EMA200 = True                # True = EMA_TRIGGER > EMA_FAST > EMA_SLOW (200) for longs (mirror for shorts);
                                     # False = only EMA_TRIGGER > EMA_FAST, the 200 EMA is ignored
 PB_CONFIRM_ATR = 0.0                # e.g. 0.25 = don't enter at the signal bar's close: place a buy stop 0.25 x ATR above it
@@ -798,7 +800,7 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
                 del open_positions[symbol]
 
         # 2a. Confirmation orders waiting above/below the signal bar
-        for symbol in list(pending):
+        for symbol in sorted(pending, key=lambda x: pending[x]["rank"], reverse=True):
             g = by_symbol_time[symbol]
             if ts not in g.index:
                 continue
@@ -831,7 +833,7 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
             elif p_["bars_left"] <= 0:
                 del pending[symbol]
 
-        # 2. Entries - highest relative volume first
+        # 2. Entries - best ENTRY_PRIORITY first
         if bar_close_time > last_entry or len(open_positions) >= NUM_SLOTS:
             continue
         candidates = []
@@ -865,14 +867,17 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
                 if pd.isna(market_up) or (side == "long" and not market_up) or (side == "short" and market_up):
                     side = None   # trade only in the market's direction
             if side:
-                candidates.append((rvol[symbol], symbol, side, bar))
-        for _, symbol, side, bar in sorted(candidates, key=lambda c: c[0], reverse=True):
+                rank = rvol[symbol]
+                if ENTRY_PRIORITY == "GAP" and pd.notna(bar["prev_day_close"]):
+                    rank = abs(bar["day_open"] / bar["prev_day_close"] - 1)
+                candidates.append((rank, symbol, side, bar))
+        for rank, symbol, side, bar in sorted(candidates, key=lambda c: c[0], reverse=True):
             if len(open_positions) >= NUM_SLOTS:
                 break
             if confirm:
                 d = 1 if side == "long" else -1
                 pending[symbol] = {"side": side, "trigger": bar["close"] + d * PB_CONFIRM_ATR * bar["atr"],
-                                   "atr": bar["atr"], "bars_left": PB_CONFIRM_BARS}
+                                   "atr": bar["atr"], "bars_left": PB_CONFIRM_BARS, "rank": rank}
                 continue
             price = fill_price(bar["close"], side, "entry")
             if STRATEGY == "MEAN_REVERSION" and (MR_MIN_VWAP_DIST_PCT or MR_MIN_BAND_WIDTH_PCT):
