@@ -117,6 +117,8 @@ PB_MIN_EMA_SPREAD_PCT = 0.0         # e.g. 1.0 = EMA_TRIGGER must be at least 1%
 PB_MAX_FROM_OPEN_PCT = 0.0          # e.g. 8 = skip if the price is already more than 8% above the day's open
 PB_MAX_ABOVE_VWAP_PCT = 0.0         # e.g. 3 = skip if the price is more than 3% above VWAP
 PB_MIN_VOLUME_ENGULF = 0.0          # e.g. 0.9 = the buying bar's volume must be at least 90% of the pullback bars' total
+DAILY_LOSS_LIMIT_PCT = 0.0          # e.g. 1.0 = no new trades once the day's closed trades lost 1% of the allocated capital
+                                    # (profits earned earlier that day give more room); 0 = no limit
 ENTRY_PRIORITY = "RVOL"             # when more signals than free slots: "RVOL" = highest relative volume first,
                                     # "GAP" = biggest opening gap first
 PB_USE_EMA200 = True                # True = EMA_TRIGGER > EMA_FAST > EMA_SLOW (200) for longs (mirror for shorts);
@@ -798,6 +800,11 @@ def simulate_day(day, watchlist, bars, capital, market_above_vwap=None, market_c
                 finish_trade(pos, trades)
                 closed_at[symbol] = ts
                 del open_positions[symbol]
+
+        # Daily loss limit: once today's closed trades are down DAILY_LOSS_LIMIT_PCT, nothing new today
+        if DAILY_LOSS_LIMIT_PCT and sum(t["pnl"] for t in trades) <= -DAILY_LOSS_LIMIT_PCT / 100 * capital:
+            pending.clear()
+            continue
 
         # 2a. Confirmation orders waiting above/below the signal bar
         for symbol in sorted(pending, key=lambda x: pending[x]["rank"], reverse=True):
