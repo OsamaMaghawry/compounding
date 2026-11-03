@@ -1,25 +1,20 @@
-# EGX Seasonality Scanner - runs once a day at the time you choose.
+# EGX Seasonality Scanner - started at an exact time by cron-job.org (or by hand).
 #
-# CONTROL IT FROM GITHUB (no code changes): Settings -> Secrets and variables -> Actions -> Variables
-#   EGX_RUN_TIME   Cairo time to run, e.g. 16:30           (default 16:30)
-#   EGX_RUN_DAYS   days to run, e.g. Sun,Mon,Tue,Wed,Thu   (default Sun,Mon,Tue,Wed,Thu)
-#   EGX_ENABLED    false = pause the daily run              (default true)
-# SECRETS (same page, "Secrets" tab): EODHD_API_KEY, SMTP_LOGIN, SMTP_PASSWORD, RECIPIENT_EMAILS (comma-separated)
-# RUN NOW: Actions tab -> "EGX daily scanner" -> Run workflow (tick "force" to run even if it already ran today).
-#
-# How the timing works: GitHub checks every 30 minutes between 07:00 and 21:30 Cairo time; the first check at or
-# after EGX_RUN_TIME on a chosen day runs the scanner, later checks that day do nothing. GitHub's scheduler can
-# be late, so expect the run within about 30-60 minutes after EGX_RUN_TIME.
+# TIMING: set in cron-job.org (Cairo time zone). It calls GitHub's API, which starts this workflow
+#   immediately. Nothing here runs on GitHub's own (imprecise) scheduler.
+# SAFETY: a second start on the same Cairo day does nothing (egx_state/last_run.txt), so a retry
+#   or double click never sends two emails. Tick "force" on a manual run to override.
+# PAUSE: Settings -> Secrets and variables -> Actions -> Variables: EGX_ENABLED = false
+# SECRETS: EODHD_API_KEY, SMTP_LOGIN, SMTP_PASSWORD, RECIPIENT_EMAILS (comma-separated)
+# RUN NOW: Actions tab -> "EGX daily scanner" -> Run workflow.
 
 name: EGX daily scanner
 
 on:
-  schedule:
-    - cron: "*/30 4-19 * * *"   # UTC; every 30 min covers 07:00-21:30 Cairo in summer and winter time
   workflow_dispatch:
     inputs:
       force:
-        description: "Run even if it already ran today / today is not a run day"
+        description: "Run even if it already ran today"
         type: boolean
         default: false
 
@@ -37,26 +32,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Is it time to run?
+      - name: Should it run?
         id: gate
         env:
-          RUN_TIME: ${{ vars.EGX_RUN_TIME || '16:30' }}
-          RUN_DAYS: ${{ vars.EGX_RUN_DAYS || 'Sun,Mon,Tue,Wed,Thu' }}
           ENABLED: ${{ vars.EGX_ENABLED || 'true' }}
-          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
-          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          FORCE: ${{ inputs.force }}
         run: |
-          today=$(TZ=Africa/Cairo date +%F); now=$(TZ=Africa/Cairo date +%H:%M); dow=$(TZ=Africa/Cairo date +%a)
+          today=$(TZ=Africa/Cairo date +%F); now=$(TZ=Africa/Cairo date +%H:%M:%S)
           last=$(cat egx_state/last_run.txt 2>/dev/null || echo none)
           go=false
           if [ "$FORCE" = "true" ]; then go=true
           elif [ "$ENABLED" != "true" ]; then echo "Paused (EGX_ENABLED=$ENABLED)"
           elif [ "$last" = "$today" ]; then echo "Already ran today ($today)"
-          elif [ "$MANUAL" = "true" ]; then go=true
-          elif ! echo ",$RUN_DAYS," | grep -qi ",$dow,"; then echo "$dow is not a run day ($RUN_DAYS)"
-          elif [[ "$now" < "$RUN_TIME" ]]; then echo "Too early: $now Cairo, run time $RUN_TIME"
           else go=true; fi
-          echo "Cairo $today $now ($dow) -> run: $go"
+          echo "Started $today $now Cairo -> run: $go"
           echo "go=$go" >> "$GITHUB_OUTPUT"; echo "today=$today" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@v5
