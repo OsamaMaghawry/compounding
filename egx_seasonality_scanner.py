@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 EGX Seasonality Live Scanner - Fully Automatic Cycle Rollover
-- Run it once a day (e.g. a PythonAnywhere scheduled task). No manual steps needed.
+- Run it once a day (GitHub Actions: .github/workflows/egx_daily.yml, or any scheduler). No manual steps needed.
 - First run (no saved cycle): starts a cycle on the latest EGX trading day.
 - Every run while the cycle is active: refreshes live prices and emails the tracker.
 - When HOLDING_DAYS trading days have passed: closes the old cycle (archived to
@@ -43,7 +43,8 @@ EMAIL_CONFIG = {
     "sender_name": "Osama Safwat",
     "smtp_login": os.environ.get("SMTP_LOGIN", "PUT_YOUR_SMTP_LOGIN_HERE"),
     "smtp_password": os.environ.get("SMTP_PASSWORD", "PUT_YOUR_SMTP_PASSWORD_HERE"),
-    "recipient_emails": [
+    # The RECIPIENT_EMAILS environment variable (comma-separated, e.g. a GitHub secret) replaces this list when set
+    "recipient_emails": [e.strip() for e in os.environ.get("RECIPIENT_EMAILS", "").split(",") if e.strip()] or [
         # "someone@example.com",
     ]
 }

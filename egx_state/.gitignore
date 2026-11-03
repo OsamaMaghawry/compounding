@@ -1,0 +1,8 @@
+# Only the scanner's memory is kept in git; reports and charts are rebuilt every run
+*
+!.gitignore
+!README.md
+!cycle_state.json
+!cycle_history.json
+!ticker_names_cache.json
+!last_run.txt

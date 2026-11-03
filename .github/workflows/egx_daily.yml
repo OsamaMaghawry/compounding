@@ -1,0 +1,92 @@
+# EGX Seasonality Scanner - runs once a day at the time you choose.
+#
+# CONTROL IT FROM GITHUB (no code changes): Settings -> Secrets and variables -> Actions -> Variables
+#   EGX_RUN_TIME   Cairo time to run, e.g. 16:30           (default 16:30)
+#   EGX_RUN_DAYS   days to run, e.g. Sun,Mon,Tue,Wed,Thu   (default Sun,Mon,Tue,Wed,Thu)
+#   EGX_ENABLED    false = pause the daily run              (default true)
+# SECRETS (same page, "Secrets" tab): EODHD_API_KEY, SMTP_LOGIN, SMTP_PASSWORD, RECIPIENT_EMAILS (comma-separated)
+# RUN NOW: Actions tab -> "EGX daily scanner" -> Run workflow (tick "force" to run even if it already ran today).
+#
+# How the timing works: GitHub checks every 30 minutes between 07:00 and 21:30 Cairo time; the first check at or
+# after EGX_RUN_TIME on a chosen day runs the scanner, later checks that day do nothing. GitHub's scheduler can
+# be late, so expect the run within about 30-60 minutes after EGX_RUN_TIME.
+
+name: EGX daily scanner
+
+on:
+  schedule:
+    - cron: "*/30 4-19 * * *"   # UTC; every 30 min covers 07:00-21:30 Cairo in summer and winter time
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even if it already ran today / today is not a run day"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: egx-daily
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is it time to run?
+        id: gate
+        env:
+          RUN_TIME: ${{ vars.EGX_RUN_TIME || '16:30' }}
+          RUN_DAYS: ${{ vars.EGX_RUN_DAYS || 'Sun,Mon,Tue,Wed,Thu' }}
+          ENABLED: ${{ vars.EGX_ENABLED || 'true' }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          today=$(TZ=Africa/Cairo date +%F); now=$(TZ=Africa/Cairo date +%H:%M); dow=$(TZ=Africa/Cairo date +%a)
+          last=$(cat egx_state/last_run.txt 2>/dev/null || echo none)
+          go=false
+          if [ "$FORCE" = "true" ]; then go=true
+          elif [ "$ENABLED" != "true" ]; then echo "Paused (EGX_ENABLED=$ENABLED)"
+          elif [ "$last" = "$today" ]; then echo "Already ran today ($today)"
+          elif [ "$MANUAL" = "true" ]; then go=true
+          elif ! echo ",$RUN_DAYS," | grep -qi ",$dow,"; then echo "$dow is not a run day ($RUN_DAYS)"
+          elif [[ "$now" < "$RUN_TIME" ]]; then echo "Too early: $now Cairo, run time $RUN_TIME"
+          else go=true; fi
+          echo "Cairo $today $now ($dow) -> run: $go"
+          echo "go=$go" >> "$GITHUB_OUTPUT"; echo "today=$today" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.go == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .github/workflows/egx_daily.yml
+
+      - name: Install packages
+        if: steps.gate.outputs.go == 'true'
+        run: pip install requests pandas numpy matplotlib
+
+      - name: Run the scanner
+        if: steps.gate.outputs.go == 'true'
+        working-directory: egx_state
+        env:
+          EODHD_API_KEY: ${{ secrets.EODHD_API_KEY }}
+          SMTP_LOGIN: ${{ secrets.SMTP_LOGIN }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT_EMAILS: ${{ secrets.RECIPIENT_EMAILS }}
+        run: python ../egx_seasonality_scanner.py
+
+      - name: Save the scanner's memory
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          echo "${{ steps.gate.outputs.today }}" > egx_state/last_run.txt
+          git config user.name "egx-scanner-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add egx_state
+          git diff --cached --quiet && exit 0
+          git commit -m "EGX scanner state ${{ steps.gate.outputs.today }} [skip ci]"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
