@@ -19,6 +19,7 @@ from email import encoders
 import alpaca_trade_api as tradeapi
 from pytz import timezone
 import time
+import math
 from pathlib import Path
 import pandas_market_calendars as mcal
 import holidays
@@ -1054,6 +1055,11 @@ def combine_data(data):
         combined.columns = [f"{col[0]}" for col in combined.columns]
     return combined
 
+def floor_qty(qty, decimals=6):
+    """Share quantity rounded DOWN, so an order never exceeds the shares available."""
+    factor = 10 ** decimals
+    return math.floor(qty * factor + 1e-9) / factor
+
 def calculate_limit_price(price, side, margin=0.0002):
     return round(price * (1 - margin) if side == "sell" else price * (1 + margin), 2)
 
@@ -1657,7 +1663,7 @@ def monitor_orders_loop(api):
                                     already_filled = float(api.get_order(order_id).filled_qty or 0)
                                 except Exception:
                                     already_filled = float(open_order.filled_qty or 0)
-                                remaining_qty = round(original_qty - already_filled, 6)
+                                remaining_qty = floor_qty(original_qty - already_filled)
                                 if remaining_qty <= 0.0001:
                                     del active_orders[order_id]
                                     if order_id in order_attempts:
@@ -2724,7 +2730,8 @@ def build_alton_orders(state, prices, account_qty, progress_pct):
             else:
                 # Never sell more than Alton owns, nor more than the account holds
                 sell_qty = held_qty if target <= 0 else abs(gap) / price
-                sell_qty = round(min(sell_qty, held_qty, float(account_qty.get(ticker, 0))), 6)
+                # Rounded DOWN: rounding up can ask for a fraction more than the account holds (Alpaca rejects it)
+                sell_qty = floor_qty(min(sell_qty, held_qty, float(account_qty.get(ticker, 0))))
                 if sell_qty > 0.0001:
                     orders.append({'ticker': ticker, 'qty': sell_qty, 'side': 'sell'})
                     action = f"Sell ${sell_qty * price:,.0f}"
