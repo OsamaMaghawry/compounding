@@ -1779,7 +1779,10 @@ def submit_order_no_polling(api, ticker, qty, side, limit_price, strategy_id):
 
     except Exception as e:
         print(f"  ❌ [{strategy_id}] {ticker} failed: {e}")
+        LAST_ORDER_ERRORS[ticker] = str(e)[:300]   # the broker's own reason, shown in the email
         return None
+
+LAST_ORDER_ERRORS = {}   # ticker -> why the last order could not be placed
 
 def execute_orders(api, orders, side, strategy_id):
     if not orders:
@@ -1801,6 +1804,7 @@ def execute_orders(api, orders, side, strategy_id):
         current_price = fetch_real_time_price(api, ticker)
         if not current_price:
             print(f"  ⚠️ {ticker}: Could not get price - skipping")
+            LAST_ORDER_ERRORS[ticker] = "no live price from Alpaca, order not sent"
             continue
 
         if side == 'buy':
@@ -2892,7 +2896,8 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
             side_orders = [o for o in orders if o['side'] == side]
             submitted = execute_orders(api, side_orders, side, ALTON_STRATEGY_ID)
             submitted_tickers = {s['ticker'] for s in submitted}
-            rejected += [f"{o['ticker']} {side} {o['qty']:.4f} shares was rejected by the broker"
+            rejected += [f"{o['ticker']} {side} {o['qty']:.4f} shares was not placed: "
+                         f"{LAST_ORDER_ERRORS.get(o['ticker'], 'rejected by the broker')}"
                          for o in side_orders if o['ticker'] not in submitted_tickers]
 
         print(f"\n📊 WAITING FOR ORDERS TO FILL (up to {ORDER_WAIT_MINUTES} min)")
