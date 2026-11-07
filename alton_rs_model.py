@@ -54,6 +54,17 @@ ORDER_WAIT_MINUTES = 30             # how long to wait for orders to fill before
 # Alton's cash is adjusted ONCE so its total value equals that amount, then it keeps compounding.
 ALTON_CAPITAL_RESET = None
 
+# One-time corrections of Alton's book after shares were traded by hand in this account.
+# Each entry is applied ONCE (remembered by its "id"), at the start of the next run:
+#   "qty": "SYNC"  -> Alton's shares of that ticker are cut to what the account really holds; the
+#                     missing shares count as sold by Alton at "price" (their value goes to Alton's cash)
+#   "qty": -10.5   -> remove 10.5 shares from Alton's book, add 10.5 x price to Alton's cash
+#   "qty": 10.5    -> add 10.5 shares to Alton's book, take 10.5 x price from Alton's cash
+#   "price": the price of the manual trade (None = the live price when the correction is applied)
+ALTON_BOOK_ADJUSTMENTS = [
+    {"id": "manual-spy-sale-2026-11", "ticker": "SPY", "qty": "SYNC", "price": None},
+]
+
 # ============================================================================
 # MERCURY BANK CONFIGURATION
 # ============================================================================
@@ -2646,6 +2657,31 @@ def apply_capital_reset(strategy_state, state, prices):
     print(f"\n📒 ALTON CAPITAL RESET to ${ALTON_CAPITAL_RESET:,.2f}: Alton cash set to ${new_cash:,.2f}")
     return strategy_state.update_state({'ledger_cash': new_cash, 'capital_reset_used': ALTON_CAPITAL_RESET})
 
+def apply_book_adjustments(strategy_state, state, prices, account_qty):
+    """Applies each ALTON_BOOK_ADJUSTMENTS entry once (see the settings at the top)."""
+    done = list(state.get('adjustments_used', []))
+    for adj in ALTON_BOOK_ADJUSTMENTS:
+        if adj.get('id') in done:
+            continue
+        ticker = adj['ticker']
+        price = float(adj.get('price') or prices.get(ticker) or 0)
+        if price <= 0:
+            print(f"⚠️ Book adjustment {adj['id']}: no price for {ticker} - tried again next run")
+            continue
+        ledger_qty = dict(state['ledger_qty'])
+        book = float(ledger_qty.get(ticker, 0))
+        if adj['qty'] == "SYNC":
+            change = min(0.0, float(account_qty.get(ticker, 0)) - book)
+        else:
+            change = float(adj['qty'])
+        ledger_qty[ticker] = max(0.0, book + change)
+        cash = float(state.get('ledger_cash', 0)) - change * price
+        done.append(adj['id'])
+        print(f"\n📒 BOOK ADJUSTMENT {adj['id']}: {ticker} {book:.4f} -> {ledger_qty[ticker]:.4f} shares "
+              f"({change:+.4f} @ ${price:,.2f}); Alton cash ${float(state.get('ledger_cash', 0)):,.2f} -> ${cash:,.2f}")
+        state = strategy_state.update_state({'ledger_qty': ledger_qty, 'ledger_cash': cash, 'adjustments_used': done})
+    return state
+
 def plan_cycle_step(state, today_signal, confidence, current_date):
     """
     Decide today's position in the 3-day cycle.
@@ -2861,6 +2897,7 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
         send_email_with_attachment(f"{portfolio_name} - Alton skipped (no prices)", email_body)
         return None, None
     state = apply_capital_reset(strategy_state, state, prices)
+    state = apply_book_adjustments(strategy_state, state, prices, account_qty)
 
     for ticker, q in state['ledger_qty'].items():
         if q > float(account_qty.get(ticker, 0)) + 0.0001:
