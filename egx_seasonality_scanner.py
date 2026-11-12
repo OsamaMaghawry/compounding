@@ -168,76 +168,62 @@ def fetch_data(symbol: str, from_date: str, to_date: str, is_index: bool = False
     return pd.DataFrame()
 
 
-def fetch_ticker_info(ticker: str) -> Optional[Dict]:
-    """Fetch ticker information from EODHD API including company name."""
-    try:
-        url = f"{EODHD_BASE_URL}/eod/{ticker}.EGX"
-        params = {
-            'api_token': EODHD_API_KEY,
-            'fmt': 'json'
-        }
-        r = requests.get(url, params=params, timeout=30)
-        if r.status_code == 200:
-            data = r.json()
-            if data and isinstance(data, list) and len(data) > 0:
-                # The API returns the ticker info in the response
-                return {'name': ticker}  # Fallback to ticker if name not available
-        return None
-    except Exception:
-        return None
+_COMPANY_NAMES: Optional[Dict[str, str]] = None
+
+
+def get_egx_company_names() -> Dict[str, str]:
+    """All EGX company names in ONE request: {'ABUK': 'Abou Kir Fertilizers', ...} (also cached for the run)."""
+    global _COMPANY_NAMES
+    if _COMPANY_NAMES is not None:
+        return _COMPANY_NAMES
+    names: Dict[str, str] = {}
+    for attempt in range(MAX_RETRIES):
+        try:
+            r = requests.get(f"{EODHD_BASE_URL}/exchange-symbol-list/EGX",
+                             params={'api_token': EODHD_API_KEY, 'fmt': 'json'}, timeout=30)
+            if r.status_code == 200 and isinstance(r.json(), list):
+                for item in r.json():
+                    code, name = str(item.get('Code', '')).strip(), str(item.get('Name', '')).strip()
+                    if code and name:
+                        names[code] = name
+                break
+        except Exception:
+            time.sleep(1)
+    print(f"🏷️ Company names loaded for {len(names)} EGX tickers")
+    _COMPANY_NAMES = names
+    return names
 
 
 def get_company_name_from_api(ticker: str) -> str:
-    """Get company name from EODHD API ticker details."""
-    # Try to fetch from exchanges endpoint
-    try:
-        url = f"{EODHD_BASE_URL}/exchanges/EGX"
-        params = {'api_token': EODHD_API_KEY, 'fmt': 'json'}
-        r = requests.get(url, params=params, timeout=30)
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, list):
-                for item in data:
-                    if item.get('code') == ticker or item.get('code') == f"{ticker}.EGX":
-                        name = item.get('name', '')
-                        if name:
-                            return name
-    except Exception:
-        pass
+    """Company name of an EGX ticker (the ticker itself if EODHD has no name for it)."""
+    return get_egx_company_names().get(ticker.replace('.EGX', '').replace('.CA', ''), ticker)
 
-    # Fallback: try to get from ticker search
-    try:
-        url = f"{EODHD_BASE_URL}/search/{ticker}"
-        params = {'api_token': EODHD_API_KEY, 'fmt': 'json', 'exchange': 'EGX'}
-        r = requests.get(url, params=params, timeout=30)
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, list) and len(data) > 0:
-                for item in data:
-                    if item.get('code') == ticker or item.get('code') == f"{ticker}.EGX":
-                        name = item.get('name', '')
-                        if name:
-                            return name
-    except Exception:
-        pass
 
-    return ticker  # Return ticker as fallback
+def fill_company_names(stocks: List[Dict]) -> List[Dict]:
+    """Adds missing company names to saved stocks (cycles started before names worked showed only tickers)."""
+    if any(s.get('name') in (None, '', s.get('ticker')) for s in stocks):
+        for s in stocks:
+            if s.get('name') in (None, '', s.get('ticker')):
+                name = get_company_name_from_api(s['ticker'])
+                s['name'] = name[:35] if len(name) > 35 else name
+    return stocks
 
 
 def load_tickers() -> List[Dict]:
-    """Load tickers from CSV and fetch company names from API."""
+    """Load tickers from the CSV, with company names from EODHD (one request for all of them)."""
     url = "https://drive.google.com/uc?export=download&id=1auS4afvNnZNZnRGp09QPitnoD7M0mt_R"
 
-    # Try to load from cache first
-    cache_data = None
+    # Cache (less than 7 days old, and only if it really has names - old caches held just tickers)
     if os.path.exists(TICKER_CACHE_FILE):
         try:
             with open(TICKER_CACHE_FILE, 'r') as f:
                 cache_data = json.load(f)
             cache_age = datetime.now() - datetime.fromisoformat(cache_data.get('timestamp', '2000-01-01'))
-            if cache_age.days < 7:  # Use cache if less than 7 days old
+            cached = cache_data.get('tickers', [])
+            has_names = any(t.get('name') and t.get('name') != t.get('code') for t in cached)
+            if cache_age.days < 7 and cached and has_names:
                 print(f"📋 Using cached ticker names from {cache_data.get('timestamp')}")
-                return cache_data.get('tickers', [])
+                return cached
         except Exception as e:
             print(f"⚠️ Could not load cache: {e}")
 
@@ -245,51 +231,30 @@ def load_tickers() -> List[Dict]:
         r = requests.get(url, timeout=30)
         r.raise_for_status()
         df = pd.read_csv(io.StringIO(r.text))
-
         code_col = df.columns[0]
-        tickers = []
 
-        # Get list of unique tickers from CSV
-        unique_codes = []
+        unique_codes, seen = [], set()
         for _, row in df.iterrows():
-            code = str(row[code_col]).replace('.CA', '').replace('.EGX', '')
-            if code and code.lower() not in ('nan', 'none', ''):
+            code = str(row[code_col]).replace('.CA', '').replace('.EGX', '').strip()
+            if code and code.lower() not in ('nan', 'none', '') and code not in seen:
+                seen.add(code)
                 unique_codes.append(code)
-
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_codes = [x for x in unique_codes if not (x in seen or seen.add(x))]
-
         print(f"📋 Found {len(unique_codes)} unique tickers in CSV")
-        print(f"🔄 Fetching company names from API (this may take a moment)...")
 
-        for i, code in enumerate(unique_codes):
-            # Get company name from API
-            name = get_company_name_from_api(code)
+        names = get_egx_company_names()
+        tickers = [{'code': code, 'name': names.get(code, code)} for code in unique_codes]
+        missing = [t['code'] for t in tickers if t['name'] == t['code']]
+        if missing:
+            print(f"⚠️ No company name on EODHD for {len(missing)} tickers: {', '.join(missing[:15])}")
 
-            # If name is still just the code, try alternative method
-            if name == code:
-                # Try to get from exchange listing with a small delay
-                time.sleep(0.1)
-                name = get_company_name_from_api(code)
-
-            tickers.append({'code': code, 'name': name})
-
-            if (i + 1) % 50 == 0:
-                print(f"   Fetched {i+1}/{len(unique_codes)} names...")
-
-        # Save to cache
         try:
             with open(TICKER_CACHE_FILE, 'w') as f:
-                json.dump({
-                    'timestamp': datetime.now().isoformat(),
-                    'tickers': tickers
-                }, f, indent=2)
+                json.dump({'timestamp': datetime.now().isoformat(), 'tickers': tickers}, f, indent=2)
             print(f"💾 Saved ticker names to cache: {TICKER_CACHE_FILE}")
         except Exception as e:
             print(f"⚠️ Could not save cache: {e}")
 
-        print(f"✅ Loaded {len(tickers)} EGX tickers with names from API")
+        print(f"✅ Loaded {len(tickers)} EGX tickers ({len(tickers) - len(missing)} with company names)")
         if tickers:
             print(f"📋 Sample: {tickers[:3]}")
         return tickers
@@ -1405,6 +1370,8 @@ def main():
         stocks = update_saved_stocks_with_current_prices(saved_cycle['stocks'])
         cycle_start_date = saved_cycle['cycle_start_date']
         is_new_cycle = False
+
+    stocks = fill_company_names(stocks)
 
     if not stocks:
         # Saved state is left untouched, so the next scheduled run simply tries again.
