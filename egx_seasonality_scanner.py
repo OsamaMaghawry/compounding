@@ -884,16 +884,32 @@ def generate_report(stocks: List[Dict], cycle_start_date: str, is_new_cycle: boo
 
     avg_return = np.mean([s['expected_return'] for s in stocks]) if stocks else 0
 
-    # Benchmark tracking from cycle start date
+    # Date of the portfolio's prices: the date most open stocks are priced at (stopped stocks are frozen)
+    open_dates = [s.get('last_price_date', cycle_start_date) for s in stocks if s.get('status') != 'Stopped']
+    all_dates = open_dates or [s.get('last_price_date', cycle_start_date) for s in stocks] or [cycle_start_date]
+    latest_price_date = max(set(all_dates), key=lambda d: (all_dates.count(d), d))
+
+    # Benchmark from the cycle start date to the SAME date as the stock prices, so both cover the same days.
+    # (EODHD sometimes publishes the EGX30 index before the individual stocks.)
     benchmark_entry = get_benchmark_performance_on_date(BENCHMARK_SYMBOL, cycle_start_date)
-    benchmark_current = get_current_benchmark_price(BENCHMARK_SYMBOL)
+    benchmark_latest = get_current_benchmark_price(BENCHMARK_SYMBOL)
+    data_note = ""
+    if benchmark_latest['date'] and benchmark_latest['date'] > latest_price_date:
+        benchmark_current = get_benchmark_performance_on_date(BENCHMARK_SYMBOL, latest_price_date)
+        data_note = (f"EODHD has EGX30 data for {benchmark_latest['date']} but stock prices only up to {latest_price_date}; "
+                     f"both are compared as of {latest_price_date}. The next run picks up the newer stock prices once published.")
+        print(f"⚠️ {data_note}")
+    else:
+        benchmark_current = benchmark_latest
+    behind = sorted(s['ticker'] for s in stocks if s.get('status') != 'Stopped'
+                    and s.get('last_price_date', cycle_start_date) < latest_price_date)
+    if behind:
+        data_note += f" Priced at an older date: {', '.join(behind)}."
 
     if benchmark_entry['price'] and benchmark_current['price']:
         benchmark_pnl_pct = ((benchmark_current['price'] - benchmark_entry['price']) / benchmark_entry['price']) * 100
     else:
         benchmark_pnl_pct = 0.0
-
-    latest_price_date = max([s.get('last_price_date', cycle_start_date) for s in stocks]) if stocks else cycle_start_date
     cycle_end_date = estimate_cycle_end_date(cycle_start_date, HOLDING_DAYS)
 
     return {
@@ -915,6 +931,7 @@ def generate_report(stocks: List[Dict], cycle_start_date: str, is_new_cycle: boo
         'benchmark_entry_date': benchmark_entry['date'],
         'benchmark_current_price': benchmark_current['price'],
         'benchmark_current_date': benchmark_current['date'],
+        'data_note': data_note.strip(),
         'benchmark_pnl_pct': round(benchmark_pnl_pct, 2),
         'is_new_cycle': is_new_cycle,
         'previous_cycle': previous_cycle,
@@ -1001,6 +1018,8 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
     outperformance_color = '#008000' if outperformance >= 0 else '#cc0000'
 
     cycle_status = "🔄 ACTIVE CYCLE" if not summary.get('is_new_cycle') else "🆕 NEW CYCLE STARTED"
+    data_note_html = (f'<p style="color: #ffe08a; font-size: 11px; margin: 6px 0 0 0;">ℹ️ {summary["data_note"]}</p>'
+                      if summary.get('data_note') else '')
 
     previous = summary.get('previous_cycle')
     previous_cycle_line = ""
@@ -1049,6 +1068,7 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
                 <p style="color: #cce5f0; font-size: 11px; margin: 4px 0 0 0;">Cycle Entry Date: {cycle_start_date} | Last Price Update: {latest_price_date}</p>
                 <p style="color: #cce5f0; font-size: 11px; margin: 2px 0 0 0;">Days in cycle: {(datetime.now() - datetime.strptime(cycle_start_date, '%Y-%m-%d')).days} days</p>
                 {previous_cycle_line}
+                {data_note_html}
             </div>
 
             <!-- Stats Cards -->
