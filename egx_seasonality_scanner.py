@@ -709,54 +709,105 @@ def generate_performance_html(rows: List[Dict], chart_cid: str) -> str:
 '''
 
 
+_CORP_ACTIONS: Dict[str, Tuple[List[Tuple[str, float]], List[Tuple[str, float]]]] = {}
+
+
+def get_corporate_actions(ticker: str) -> Tuple[List[Tuple[str, float]], List[Tuple[str, float]]]:
+    """
+    Splits / bonus shares and cash dividends from EODHD: ([(date, shares_multiplier)], [(ex_date, cash_per_share)]).
+    A 3:2 bonus issue returns (date, 1.5): every share became 1.5 shares and the price dropped by 1.5x.
+    """
+    if ticker in _CORP_ACTIONS:
+        return _CORP_ACTIONS[ticker]
+    splits, divs = [], []
+    symbol = ticker if '.' in ticker else f"{ticker}.EGX"
+    for kind in ('splits', 'div'):
+        try:
+            r = requests.get(f"{EODHD_BASE_URL}/{kind}/{symbol}",
+                             params={'api_token': EODHD_API_KEY, 'from': '2015-01-01', 'fmt': 'json'}, timeout=30)
+            rows = r.json() if r.status_code == 200 else []
+        except Exception:
+            rows = []
+        for row in rows if isinstance(rows, list) else []:
+            try:
+                if kind == 'splits':
+                    new_sh, old_sh = str(row['split']).split('/')
+                    ratio = float(new_sh) / float(old_sh)
+                    if ratio > 0 and abs(ratio - 1) > 1e-9:
+                        splits.append((row['date'], ratio))
+                else:
+                    value = float(row.get('unadjustedValue') or row.get('value') or 0)   # amount actually paid per share at the time
+                    if value > 0:
+                        divs.append((row['date'], value))
+            except Exception:
+                continue
+    _CORP_ACTIONS[ticker] = (sorted(splits), sorted(divs))
+    return _CORP_ACTIONS[ticker]
+
+
 def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date: Optional[str] = None) -> List[Dict]:
     """
-    Update saved stocks with CURRENT live prices (or the close on as_of_date) and recalculate P/L.
-    IMPORTANT: Once a stock is stopped, its P/L is frozen and remains unchanged.
+    Recalculates every position from its daily closes since entry (up to as_of_date, or the latest close),
+    counting splits / bonus shares and cash dividends, so a corporate action never looks like a loss.
+    - value per original share = close x shares now held per original share + cash dividends received
+    - the stop is hit on the first close where that value is STOP_LOSS_PCT below entry; the P/L is then
+      frozen at -STOP_LOSS_PCT (as before). Because the whole history is re-checked each run, a position
+      that was stopped only because of a split (wrongly) is reopened automatically.
     """
-    label = f"closing prices on {as_of_date}" if as_of_date else "latest prices"
-    print(f"📊 Updating {len(saved_stocks)} stocks with {label}...")
+    label = f"closing prices up to {as_of_date}" if as_of_date else "latest prices"
+    print(f"📊 Updating {len(saved_stocks)} stocks with {label} (splits, bonus shares and dividends included)...")
+    end_date = as_of_date or datetime.now().strftime('%Y-%m-%d')
 
-    for idx, stock in enumerate(saved_stocks):
+    for stock in saved_stocks:
         ticker = stock['ticker']
-
-        # Check if stock was already stopped in previous runs
-        # If status is already 'Stopped', we keep it stopped and freeze the P/L
-        if stock.get('status') == 'Stopped':
-            print(f"      🔒 {ticker}: Already stopped at {stock.get('current_pnl_pct', 0):+.2f}% - frozen")
-            continue  # Skip updating this stock - keep the stopped price
-
-        print(f"   Fetching price for {ticker}...")
-
-        if as_of_date:
-            price_info = get_price_on_date(ticker, as_of_date)
-            price_data = (price_info[1], price_info[0]) if price_info else None
-        else:
-            price_data = get_current_price(ticker)
-        if price_data:
-            current_price, price_date = price_data
-            stock['current_price'] = round(current_price, 2)
-            stock['last_price_date'] = price_date
-            pnl_pct = ((current_price - stock['entry_price']) / stock['entry_price']) * 100
-            stock['current_pnl_pct'] = round(pnl_pct, 2)
-
-            # Check if stop loss was triggered
-            if pnl_pct <= -stock['stop_loss_pct']:
-                stock['status'] = 'Stopped'
-                # Freeze the P/L at the stop loss level
-                stock['current_pnl_pct'] = -stock['stop_loss_pct']
-                stock['current_price'] = stock['stop_loss_price']  # Set price to stop loss price
-                print(f"      🔴 {ticker}: STOP LOSS TRIGGERED at {stock['stop_loss_pct']}% loss - FROZEN")
-            else:
-                stock['status'] = 'Open'
-                print(f"      🟢 {ticker}: Entry={stock['entry_price']}, Current={current_price}, P/L={pnl_pct:+.2f}%")
-        else:
-            # If no current price available, keep the last known values
-            stock.setdefault('current_price', stock['entry_price'])
+        entry = float(stock['entry_price'])
+        stop_pct = float(stock.get('stop_loss_pct', STOP_LOSS_PCT))
+        hist = fetch_data(ticker, stock['entry_date'], end_date, is_index=False)
+        hist = hist[hist['date'] > pd.to_datetime(stock['entry_date'])] if not hist.empty else hist
+        if hist.empty:
+            stock.setdefault('current_price', entry)
             stock.setdefault('last_price_date', stock['entry_date'])
             stock.setdefault('current_pnl_pct', 0.0)
+            stock.setdefault('status', 'Open')
+            print(f"      ⚠️ {ticker}: no prices after entry yet - keeping last known values")
+            continue
+
+        splits, divs = get_corporate_actions(ticker)
+        splits = [(d, r) for d, r in splits if stock['entry_date'] < d <= end_date]
+        divs = [(d, v) for d, v in divs if stock['entry_date'] < d <= end_date]
+
+        was_stopped = stock.get('status') == 'Stopped'
+        status, stop_date = 'Open', None
+        for _, row in hist.iterrows():
+            day = row['date'].strftime('%Y-%m-%d')
+            shares = float(np.prod([r for d, r in splits if d <= day])) if splits else 1.0
+            cash = sum(v * float(np.prod([r for d2, r in splits if d2 <= d])) for d, v in divs if d <= day)
+            value = float(row['close']) * shares + cash
+            pnl = (value / entry - 1) * 100
+            last_day, last_close, last_shares, last_pnl = day, float(row['close']), shares, pnl
+            if pnl <= -stop_pct:
+                status, stop_date = 'Stopped', day
+                break
+
+        stock['split_factor'] = round(last_shares, 6)
+        stock['corporate_actions'] = ([f"{d}: {r:g}-for-1 shares" for d, r in splits] +
+                                      [f"{d}: dividend {v:g}" for d, v in divs])
+        if status == 'Stopped':
+            stock['status'] = 'Stopped'
+            stock['stop_date'] = stop_date
+            stock['current_pnl_pct'] = -stop_pct
+            stock['current_price'] = round(stock['stop_loss_price'] / last_shares, 2)
+            stock['last_price_date'] = stop_date
+            print(f"      🔴 {ticker}: stopped on {stop_date} ({-stop_pct:.1f}%)")
+        else:
             stock['status'] = 'Open'
-            print(f"      ⚠️ {ticker}: No price available, keeping last known price")
+            stock.pop('stop_date', None)
+            stock['current_price'] = round(last_close, 2)
+            stock['last_price_date'] = last_day
+            stock['current_pnl_pct'] = round(last_pnl, 2)
+            note = f" | {', '.join(stock['corporate_actions'])}" if stock['corporate_actions'] else ""
+            print(f"      🟢 {ticker}: entry {entry} -> {last_close} on {last_day}, P/L {last_pnl:+.2f}%{note}"
+                  + ("  (REOPENED: the earlier stop came from a corporate action)" if was_stopped else ""))
 
     return saved_stocks
 
@@ -1037,16 +1088,23 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
         status_text = s['status']
         status_color = '#27ae60' if status_text == 'Open' else '#c0392b'
         company_display = s['name'] if s['name'] != s['ticker'] else '—'
+        factor = float(s.get('split_factor') or 1.0)
+        entry_shown = s['entry_price'] / factor
+        stop_shown = s['stop_loss_price'] / factor
+        if s.get('corporate_actions'):
+            company_display += ('<br><span style="font-size: 10px; color: #b36b00;">'
+                                + '; '.join(s['corporate_actions'])
+                                + (' - prices shown per current share' if factor != 1 else '') + '</span>')
 
         table_rows += f'''
         <tr style="border-bottom: 1px solid #e0e0e0;">
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px;"><strong>{s['ticker']}</strong></td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; color: #555;">{company_display}</td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px;">{s['entry_date']}</td>
-            <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px; text-align: right;">{s['entry_price']:,.2f}</td>
+            <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px; text-align: right;">{entry_shown:,.2f}</td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 13px; text-align: right;">{s.get('current_price', s['entry_price']):,.2f}</td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: right; color: {'#008000' if s.get('current_pnl_pct', 0) >= 0 else '#cc0000'};">{s.get('current_pnl_pct', 0):+.2f}%</td>
-            <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: center;"><span style="background: #f0f0f0; padding: 4px 8px;">{s['stop_loss_price']:,.2f}</span></td>
+            <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: center;"><span style="background: #f0f0f0; padding: 4px 8px;">{stop_shown:,.2f}</span></td>
             <td style="padding: 10px 8px; font-family: Arial, sans-serif; font-size: 12px; text-align: center;"><span style="background: {status_color}20; color: {status_color}; padding: 4px 10px;">{status_text}</span></td>
          </tr>
         '''
