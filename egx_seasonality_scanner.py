@@ -49,6 +49,22 @@ EMAIL_CONFIG = {
     ]
 }
 
+# ---------- DATA CHECKS (internal - never shown to clients) ----------
+# Every run checks the price data and sends a separate INTERNAL email (only to these addresses)
+# listing anything that needs a human look. Clients never see any of this.
+INTERNAL_ALERT_EMAILS = [EMAIL_CONFIG["sender_email"]]
+SEND_INTERNAL_REPORT = "issues"     # "issues" = only when something needs checking, "always" = every run, "off"
+UNEXPLAINED_MOVE_PCT = 15.0         # a one-day move bigger than this with no corporate action on record is NOT
+                                    # used (no stop, no P/L) until it is explained - EGX price limits make such
+                                    # moves almost always a corporate action the data provider has not recorded yet
+
+# Corporate actions entered by hand (added to EODHD's own records). Use them for anything EODHD is missing or late on.
+MANUAL_CORPORATE_ACTIONS = [
+    # {"ticker": "XXXX", "date": "YYYY-MM-DD", "split": 1.5},          # bonus 1 share per 2 held -> 1.5 shares per share
+    # {"ticker": "XXXX", "date": "YYYY-MM-DD", "dividend": 1.25},      # cash dividend per share (EGP), ex-date
+    # {"ticker": "XXXX", "date": "YYYY-MM-DD", "genuine_move": True},  # checked: a real price move, not an action
+]
+
 # ---------- DATA API ----------
 EODHD_API_KEY = os.environ.get("EODHD_API_KEY", "PUT_YOUR_EODHD_API_KEY_HERE")
 EODHD_BASE_URL = "https://eodhd.com/api"
@@ -741,8 +757,30 @@ def get_corporate_actions(ticker: str) -> Tuple[List[Tuple[str, float]], List[Tu
                         divs.append((row['date'], value))
             except Exception:
                 continue
+    for m in MANUAL_CORPORATE_ACTIONS:
+        if m.get('ticker') != ticker.replace('.EGX', ''):
+            continue
+        if m.get('split') and not any(d == m['date'] for d, _ in splits):
+            splits.append((m['date'], float(m['split'])))
+        if m.get('dividend') and not any(d == m['date'] for d, _ in divs):
+            divs.append((m['date'], float(m['dividend'])))
     _CORP_ACTIONS[ticker] = (sorted(splits), sorted(divs))
     return _CORP_ACTIONS[ticker]
+
+
+# Findings for the internal data-check email (never part of the client report)
+INTERNAL_ISSUES: List[str] = []
+INTERNAL_INFO: List[str] = []
+
+
+def confirmed_genuine_moves(ticker: str) -> set:
+    return {m['date'] for m in MANUAL_CORPORATE_ACTIONS
+            if m.get('ticker') == ticker.replace('.EGX', '') and m.get('genuine_move')}
+
+
+def near(day: str, dates: List[str], days: int) -> bool:
+    d0 = datetime.strptime(day, '%Y-%m-%d')
+    return any(abs((datetime.strptime(d, '%Y-%m-%d') - d0).days) <= days for d in dates)
 
 
 def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date: Optional[str] = None) -> List[Dict]:
@@ -762,8 +800,8 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
         ticker = stock['ticker']
         entry = float(stock['entry_price'])
         stop_pct = float(stock.get('stop_loss_pct', STOP_LOSS_PCT))
-        hist = fetch_data(ticker, stock['entry_date'], end_date, is_index=False)
-        hist = hist[hist['date'] > pd.to_datetime(stock['entry_date'])] if not hist.empty else hist
+        full = fetch_data(ticker, stock['entry_date'], end_date, is_index=False)
+        hist = full[full['date'] > pd.to_datetime(stock['entry_date'])] if not full.empty else full
         if hist.empty:
             stock.setdefault('current_price', entry)
             stock.setdefault('last_price_date', stock['entry_date'])
@@ -778,20 +816,60 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
 
         was_stopped = stock.get('status') == 'Stopped'
         status, stop_date = 'Open', None
+        genuine = confirmed_genuine_moves(ticker)
+        action_dates = [d for d, _ in splits] + [d for d, _ in divs]
+        first = full.iloc[0] if full.iloc[0]['date'] == pd.to_datetime(stock['entry_date']) else None
+        prev_close = float(first['close']) if first is not None else entry
+        prev_ratio = (float(first['close']) / float(first['adjusted_close'])
+                      if first is not None and first.get('adjusted_close') else None)
+        last_day, last_close, last_shares, last_pnl = stock['entry_date'], prev_close, 1.0, 0.0
+        stock.pop('needs_review', None)
         for _, row in hist.iterrows():
             day = row['date'].strftime('%Y-%m-%d')
-            shares = float(np.prod([r for d, r in splits if d <= day])) if splits else 1.0
-            cash = sum(v * float(np.prod([r for d2, r in splits if d2 <= d])) for d, v in divs if d <= day)
-            value = float(row['close']) * shares + cash
-            pnl = (value / entry - 1) * 100
-            last_day, last_close, last_shares, last_pnl = day, float(row['close']), shares, pnl
-            if pnl <= -stop_pct:
-                status, stop_date = 'Stopped', day
+            close = float(row['close'])
+            split_today = float(np.prod([r for d, r in splits if d == day])) if splits else 1.0
+            move = (close * split_today / prev_close - 1) * 100 if prev_close else 0.0
+
+            # Check 1: a big one-day move with no corporate action on record -> not used until explained
+            if abs(move) >= UNEXPLAINED_MOVE_PCT and day not in genuine and not near(day, action_dates, 1):
+                msg = (f"{ticker}: {move:+.1f}% on {day} ({prev_close:g} -> {close:g}) with no split, bonus or dividend on record. "
+                       f"Prices from {day} are NOT used (no stop, P/L kept at {last_day}) until it is explained. "
+                       f"Fix: add the action to MANUAL_CORPORATE_ACTIONS, or add genuine_move if it is a real move.")
+                INTERNAL_ISSUES.append(msg)
+                stock['needs_review'] = msg
+                print(f"      ⚠️ {msg}")
                 break
 
+            # Check 2: EODHD's adjusted prices imply an action that is not in its corporate-action records
+            adj = float(row.get('adjusted_close') or 0)
+            ratio = close / adj if adj > 0 else None
+            if prev_ratio and ratio and abs(ratio / prev_ratio - 1) > 0.02 and not near(day, action_dates, 7):
+                INTERNAL_ISSUES.append(
+                    f"{ticker}: EODHD's adjusted prices change by {ratio / prev_ratio:.3f}x around {day}, but EODHD lists no "
+                    f"split or dividend near that date. Check the company's announcements (rights issue / bonus / dividend).")
+            prev_ratio = ratio or prev_ratio
+
+            shares = float(np.prod([r for d, r in splits if d <= day])) if splits else 1.0
+            cash = sum(v * float(np.prod([r for d2, r in splits if d2 <= d])) for d, v in divs if d <= day)
+            value = close * shares + cash
+            pnl = (value / entry - 1) * 100
+            last_day, last_close, last_shares, last_pnl = day, close, shares, pnl
+            prev_close = close
+            if pnl <= -stop_pct:
+                status, stop_date = 'Stopped', day
+                if pnl < -stop_pct - 2:
+                    INTERNAL_INFO.append(f"{ticker}: stop hit on {day} at a close of {pnl:+.1f}% (gapped through the "
+                                         f"-{stop_pct:g}% stop); the report books -{stop_pct:g}%.")
+                break
+        for d, r in splits:
+            INTERNAL_INFO.append(f"{ticker}: {r:g}-for-1 shares on {d} applied (split / bonus shares).")
+        for d, v in divs:
+            INTERNAL_INFO.append(f"{ticker}: cash dividend {v:g} EGP per share (ex {d}) applied.")
+
         stock['split_factor'] = round(last_shares, 6)
-        stock['corporate_actions'] = ([f"{d}: {r:g}-for-1 shares" for d, r in splits] +
-                                      [f"{d}: dividend {v:g}" for d, v in divs])
+        shown = [(d, r) for d, r in splits if d <= last_day]
+        stock['corporate_actions'] = ([f"Bonus/split {r:g}x shares on {datetime.strptime(d, '%Y-%m-%d'):%d %b %Y}" for d, r in shown] +
+                                      [f"Dividend EGP {v:g} on {datetime.strptime(d, '%Y-%m-%d'):%d %b %Y}" for d, v in divs if d <= last_day])
         if status == 'Stopped':
             stock['status'] = 'Stopped'
             stock['stop_date'] = stop_date
@@ -808,6 +886,9 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
             note = f" | {', '.join(stock['corporate_actions'])}" if stock['corporate_actions'] else ""
             print(f"      🟢 {ticker}: entry {entry} -> {last_close} on {last_day}, P/L {last_pnl:+.2f}%{note}"
                   + ("  (REOPENED: the earlier stop came from a corporate action)" if was_stopped else ""))
+            if was_stopped:
+                INTERNAL_INFO.append(f"{ticker}: REOPENED - its earlier stop came from a corporate action, not a real loss "
+                                     f"(now {last_pnl:+.2f}%).")
 
     return saved_stocks
 
@@ -950,12 +1031,14 @@ def generate_report(stocks: List[Dict], cycle_start_date: str, is_new_cycle: boo
         data_note = (f"EODHD has EGX30 data for {benchmark_latest['date']} but stock prices only up to {latest_price_date}; "
                      f"both are compared as of {latest_price_date}. The next run picks up the newer stock prices once published.")
         print(f"⚠️ {data_note}")
+        INTERNAL_ISSUES.append(data_note)
     else:
         benchmark_current = benchmark_latest
     behind = sorted(s['ticker'] for s in stocks if s.get('status') != 'Stopped'
                     and s.get('last_price_date', cycle_start_date) < latest_price_date)
     if behind:
         data_note += f" Priced at an older date: {', '.join(behind)}."
+        INTERNAL_INFO.append(f"Stocks priced at an older date than the rest: {', '.join(behind)}.")
 
     if benchmark_entry['price'] and benchmark_current['price']:
         benchmark_pnl_pct = ((benchmark_current['price'] - benchmark_entry['price']) / benchmark_entry['price']) * 100
@@ -1069,8 +1152,6 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
     outperformance_color = '#008000' if outperformance >= 0 else '#cc0000'
 
     cycle_status = "🔄 ACTIVE CYCLE" if not summary.get('is_new_cycle') else "🆕 NEW CYCLE STARTED"
-    data_note_html = (f'<p style="color: #ffe08a; font-size: 11px; margin: 6px 0 0 0;">ℹ️ {summary["data_note"]}</p>'
-                      if summary.get('data_note') else '')
 
     previous = summary.get('previous_cycle')
     previous_cycle_line = ""
@@ -1092,9 +1173,9 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
         entry_shown = s['entry_price'] / factor
         stop_shown = s['stop_loss_price'] / factor
         if s.get('corporate_actions'):
-            company_display += ('<br><span style="font-size: 10px; color: #b36b00;">'
+            company_display += ('<br><span style="font-size: 10px; color: #777;">'
                                 + '; '.join(s['corporate_actions'])
-                                + (' - prices shown per current share' if factor != 1 else '') + '</span>')
+                                + (' (prices per current share)' if factor != 1 else '') + '</span>')
 
         table_rows += f'''
         <tr style="border-bottom: 1px solid #e0e0e0;">
@@ -1126,7 +1207,6 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
                 <p style="color: #cce5f0; font-size: 11px; margin: 4px 0 0 0;">Cycle Entry Date: {cycle_start_date} | Last Price Update: {latest_price_date}</p>
                 <p style="color: #cce5f0; font-size: 11px; margin: 2px 0 0 0;">Days in cycle: {(datetime.now() - datetime.strptime(cycle_start_date, '%Y-%m-%d')).days} days</p>
                 {previous_cycle_line}
-                {data_note_html}
             </div>
 
             <!-- Stats Cards -->
@@ -1394,6 +1474,43 @@ Please view the HTML version or PDF attachment for complete details."""
         print(f"❌ Email failed: {e}")
 
 
+def send_internal_report():
+    """Separate data-check email to INTERNAL_ALERT_EMAILS only (never to clients)."""
+    issues = list(dict.fromkeys(INTERNAL_ISSUES))
+    info = list(dict.fromkeys(INTERNAL_INFO))
+    print(f"\n🔧 Internal data check: {len(issues)} to check, {len(info)} notes")
+    for line in issues:
+        print(f"   ❗ {line}")
+    for line in info:
+        print(f"   • {line}")
+    if SEND_INTERNAL_REPORT == "off" or not INTERNAL_ALERT_EMAILS:
+        return
+    if SEND_INTERNAL_REPORT == "issues" and not issues:
+        return
+    def ul(items):
+        return "<ul>" + "".join(f"<li style='margin-bottom:6px'>{x}</li>" for x in items) + "</ul>" if items else "<p>None.</p>"
+    html = (f"<html><body style='font-family:Arial,sans-serif;font-size:13px;max-width:900px'>"
+            f"<h2>EGX scanner - internal data check ({datetime.now():%Y-%m-%d})</h2>"
+            f"<p>Internal only - not sent to clients.</p>"
+            f"<h3>Needs checking ({len(issues)})</h3>{ul(issues)}"
+            f"<h3>Applied automatically ({len(info)})</h3>{ul(info)}</body></html>")
+    msg = MIMEMultipart('alternative')
+    msg['From'] = f"{EMAIL_CONFIG['sender_name']} <{EMAIL_CONFIG['sender_email']}>"
+    msg['To'] = ', '.join(INTERNAL_ALERT_EMAILS)
+    msg['Subject'] = (f"🔧 INTERNAL | EGX scanner data check | {datetime.now():%Y-%m-%d} | "
+                      f"{len(issues)} to check" if issues else f"🔧 INTERNAL | EGX scanner data check | {datetime.now():%Y-%m-%d} | all clear")
+    msg.attach(MIMEText("\n".join(["Needs checking:"] + issues + ["", "Applied automatically:"] + info), 'plain'))
+    msg.attach(MIMEText(html, 'html'))
+    try:
+        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'], timeout=30) as server:
+            server.starttls()
+            server.login(EMAIL_CONFIG['smtp_login'], EMAIL_CONFIG['smtp_password'])
+            server.send_message(msg)
+        print(f"✅ Internal data-check email sent to {', '.join(INTERNAL_ALERT_EMAILS)}")
+    except Exception as e:
+        print(f"❌ Internal email failed: {e}")
+
+
 def main():
     print("\n" + "=" * 70)
     print("🏦 EGX SEASONALITY LIVE SCANNER - Automatic Cycle Rollover")
@@ -1523,6 +1640,7 @@ def main():
         perf_chart_path=PERFORMANCE_CHART_PATH if performance_html else None,
         perf_html_path=PERFORMANCE_HTML_OUTPUT if performance_html else None,
     )
+    send_internal_report()
     print("\n✨ Done.")
 
 
