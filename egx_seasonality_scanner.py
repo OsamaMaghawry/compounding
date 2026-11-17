@@ -762,10 +762,11 @@ def get_corporate_actions(ticker: str) -> Tuple[List[Tuple[str, float]], List[Tu
     for m in MANUAL_CORPORATE_ACTIONS:
         if m.get('ticker') != ticker.replace('.EGX', ''):
             continue
-        if m.get('split') and not any(d == m['date'] for d, _ in splits):
-            splits.append((m['date'], float(m['split'])))
-        if m.get('dividend') and not any(d == m['date'] for d, _ in divs):
-            divs.append((m['date'], float(m['dividend'])))
+        # Your entries win: they replace whatever EODHD has for the same date
+        if m.get('split'):
+            splits = [(d, r) for d, r in splits if d != m['date']] + [(m['date'], float(m['split']))]
+        if m.get('dividend'):
+            divs = [(d, v) for d, v in divs if d != m['date']] + [(m['date'], float(m['dividend']))]
     _CORP_ACTIONS[ticker] = (sorted(splits), sorted(divs))
     return _CORP_ACTIONS[ticker]
 
