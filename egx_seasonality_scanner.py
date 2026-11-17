@@ -58,7 +58,9 @@ UNEXPLAINED_MOVE_PCT = 15.0         # a one-day move bigger than this with no co
                                     # used (no stop, no P/L) until it is explained - EGX price limits make such
                                     # moves almost always a corporate action the data provider has not recorded yet
 
-# Corporate actions entered by hand (added to EODHD's own records). Use them for anything EODHD is missing or late on.
+# Corporate actions entered by hand. EODHD officially provides only EOD prices for EGX: the splits/dividends it
+# returns for EGX are unofficial and incomplete, so every recorded split is checked against the price move that
+# day, and anything missing or wrong is reported in the internal email. Add the correct action here.
 MANUAL_CORPORATE_ACTIONS = [
     # {"ticker": "XXXX", "date": "YYYY-MM-DD", "split": 1.5},          # bonus 1 share per 2 held -> 1.5 shares per share
     # {"ticker": "XXXX", "date": "YYYY-MM-DD", "dividend": 1.25},      # cash dividend per share (EGP), ex-date
@@ -831,8 +833,11 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
             move = (close * split_today / prev_close - 1) * 100 if prev_close else 0.0
 
             # Check 1: a big one-day move with no corporate action on record -> not used until explained
-            if abs(move) >= UNEXPLAINED_MOVE_PCT and day not in genuine and not near(day, action_dates, 1):
-                msg = (f"{ticker}: {move:+.1f}% on {day} ({prev_close:g} -> {close:g}) with no split, bonus or dividend on record. "
+            # (the move already includes any split recorded for this day, so this also catches a WRONG or mis-dated
+            #  record: EODHD's EGX corporate-action data is unofficial - EODHD says EGX is EOD prices only)
+            if abs(move) >= UNEXPLAINED_MOVE_PCT and day not in genuine:
+                recorded = f"recorded split x{split_today:g} does not explain it" if split_today != 1 else "no split, bonus or dividend on record"
+                msg = (f"{ticker}: {move:+.1f}% on {day} ({prev_close:g} -> {close:g}) after corporate actions - {recorded}. "
                        f"Prices from {day} are NOT used (no stop, P/L kept at {last_day}) until it is explained. "
                        f"Fix: add the action to MANUAL_CORPORATE_ACTIONS, or add genuine_move if it is a real move.")
                 INTERNAL_ISSUES.append(msg)
