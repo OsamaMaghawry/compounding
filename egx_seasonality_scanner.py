@@ -54,9 +54,9 @@ EMAIL_CONFIG = {
 # listing anything that needs a human look. Clients never see any of this.
 INTERNAL_ALERT_EMAILS = [EMAIL_CONFIG["sender_email"]]
 SEND_INTERNAL_REPORT = "issues"     # "issues" = only when something needs checking, "always" = every run, "off"
-UNEXPLAINED_MOVE_PCT = 15.0         # a one-day move bigger than this with no corporate action on record is NOT
-                                    # used (no stop, no P/L) until it is explained - EGX price limits make such
-                                    # moves almost always a corporate action the data provider has not recorded yet
+UNEXPLAINED_DROP_PCT = 22.0         # a one-day DROP bigger than this (beyond EGX's normal 20% daily limit) with no
+                                    # corporate action that explains it is NOT used (no stop, no P/L) until explained.
+                                    # Rises are never held back: a corporate action can only push the price down.
 
 # Corporate actions entered by hand. EODHD officially provides only EOD prices for EGX: the splits/dividends it
 # returns for EGX are unofficial and incomplete, so every recorded split is checked against the price move that
@@ -817,15 +817,35 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
         splits = [(d, r) for d, r in splits if stock['entry_date'] < d <= end_date]
         divs = [(d, v) for d, v in divs if stock['entry_date'] < d <= end_date]
 
+        # P/L is measured on ONE price series: today's EODHD data, including the entry-day close.
+        # EODHD sometimes rewrites old closes after a split (DTPP) and sometimes not yet (CANA); measuring
+        # entry and today on the same series is correct in both cases.
+        first = full.iloc[0] if full.iloc[0]['date'] == pd.to_datetime(stock['entry_date']) else None
+        basis = float(first['close']) if first is not None else entry
+
+        # A recorded split is applied only if the prices really drop by its ratio on that day. If EODHD has
+        # already rewritten the old prices for it, there is no drop and applying it again would double count.
+        closes = list(zip([d.strftime('%Y-%m-%d') for d in full['date']], full['close'].astype(float)))
+        applied = []
+        for d, r in splits:
+            idx = next((i for i, (day, _) in enumerate(closes) if day >= d), None)
+            if idx is None or idx == 0:
+                continue
+            before, after = closes[idx - 1][1], closes[idx][1]
+            if abs(after * r / before - 1) < abs(after / before - 1):
+                applied.append((closes[idx][0], r))
+            else:
+                INTERNAL_INFO.append(f"{ticker}: split x{r:g} on {d} is already included in EODHD's prices - not applied again.")
+        splits = applied
+
         was_stopped = stock.get('status') == 'Stopped'
         status, stop_date = 'Open', None
         genuine = confirmed_genuine_moves(ticker)
         action_dates = [d for d, _ in splits] + [d for d, _ in divs]
-        first = full.iloc[0] if full.iloc[0]['date'] == pd.to_datetime(stock['entry_date']) else None
-        prev_close = float(first['close']) if first is not None else entry
+        prev_close = basis
         prev_ratio = (float(first['close']) / float(first['adjusted_close'])
                       if first is not None and first.get('adjusted_close') else None)
-        last_day, last_close, last_shares, last_pnl = stock['entry_date'], prev_close, 1.0, 0.0
+        last_day, last_close, last_shares, last_pnl = stock['entry_date'], basis, 1.0, 0.0
         stock.pop('needs_review', None)
         for _, row in hist.iterrows():
             day = row['date'].strftime('%Y-%m-%d')
@@ -833,32 +853,29 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
             split_today = float(np.prod([r for d, r in splits if d == day])) if splits else 1.0
             move = (close * split_today / prev_close - 1) * 100 if prev_close else 0.0
 
-            # Check 1: a big one-day move with no corporate action on record -> not used until explained
-            # (the move already includes any split recorded for this day, so this also catches a WRONG or mis-dated
-            #  record: EODHD's EGX corporate-action data is unofficial - EODHD says EGX is EOD prices only)
-            if abs(move) >= UNEXPLAINED_MOVE_PCT and day not in genuine:
-                recorded = f"recorded split x{split_today:g} does not explain it" if split_today != 1 else "no split, bonus or dividend on record"
-                msg = (f"{ticker}: {move:+.1f}% on {day} ({prev_close:g} -> {close:g}) after corporate actions - {recorded}. "
+            # Check 1: a drop beyond the normal EGX limit that no corporate action explains -> held until explained
+            if move <= -UNEXPLAINED_DROP_PCT and day not in genuine:
+                msg = (f"{ticker}: {move:+.1f}% on {day} ({prev_close:g} -> {close:g}) and no corporate action explains it. "
                        f"Prices from {day} are NOT used (no stop, P/L kept at {last_day}) until it is explained. "
-                       f"Fix: add the action to MANUAL_CORPORATE_ACTIONS, or add genuine_move if it is a real move.")
+                       f"Fix: add the action to MANUAL_CORPORATE_ACTIONS, or add genuine_move if it is a real drop.")
                 INTERNAL_ISSUES.append(msg)
                 stock['needs_review'] = msg
                 print(f"      ⚠️ {msg}")
                 break
 
-            # Check 2: EODHD's adjusted prices imply an action that is not in its corporate-action records
+            # Check 2 (report only, never changes numbers): adjusted prices imply an action EODHD does not list
             adj = float(row.get('adjusted_close') or 0)
             ratio = close / adj if adj > 0 else None
             if prev_ratio and ratio and abs(ratio / prev_ratio - 1) > 0.02 and not near(day, action_dates, 7):
-                INTERNAL_ISSUES.append(
-                    f"{ticker}: EODHD's adjusted prices change by {ratio / prev_ratio:.3f}x around {day}, but EODHD lists no "
-                    f"split or dividend near that date. Check the company's announcements (rights issue / bonus / dividend).")
+                INTERNAL_INFO.append(
+                    f"{ticker}: EODHD's adjusted prices change by {ratio / prev_ratio:.3f}x around {day} with no split or "
+                    f"dividend listed near that date - worth a look at the company's announcements.")
             prev_ratio = ratio or prev_ratio
 
             shares = float(np.prod([r for d, r in splits if d <= day])) if splits else 1.0
             cash = sum(v * float(np.prod([r for d2, r in splits if d2 <= d])) for d, v in divs if d <= day)
             value = close * shares + cash
-            pnl = (value / entry - 1) * 100
+            pnl = (value / basis - 1) * 100
             last_day, last_close, last_shares, last_pnl = day, close, shares, pnl
             prev_close = close
             if pnl <= -stop_pct:
@@ -873,6 +890,8 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
             INTERNAL_INFO.append(f"{ticker}: cash dividend {v:g} EGP per share (ex {d}) applied.")
 
         stock['split_factor'] = round(last_shares, 6)
+        stock['entry_display'] = round(basis / last_shares, 2)
+        stock['stop_display'] = round(basis / last_shares * (1 - stop_pct / 100), 2)
         shown = [(d, r) for d, r in splits if d <= last_day]
         stock['corporate_actions'] = ([f"Bonus/split {r:g}x shares on {datetime.strptime(d, '%Y-%m-%d'):%d %b %Y}" for d, r in shown] +
                                       [f"Dividend EGP {v:g} on {datetime.strptime(d, '%Y-%m-%d'):%d %b %Y}" for d, v in divs if d <= last_day])
@@ -880,7 +899,7 @@ def update_saved_stocks_with_current_prices(saved_stocks: List[Dict], as_of_date
             stock['status'] = 'Stopped'
             stock['stop_date'] = stop_date
             stock['current_pnl_pct'] = -stop_pct
-            stock['current_price'] = round(stock['stop_loss_price'] / last_shares, 2)
+            stock['current_price'] = stock['stop_display']
             stock['last_price_date'] = stop_date
             print(f"      🔴 {ticker}: stopped on {stop_date} ({-stop_pct:.1f}%)")
         else:
@@ -1176,8 +1195,8 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
         status_color = '#27ae60' if status_text == 'Open' else '#c0392b'
         company_display = s['name'] if s['name'] != s['ticker'] else '—'
         factor = float(s.get('split_factor') or 1.0)
-        entry_shown = s['entry_price'] / factor
-        stop_shown = s['stop_loss_price'] / factor
+        entry_shown = s.get('entry_display', s['entry_price'] / factor)
+        stop_shown = s.get('stop_display', s['stop_loss_price'] / factor)
         if s.get('corporate_actions'):
             company_display += ('<br><span style="font-size: 10px; color: #777;">'
                                 + '; '.join(s['corporate_actions'])
