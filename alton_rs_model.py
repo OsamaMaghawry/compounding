@@ -37,35 +37,20 @@ warnings.filterwarnings('ignore')
 # ============================================================================
 
 # ============================================================================
-# ALTON BOOK - Alton runs as its own portfolio inside the account
+# ALTON - sized on the whole account equity
 # ============================================================================
-# Alton only counts and trades its OWN shares of the Alton tickers and its OWN cash
-# (both recorded in strategy_state/). Positions, options and margin of other
-# strategies in the same account are ignored and never touched.
-ALTON_CASH_RESERVE_PCT = 0.5        # % of Alton's own value kept in cash when fully invested (0.5 -> 99.5% invested)
+# - Alton's money = the account's total EQUITY (x (1 - RS allocation)). Margin used by other trades is fine:
+#   Alton still sizes on equity, and selling Alton shares simply reduces the margin in use.
+# - Alton's holdings = EVERYTHING the account holds in the Alton tickers (ALTON_TICKERS below, plus SH / PSQ
+#   when a hedge is on), however it was bought - by Alton, by hand or anything else.
+#   BUY counts what is already there and only buys the difference; the last SELL day sells all of it.
+# - Any other ticker in the account (your own trades, RS picks, ...) is never touched by Alton.
+ALTON_CASH_RESERVE_PCT = 0.5        # % of equity kept out of Alton when fully invested (0.5 -> 99.5% invested)
 ALTON_REBALANCE_TOLERANCE = 0.20    # a ticker is only traded when it is more than 20% away from its target value
-MIN_TRADE_VALUE = 500               # never place an Alton order smaller than this ($)
+MIN_TRADE_VALUE = 500               # never place an Alton order smaller than this ($) - except selling out to zero
 MIN_CONFIDENCE_TO_SWITCH = 0.65     # a BUY/SELL flip with less than 65% confidence is ignored (your original confidence_threshold)
-SH_HEDGE_ENABLED = True             # SELL cycles build the monthly SH hedge (SH_MONTHLY_ALLOCATION) inside the Alton book
+SH_HEDGE_ENABLED = True             # normal mode: SELL cycles build the monthly SH hedge (SH_MONTHLY_ALLOCATION)
 ORDER_WAIT_MINUTES = 30             # how long to wait for orders to fill before cancelling what is left
-
-# Alton's starting value is taken automatically from the Alton ETFs it holds the first time
-# this version runs. To move money in or out of Alton, set a dollar amount here (e.g. 120000):
-# Alton's cash is adjusted ONCE so its total value equals that amount, then it keeps compounding.
-ALTON_CAPITAL_RESET = None
-
-# One-time corrections of Alton's book after shares were traded by hand in this account.
-# Each entry is applied ONCE (remembered by its "id"), at the start of the next run:
-#   "qty": "SYNC"  -> Alton's shares of that ticker are cut to what the account really holds; the
-#                     missing shares count as sold by Alton at "price" (their value goes to Alton's cash)
-#   "qty": -10.5   -> remove 10.5 shares from Alton's book, add 10.5 x price to Alton's cash
-#   "qty": 10.5    -> add 10.5 shares to Alton's book, take 10.5 x price from Alton's cash
-#   "price": the price of the manual trade (None = the live price when the correction is applied)
-ALTON_BOOK_ADJUSTMENTS = [
-    {"id": "manual-spy-sale-2026-11", "ticker": "SPY", "qty": "SYNC", "price": None},
-    {"id": "missing-qqq-2026-11", "ticker": "QQQ", "qty": "SYNC", "price": None},   # book 12.6238, account 0
-    {"id": "missing-sh-2026-11", "ticker": "SH", "qty": "SYNC", "price": None},     # book 242.1887, account 0
-]
 
 # ============================================================================
 # MERCURY BANK CONFIGURATION
@@ -75,8 +60,13 @@ MERCURY_BANK_ENABLED = False
 # ============================================================================
 # HEDGE MODE CONFIGURATION
 # ============================================================================
-HEDGE_MODE_ENABLED = False
-HEDGE_THRESHOLD_MULTIPLIER = 0.5
+HEDGE_MODE_ENABLED = False          # True = on a SELL signal Alton KEEPS its ETFs and buys inverse ETFs instead
+                                    # (SH against SPY/IVV/VOO, PSQ against QQQ - see HEDGE_GROUPS), sized at
+                                    # (1 + this month's SH_MONTHLY_ALLOCATION) x the ETFs they cover, built over
+                                    # the 3 SELL days; a BUY signal removes the hedge over 3 days. Uses margin.
+                                    # When True it replaces the monthly SH hedge above.
+HEDGE_THRESHOLD_MULTIPLIER = 0.5    # if the ETFs held are below (monthly % x this) of equity, only the monthly %
+                                    # is hedged, on the target weights (same rule as calculate_hedge_targets)
 
 # ============================================================================
 # HEDGE GROUPS CONFIGURATION
@@ -814,8 +804,7 @@ class StrategyStateManager:
     """
     Saves the Alton strategy state (strategy_state/strategy_state_XXXXXXXX.json).
 
-    It holds the Alton BOOK - Alton's own share counts (ledger_qty) and own cash
-    (ledger_cash) - and the 3-day cycle:
+    It holds the 3-day cycle (Alton's holdings and money are read from the account every run):
     - direction: BUY or SELL (the last signal Alton acted on)
     - current_day: 1..execution_days of the running cycle (execution_days = cycle complete)
     - start_pct / progress_pct: how invested Alton was when the cycle started / should be now
@@ -1107,11 +1096,10 @@ def calculate_hedge_targets(alton_portfolio_value, monthly_allocation, etf_value
     print(f"[HEDGE] Threshold ({HEDGE_THRESHOLD_MULTIPLIER*100:.0f}% of monthly): {threshold_pct*100:.1f}% (${threshold_value:,.2f})")
     print(f"[HEDGE] ETFs Held: ${total_etf_value:,.2f}")
 
-    if monthly_allocation == 0:
+    if total_etf_value <= 0:
         use_actual = False
         etf_values_to_use = {}
-        total_etf_value = 0
-        print(f"[HEDGE] Monthly allocation is 0% - no hedge needed")
+        print(f"[HEDGE] No Alton ETFs held - nothing to hedge")
     elif total_etf_value < threshold_value:
         use_actual = False
         etf_values_to_use = {ticker: alton_portfolio_value * weight for ticker, weight in target_allocations.items() if weight > 0}
@@ -2596,11 +2584,17 @@ def generate_model_signal():
 # ALTON BOOK - Alton's own shares and cash, kept apart from the rest of the account
 # ============================================================================
 
+def alton_etf_tickers():
+    return [t for t, w in buy_tickers.items() if w > 0]
+
+def alton_hedge_tickers():
+    if HEDGE_MODE_ENABLED:
+        return [t for t, cfg in HEDGE_GROUPS.items() if cfg.get("enabled")]
+    return ["SH"] if SH_HEDGE_ENABLED else []
+
 def alton_book_tickers():
-    tickers = [t for t, w in buy_tickers.items() if w > 0]
-    if SH_HEDGE_ENABLED and "SH" not in tickers:
-        tickers.append("SH")
-    return tickers
+    """Every ticker that belongs to Alton: the ETFs plus the hedge ticker(s) in use."""
+    return alton_etf_tickers() + [t for t in alton_hedge_tickers() if t not in alton_etf_tickers()]
 
 def get_prices(api, tickers):
     prices = {}
@@ -2610,79 +2604,15 @@ def get_prices(api, tickers):
             prices[ticker] = float(price)
     return prices
 
-def init_alton_book(strategy_state, portfolio):
-    """
-    Create the Alton book the first time this version runs: the Alton ETFs now in the
-    account are Alton's, fully invested, with no Alton cash yet. SH and every other
-    position stay with the other strategies.
-    """
-    state = strategy_state.load_state()
-    if 'ledger_qty' in state:
-        return state
-
-    ledger_qty = {t: float(portfolio["other_stocks"].get(t, 0)) for t, w in buy_tickers.items() if w > 0}
-    holds_etfs = any(q > 0 for q in ledger_qty.values())
-    progress = 100.0 if holds_etfs else 0.0
-    direction = 'BUY' if holds_etfs else 'SELL'
-
-    print(f"\n📒 CREATING ALTON BOOK from current holdings:")
-    for t, q in ledger_qty.items():
-        print(f"   {t}: {q:.4f} shares")
-    print(f"   Alton cash: $0.00 | Position: {progress:.0f}% ({direction}, cycle complete)")
-
-    return strategy_state.update_state({
-        'version': 3,
-        'ledger_qty': ledger_qty,
-        'ledger_cash': 0.0,
-        'direction': direction,
-        'start_pct': progress,
-        'progress_pct': progress,
-        'current_day': execution_days,
-        'cycle_complete': True,
-        'cycle_start_date': None,
-        'last_step_date': None,
-        'capital_reset_used': None,
-        'state': StrategyStateManager.STATE_FULLY_INVESTED_BUY if holds_etfs else StrategyStateManager.STATE_FULLY_INVESTED_SELL,
-    })
-
-def alton_book_value(state, prices):
-    """Value of Alton's own positions + Alton's own cash."""
-    positions = {t: q * prices.get(t, 0) for t, q in state['ledger_qty'].items()}
-    cash = float(state.get('ledger_cash', 0))
-    return positions, cash, sum(positions.values()) + cash
-
-def apply_capital_reset(strategy_state, state, prices):
-    if ALTON_CAPITAL_RESET is None or state.get('capital_reset_used') == ALTON_CAPITAL_RESET:
-        return state
-    positions, _, _ = alton_book_value(state, prices)
-    new_cash = float(ALTON_CAPITAL_RESET) - sum(positions.values())
-    print(f"\n📒 ALTON CAPITAL RESET to ${ALTON_CAPITAL_RESET:,.2f}: Alton cash set to ${new_cash:,.2f}")
-    return strategy_state.update_state({'ledger_cash': new_cash, 'capital_reset_used': ALTON_CAPITAL_RESET})
-
-def apply_book_adjustments(strategy_state, state, prices, account_qty):
-    """Applies each ALTON_BOOK_ADJUSTMENTS entry once (see the settings at the top)."""
-    done = list(state.get('adjustments_used', []))
-    for adj in ALTON_BOOK_ADJUSTMENTS:
-        if adj.get('id') in done:
-            continue
-        ticker = adj['ticker']
-        price = float(adj.get('price') or prices.get(ticker) or 0)
-        if price <= 0:
-            print(f"⚠️ Book adjustment {adj['id']}: no price for {ticker} - tried again next run")
-            continue
-        ledger_qty = dict(state['ledger_qty'])
-        book = float(ledger_qty.get(ticker, 0))
-        if adj['qty'] == "SYNC":
-            change = min(0.0, float(account_qty.get(ticker, 0)) - book)
-        else:
-            change = float(adj['qty'])
-        ledger_qty[ticker] = max(0.0, book + change)
-        cash = float(state.get('ledger_cash', 0)) - change * price
-        done.append(adj['id'])
-        print(f"\n📒 BOOK ADJUSTMENT {adj['id']}: {ticker} {book:.4f} -> {ledger_qty[ticker]:.4f} shares "
-              f"({change:+.4f} @ ${price:,.2f}); Alton cash ${float(state.get('ledger_cash', 0)):,.2f} -> ${cash:,.2f}")
-        state = strategy_state.update_state({'ledger_qty': ledger_qty, 'ledger_cash': cash, 'adjustments_used': done})
-    return state
+def alton_capital(api, portfolio):
+    """Alton's money = account equity x (1 - RS share). Returns (capital, equity, account_cash)."""
+    try:
+        account = api.get_account()
+        equity, cash = float(account.equity), float(account.cash)
+    except Exception:
+        cash = float(portfolio["cash"])
+        equity = cash + sum(float(q) * (fetch_real_time_price(api, t) or 0) for t, q in portfolio["other_stocks"].items())
+    return equity * (1 - rs_allocation_percentage), equity, cash
 
 def plan_cycle_step(state, today_signal, confidence, current_date):
     """
@@ -2737,49 +2667,63 @@ def plan_cycle_step(state, today_signal, confidence, current_date):
         'state': state_name,
     }, new_cycle, note
 
-def build_alton_orders(state, prices, account_qty, progress_pct):
+def build_alton_orders(capital, prices, account_qty, progress_pct):
     """
-    Target value per ticker from Alton's own value, and the orders to get there.
-    A ticker is only traded when its gap is bigger than both MIN_TRADE_VALUE and
-    ALTON_REBALANCE_TOLERANCE of its target, so small drifts are never chased.
+    Targets from Alton's capital (account equity) and the orders to reach them, counting everything the
+    account already holds in each Alton ticker. Small drifts (under MIN_TRADE_VALUE or
+    ALTON_REBALANCE_TOLERANCE of the target) are not traded; a ticker whose target is zero is always sold out.
     """
-    positions, cash, capital = alton_book_value(state, prices)
-    invest_value = capital * (1 - ALTON_CASH_RESERVE_PCT / 100) * (1 - rs_allocation_percentage)
+    invest_value = capital * (1 - ALTON_CASH_RESERVE_PCT / 100)
+    monthly = SH_MONTHLY_ALLOCATION.get(datetime.now().month, 0.0)
+    held = {t: float(account_qty.get(t, 0)) for t in alton_book_tickers()}
+    values = {t: held[t] * prices.get(t, 0) for t in held}
 
-    targets = {t: invest_value * (progress_pct / 100) * w for t, w in buy_tickers.items() if w > 0}
-    sh_allocation = SH_MONTHLY_ALLOCATION.get(datetime.now().month, 0.0) if SH_HEDGE_ENABLED else 0.0
-    if SH_HEDGE_ENABLED:
-        # The hedge grows as Alton sells out and shrinks as it buys back in
-        targets["SH"] = targets.get("SH", 0) + invest_value * sh_allocation * (1 - progress_pct / 100)
+    if HEDGE_MODE_ENABLED:
+        # ETFs are never sold in hedge mode (only bought, on BUY cycles); the hedge grows over the SELL days
+        # and shrinks over the BUY days
+        targets = {t: max(values.get(t, 0.0), invest_value * (progress_pct / 100) * w)
+                   for t, w in buy_tickers.items() if w > 0}
+        etf_values = {t: v for t, v in values.items() if t in targets and v > 0}
+        hedge, _, _ = calculate_hedge_targets(invest_value, monthly, etf_values, HEDGE_GROUPS,
+                                              {t: w for t, w in buy_tickers.items() if w > 0})
+        for t in alton_hedge_tickers():
+            targets[t] = hedge.get(t, {}).get("target_value", 0.0) * (1 - progress_pct / 100)
+        hedge_note = f"Hedge mode: {', '.join(alton_hedge_tickers())} at {(1 + monthly) * 100:.0f}% of the ETFs x {100 - progress_pct:.0f}%"
+    else:
+        targets = {t: invest_value * (progress_pct / 100) * w for t, w in buy_tickers.items() if w > 0}
+        if SH_HEDGE_ENABLED:
+            # The monthly SH hedge grows as Alton sells out and shrinks as it buys back in
+            targets["SH"] = targets.get("SH", 0) + invest_value * monthly * (1 - progress_pct / 100)
+        hedge_note = f"Monthly SH hedge {monthly * 100:.0f}%" if SH_HEDGE_ENABLED else "No hedge"
 
     rows, orders = [], []
-    for ticker, target in targets.items():
+    for ticker in alton_book_tickers():
+        target = targets.get(ticker, 0.0)
         price = prices.get(ticker)
-        held_qty = float(state['ledger_qty'].get(ticker, 0))
-        value = positions.get(ticker, 0)
+        qty, value = held.get(ticker, 0.0), values.get(ticker, 0.0)
         gap = target - value
         threshold = max(MIN_TRADE_VALUE, target * ALTON_REBALANCE_TOLERANCE)
         action = "Hold"
-
-        if price and abs(gap) > threshold:
+        if price and target <= 0 and qty > 0:
+            sell_qty = floor_qty(qty)              # sell out completely, whatever its size
+            if sell_qty > 0:
+                orders.append({'ticker': ticker, 'qty': sell_qty, 'side': 'sell'})
+                action = f"Sell all ${sell_qty * price:,.0f}"
+        elif price and abs(gap) > threshold:
             if gap > 0:
-                orders.append({'ticker': ticker, 'qty': round(gap / price, 6), 'side': 'buy'})
+                orders.append({'ticker': ticker, 'qty': floor_qty(gap / price), 'side': 'buy'})
                 action = f"Buy ${gap:,.0f}"
             else:
-                # Never sell more than Alton owns, nor more than the account holds
-                sell_qty = held_qty if target <= 0 else abs(gap) / price
-                # Rounded DOWN: rounding up can ask for a fraction more than the account holds (Alpaca rejects it)
-                sell_qty = floor_qty(min(sell_qty, held_qty, float(account_qty.get(ticker, 0))))
+                # Rounded DOWN and never more than the account holds (Alpaca rejects anything more)
+                sell_qty = floor_qty(min(abs(gap) / price, qty))
                 if sell_qty > 0.0001:
                     orders.append({'ticker': ticker, 'qty': sell_qty, 'side': 'sell'})
                     action = f"Sell ${sell_qty * price:,.0f}"
-        elif gap != 0:
+        elif gap != 0 and target > 0:
             action = f"Hold (gap ${gap:,.0f} under ${threshold:,.0f} threshold)"
-
-        rows.append({'ticker': ticker, 'qty': held_qty, 'price': price or 0, 'value': value,
+        rows.append({'ticker': ticker, 'qty': qty, 'price': price or 0, 'value': value,
                      'target': target, 'gap': gap, 'action': action})
-
-    return rows, orders, capital, cash, sh_allocation
+    return rows, orders, hedge_note, monthly
 
 def collect_alton_fills(api, since):
     """What Alton's orders since `since` actually filled (includes re-priced and partly filled orders)."""
@@ -2808,33 +2752,21 @@ def cancel_open_alton_orders(api):
     except Exception as e:
         print(f"⚠️ Could not cancel open Alton orders: {e}")
 
-def apply_fills_to_book(state, fills):
-    ledger_qty = dict(state['ledger_qty'])
-    cash = float(state.get('ledger_cash', 0))
-    for f in fills:
-        if f['side'] == 'buy':
-            ledger_qty[f['ticker']] = ledger_qty.get(f['ticker'], 0) + f['qty']
-            cash -= f['total']
-        else:
-            ledger_qty[f['ticker']] = max(0.0, ledger_qty.get(f['ticker'], 0) - f['qty'])
-            cash += f['total']
-    return {'ledger_qty': ledger_qty, 'ledger_cash': cash}
-
-
 # ============================================================================
 # ALTON EMAIL SECTIONS
 # ============================================================================
 
-def create_alton_book_section(rows, capital, cash, progress_pct, title):
+def create_alton_book_section(rows, capital, account_cash, progress_pct, title, hedge_note):
     invested = sum(r['value'] for r in rows)
     body = "".join(
         f'<tr><td class="ticker">{r["ticker"]}</td><td>{r["qty"]:.4f}</td><td>${r["value"]:,.2f}</td>'
         f'<td>${r["target"]:,.2f}</td><td class="weight">{r["action"]}</td></tr>' for r in rows)
     return f"""<div class="section"><div class="section-title">{title}</div><div class="metrics-grid">
-        <div class="metric-row"><div class="metric-cell metric-label">Alton Value (own positions + own cash)</div><div class="metric-cell metric-value">${capital:,.2f}</div></div>
+        <div class="metric-row"><div class="metric-cell metric-label">Alton Capital (account equity)</div><div class="metric-cell metric-value">${capital:,.2f}</div></div>
         <div class="metric-row"><div class="metric-cell metric-label">Alton Positions</div><div class="metric-cell metric-value">${invested:,.2f} ({invested / capital * 100 if capital else 0:.1f}%)</div></div>
-        <div class="metric-row"><div class="metric-cell metric-label">Alton Cash</div><div class="metric-cell metric-value">${cash:,.2f} ({cash / capital * 100 if capital else 0:.1f}%)</div></div>
+        <div class="metric-row"><div class="metric-cell metric-label">Account Cash (negative = margin)</div><div class="metric-cell metric-value">${account_cash:,.2f}</div></div>
         <div class="metric-row"><div class="metric-cell metric-label">Cycle Target</div><div class="metric-cell metric-value">{progress_pct:.1f}% of {100 - ALTON_CASH_RESERVE_PCT:.1f}% invested</div></div>
+        <div class="metric-row"><div class="metric-cell metric-label">Hedge</div><div class="metric-cell metric-value">{hedge_note}</div></div>
         </div><table class="holdings-table"><thead><tr><th>Ticker</th><th>Shares</th><th>Value</th><th>Target</th><th style="text-align:right;">Action</th></tr></thead><tbody>{body}</tbody></table></div>"""
 
 def create_fills_section(fills, rejected):
@@ -2848,15 +2780,6 @@ def create_fills_section(fills, rejected):
     if rejected:
         html += create_alert_box("Orders not filled", "<br>".join(rejected), "error")
     return html
-
-def create_account_section(account_equity, account_cash, alton_capital):
-    other = account_equity - alton_capital
-    return f"""<div class="section"><div class="section-title">Whole Account (information only)</div><div class="metrics-grid">
-        <div class="metric-row"><div class="metric-cell metric-label">Account Equity</div><div class="metric-cell metric-value">${account_equity:,.2f}</div></div>
-        <div class="metric-row"><div class="metric-cell metric-label">Account Cash (negative = margin)</div><div class="metric-cell metric-value">${account_cash:,.2f}</div></div>
-        <div class="metric-row"><div class="metric-cell metric-label">Other Strategies (equity outside Alton)</div><div class="metric-cell metric-value">${other:,.2f}</div></div>
-        </div><div style="font-size:12px;color:#888;margin-top:6px;">Alton never trades or sizes on positions outside its own book.</div></div>"""
-
 
 # ============================================================================
 # MAIN TRADING STRATEGY - ALTON BOOK WITH 3-DAY CYCLES
@@ -2873,7 +2796,7 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
     print(f"  Alton Cash Reserve: {ALTON_CASH_RESERVE_PCT:.1f}% (fully invested = {100 - ALTON_CASH_RESERVE_PCT:.1f}%)")
     print(f"  Rebalance Threshold: {ALTON_REBALANCE_TOLERANCE*100:.0f}% of target and at least ${MIN_TRADE_VALUE:,.0f}")
     print(f"  RS Allocation: {rs_allocation_percentage*100:.0f}%")
-    print(f"  SH Hedge: {'ON' if SH_HEDGE_ENABLED else 'OFF'}")
+    print(f"  Hedge: {'HEDGE MODE (' + ', '.join(alton_hedge_tickers()) + ')' if HEDGE_MODE_ENABLED else ('monthly SH' if SH_HEDGE_ENABLED else 'OFF')}")
     print(f"{'='*60}\n")
 
     if not is_market_open_today():
@@ -2886,11 +2809,11 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
     account_qty = portfolio["other_stocks"]
 
     # ----------------------------------------------------------------
-    # 1. Alton book and prices
+    # 1. Alton capital (account equity) and prices
     # ----------------------------------------------------------------
-    state = init_alton_book(strategy_state, portfolio)
+    state = strategy_state.load_state()
     prices = get_prices(api, alton_book_tickers())
-    missing = [t for t, q in state['ledger_qty'].items() if q > 0 and t not in prices]
+    missing = [t for t in alton_book_tickers() if float(account_qty.get(t, 0)) > 0 and t not in prices]
     if missing:
         msg = f"No price for {', '.join(missing)} - Alton skipped today so nothing is traded on a wrong value."
         print(f"⚠️ {msg}")
@@ -2898,12 +2821,16 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
         email_body += create_alert_box("No trading today", msg, "error") + create_email_footer()
         send_email_with_attachment(f"{portfolio_name} - Alton skipped (no prices)", email_body)
         return None, None
-    state = apply_capital_reset(strategy_state, state, prices)
-    state = apply_book_adjustments(strategy_state, state, prices, account_qty)
-
-    for ticker, q in state['ledger_qty'].items():
-        if q > float(account_qty.get(ticker, 0)) + 0.0001:
-            print(f"⚠️ Alton book has {q:.4f} {ticker} but the account only holds {float(account_qty.get(ticker, 0)):.4f}")
+    capital, account_equity, account_cash = alton_capital(api, portfolio)
+    print(f"📒 Alton capital ${capital:,.2f} (account equity ${account_equity:,.2f}, cash ${account_cash:,.2f})")
+    if 'direction' not in state:
+        # First run of this version: start from how invested Alton already is, as a finished cycle
+        etf_value = sum(float(account_qty.get(t, 0)) * prices.get(t, 0) for t in alton_etf_tickers())
+        invested = min(100.0, etf_value / (capital * (1 - ALTON_CASH_RESERVE_PCT / 100)) * 100) if capital > 0 else 0.0
+        direction = 'BUY' if invested >= 50 else 'SELL'
+        state = strategy_state.update_state({'direction': direction, 'current_day': execution_days, 'start_pct': invested,
+                                             'progress_pct': 100.0 if direction == 'BUY' else 0.0, 'cycle_complete': True})
+        print(f"📒 First run: Alton is {invested:.0f}% invested - starting as a completed {direction} cycle")
 
     # ----------------------------------------------------------------
     # 2. Signal (the first signal of the day is the one used for the whole day)
@@ -2927,10 +2854,10 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
     print(f"  Direction: {plan['direction']} | Day {plan['current_day']}/{execution_days} | Target: {plan['progress_pct']:.1f}% invested")
 
     # ----------------------------------------------------------------
-    # 4. Orders on Alton's own book
+    # 4. Orders on everything the account holds in the Alton tickers
     # ----------------------------------------------------------------
-    rows, orders, capital, cash, sh_allocation = build_alton_orders(state, prices, account_qty, plan['progress_pct'])
-    print(f"\n📒 ALTON BOOK: value ${capital:,.2f} (cash ${cash:,.2f})")
+    rows, orders, hedge_note, sh_allocation = build_alton_orders(capital, prices, account_qty, plan['progress_pct'])
+    print(f"\n📒 ALTON: capital ${capital:,.2f} | {hedge_note}")
     for r in rows:
         print(f"  {r['ticker']}: {r['qty']:.4f} sh = ${r['value']:,.2f} | target ${r['target']:,.2f} | {r['action']}")
 
@@ -2973,16 +2900,16 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
         print(f"\n✅ Filled {len(fills)} order(s)")
 
     # ----------------------------------------------------------------
-    # 5. Save the book and the cycle
+    # 5. Save the cycle and show the holdings after today's fills
     # ----------------------------------------------------------------
-    plan.update(apply_fills_to_book(state, fills))
     plan['last_execution_date'] = current_date
     state = strategy_state.update_state(plan)
-
-    positions, cash, capital = alton_book_value(state, prices)
+    after = fetch_current_positions(api)
+    after_qty = after["other_stocks"] if after and after.get("other_stocks") is not None else account_qty
+    capital, account_equity, account_cash = alton_capital(api, after or portfolio)
     for r in rows:
-        r['qty'] = float(state['ledger_qty'].get(r['ticker'], 0))
-        r['value'] = positions.get(r['ticker'], r['qty'] * r['price'])
+        r['qty'] = float(after_qty.get(r['ticker'], 0))
+        r['value'] = r['qty'] * r['price']
 
     # ----------------------------------------------------------------
     # 6. Daily email
@@ -2993,12 +2920,6 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
         status = f"{plan['direction']} day {plan['current_day']}/{execution_days}"
     subject = f"{portfolio_name} - Alton {status} ({plan['progress_pct']:.0f}%)"
 
-    try:
-        account = api.get_account()
-        account_equity, account_cash = float(account.equity), float(account.cash)
-    except Exception:
-        account_equity, account_cash = capital, float(portfolio["cash"])
-
     email_body = create_email_header(f"Alton {status}", note, "success" if fills else "update", portfolio_name)
     email_body += create_signal_box(signal_numeric, confidence, new_cycle)
     email_body += create_cycle_progress(plan['current_day'], execution_days, 1 if plan['direction'] == 'BUY' else 0,
@@ -3006,10 +2927,9 @@ def trading_strategy(api, portfolio, transaction_log, api_key):
     email_body += create_fills_section(fills, rejected)
     if not orders:
         email_body += create_alert_box("No trades needed", "Alton is within its rebalance threshold - nothing was traded.", "success")
-    email_body += create_alton_book_section(rows, capital, cash, plan['progress_pct'], "Alton Book")
-    if SH_HEDGE_ENABLED:
+    email_body += create_alton_book_section(rows, capital, account_cash, plan['progress_pct'], "Alton", hedge_note)
+    if SH_HEDGE_ENABLED or HEDGE_MODE_ENABLED:
         email_body += create_sh_allocation_box(MONTH_NAMES[datetime.now().month], sh_allocation)
-    email_body += create_account_section(account_equity, account_cash, capital)
     email_body += create_signal_history_summary(signal_history)
     email_body += create_email_footer()
     send_email_with_attachment(subject, email_body)
@@ -3030,7 +2950,7 @@ if __name__ == "__main__":
             fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
             print("\n" + "="*60)
-            print("ALTON RS HYBRID MODEL - ALTON BOOK & 3-DAY CYCLES")
+            print("ALTON RS HYBRID MODEL - EQUITY-BASED ALTON & 3-DAY CYCLES")
             print(f"Alton: {(1-rs_allocation_percentage)*100:.0f}% | RS: {rs_allocation_percentage*100:.0f}%")
             print(f"Cash Reserve: {ALTON_CASH_RESERVE_PCT:.1f}% | Execution Days: {execution_days}")
             print(f"Min Confidence To Switch: {MIN_CONFIDENCE_TO_SWITCH*100:.0f}%")
