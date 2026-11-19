@@ -45,7 +45,7 @@ warnings.filterwarnings('ignore')
 ALTON_CASH_RESERVE_PCT = 0.5        # % of Alton's own value kept in cash when fully invested (0.5 -> 99.5% invested)
 ALTON_REBALANCE_TOLERANCE = 0.20    # a ticker is only traded when it is more than 20% away from its target value
 MIN_TRADE_VALUE = 500               # never place an Alton order smaller than this ($)
-MIN_CONFIDENCE_TO_SWITCH = 0.0      # e.g. 0.65 = a BUY/SELL flip with less than 65% confidence is ignored
+MIN_CONFIDENCE_TO_SWITCH = 0.65     # a BUY/SELL flip with less than 65% confidence is ignored (your original confidence_threshold)
 SH_HEDGE_ENABLED = True             # SELL cycles build the monthly SH hedge (SH_MONTHLY_ALLOCATION) inside the Alton book
 ORDER_WAIT_MINUTES = 30             # how long to wait for orders to fill before cancelling what is left
 
