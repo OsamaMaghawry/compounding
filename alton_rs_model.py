@@ -63,6 +63,8 @@ ALTON_CAPITAL_RESET = None
 #   "price": the price of the manual trade (None = the live price when the correction is applied)
 ALTON_BOOK_ADJUSTMENTS = [
     {"id": "manual-spy-sale-2026-11", "ticker": "SPY", "qty": "SYNC", "price": None},
+    {"id": "missing-qqq-2026-11", "ticker": "QQQ", "qty": "SYNC", "price": None},   # book 12.6238, account 0
+    {"id": "missing-sh-2026-11", "ticker": "SH", "qty": "SYNC", "price": None},     # book 242.1887, account 0
 ]
 
 # ============================================================================
@@ -198,7 +200,7 @@ API_CLIENTS = [
 # ============================================================================
 # EMAIL CONFIGURATION
 # ============================================================================
-EMAIL_SENDER = "osamamaghawry@gmail.com"
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "PUT_YOUR_SENDER_GMAIL_HERE")   # kept out of the public repo
 EMAIL_RECEIVER = "osama@optvest.capital"
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "PUT_YOUR_GMAIL_APP_PASSWORD_HERE")
 
