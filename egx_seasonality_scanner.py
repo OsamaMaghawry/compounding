@@ -28,11 +28,14 @@ HOLDING_DAYS = 21
 STOP_LOSS_PCT = 5.0
 HYPOTHETICAL_PORTFOLIO_SIZE = 100_000  # EGP
 
-# ENTRY DATE - OPTIONAL, normally leave as None.
+# NEW CYCLE DATE - OPTIONAL, normally None.
 # None  -> fully automatic: a new cycle starts by itself every HOLDING_DAYS trading days.
-# "YYYY-MM-DD" -> start ONE cycle on that date (e.g. to back-date a cycle). It is applied
-#                 once and remembered in cycle_state.json, so you can leave it here and
-#                 the following cycles will still roll over automatically.
+# "YYYY-MM-DD" -> the next cycle starts on that date, whatever the current cycle's day count:
+#   - today or a past date: the running cycle is CLOSED on that date (its result stays in the history,
+#     performance table and chart) and the new cycle starts on that date's closing prices
+#   - a future date: the running cycle simply continues (no automatic rollover) until that day
+#   Applied once and remembered, so you can leave it here; later cycles roll over every HOLDING_DAYS
+#   from that date. Change it again any time to move the next cycle.
 CYCLE_ENTRY_DATE = None
 
 # ---------- EMAIL ----------
@@ -547,6 +550,8 @@ def archive_closed_cycle(closed: Dict):
                 history = json.load(f)
         except Exception as e:
             print(f"⚠️ Could not read cycle history: {e}")
+    # One entry per cycle: if this cycle was already archived (e.g. a rerun), replace it instead of adding it twice
+    history = [c for c in history if c.get('cycle_start_date') != closed['cycle_start_date']]
     history.append(closed)
     try:
         with open(CYCLE_HISTORY_FILE, 'w') as f:
@@ -1562,11 +1567,31 @@ def main():
 
     # A manual date is applied only once: if it is the saved cycle's start date, or it was
     # already used before, it is ignored and the normal automatic rollover takes over.
-    if manual_entry_date and (saved_cycle is None or
-                              manual_entry_date not in (saved_cycle.get('cycle_start_date'), manual_date_used)):
+    pending_manual = bool(manual_entry_date and (saved_cycle is None or
+                          manual_entry_date not in (saved_cycle.get('cycle_start_date'), manual_date_used)))
+    if pending_manual and saved_cycle is None:
         print(f"\n📅 Manual entry date {manual_entry_date} set - starting a cycle on that date (one time only).")
         new_entry_date = manual_entry_date
         manual_date_used = manual_entry_date
+    elif pending_manual and manual_entry_date <= saved_cycle['cycle_start_date']:
+        print(f"\n⚠️ CYCLE_ENTRY_DATE {manual_entry_date} is not after the current cycle's start "
+              f"({saved_cycle['cycle_start_date']}) - ignored. Pick a later date.")
+        pending_manual = False
+    elif pending_manual and manual_entry_date > get_latest_trading_date():
+        # A future date: the current cycle keeps running (no automatic rollover) until that day
+        print(f"\n📅 New cycle scheduled for {manual_entry_date} - the current cycle "
+              f"({saved_cycle['cycle_start_date']}) runs until then.")
+    elif pending_manual:
+        # Today or a past date: close the running cycle on that date (kept in the history),
+        # then start the new cycle on the same date
+        print(f"\n📅 Manual entry date {manual_entry_date}: closing the cycle of {saved_cycle['cycle_start_date']} "
+              f"on that date and starting a new one (one time only).")
+        previous_cycle = close_cycle(saved_cycle, manual_entry_date)
+        new_entry_date = manual_entry_date
+        manual_date_used = manual_entry_date
+
+    if new_entry_date or pending_manual:
+        pass
     elif saved_cycle is None:
         new_entry_date = get_latest_trading_date()
         print(f"\n📅 No saved cycle - starting the first cycle on the latest trading day: {new_entry_date}")
