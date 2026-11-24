@@ -395,6 +395,23 @@ def estimate_cycle_end_date(cycle_start_date: str, holding_days: int) -> str:
     return str(end)
 
 
+def next_cycle_info(cycle_start_date: str, scheduled_date: Optional[str] = None) -> Tuple[str, int]:
+    """
+    When the next cycle is expected: (date, EGX trading days left). Automatic mode counts the trading
+    days already passed and adds the rest as Sun-Thu days (EGX holidays can move it by a day or two).
+    A future CYCLE_ENTRY_DATE that is still pending is used as it is.
+    """
+    latest = get_latest_trading_date()
+    if scheduled_date:
+        left = int(np.busday_count(np.datetime64(latest, 'D') + 1, np.datetime64(scheduled_date, 'D') + 1,
+                                   weekmask=EGX_WEEKMASK))
+        return scheduled_date, max(left, 0)
+    passed, _ = get_cycle_progress(cycle_start_date, HOLDING_DAYS)
+    left = max(HOLDING_DAYS - passed, 0)
+    target = np.busday_offset(np.datetime64(latest, 'D'), left, roll='forward', weekmask=EGX_WEEKMASK)
+    return str(target), left
+
+
 def get_price_on_exact_date(ticker: str, target_date: str) -> Optional[Tuple[str, float]]:
     """Get price on exact target date - no fallback to earlier date."""
     start = target_date
@@ -1166,6 +1183,13 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
     portfolio_pnl_pct = summary['portfolio_pnl_pct']
     portfolio_pnl_egp = summary['portfolio_pnl_egp']
     cycle_end_date = summary['cycle_end_date']
+    if summary.get('next_cycle_date'):
+        nd = datetime.strptime(summary['next_cycle_date'], '%Y-%m-%d')
+        left = summary.get('next_cycle_days_left', 0)
+        next_cycle_text = (f"{nd:%A %d %B %Y} ({left} EGX trading day{'s' if left != 1 else ''} left)" if left > 0
+                           else f"{nd:%A %d %B %Y} (rollover on the next run)")
+    else:
+        next_cycle_text = cycle_end_date
     open_count = summary['open_count']
     stopped_count = summary['stopped_count']
     num_stocks = summary['num_stocks']
@@ -1235,6 +1259,7 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
                 <h1 style="color: #ffffff; font-size: 24px; margin: 0; font-weight: 600;">📈 EGX Seasonality Live Report</h1>
                 <p style="color: #cce5f0; font-size: 13px; margin: 8px 0 0 0;">Report Date: {formatted_date} | {cycle_status}</p>
                 <p style="color: #cce5f0; font-size: 11px; margin: 4px 0 0 0;">Cycle Entry Date: {cycle_start_date} | Last Price Update: {latest_price_date}</p>
+                <p style="color: #ffffff; font-size: 14px; font-weight: 600; margin: 8px 0 0 0;">📅 Next cycle expected: {next_cycle_text}</p>
                 <p style="color: #cce5f0; font-size: 11px; margin: 2px 0 0 0;">Days in cycle: {(datetime.now() - datetime.strptime(cycle_start_date, '%Y-%m-%d')).days} days</p>
                 {previous_cycle_line}
             </div>
@@ -1561,6 +1586,7 @@ def main():
     print("=" * 70)
 
     saved_cycle = load_saved_cycle()
+    scheduled_date = None
     previous_cycle = None
     new_entry_date = None
     manual_date_used = saved_cycle.get('manual_entry_date_used') if saved_cycle else None
@@ -1578,6 +1604,7 @@ def main():
               f"({saved_cycle['cycle_start_date']}) - ignored. Pick a later date.")
         pending_manual = False
     elif pending_manual and manual_entry_date > get_latest_trading_date():
+        scheduled_date = manual_entry_date
         # A future date: the current cycle keeps running (no automatic rollover) until that day
         print(f"\n📅 New cycle scheduled for {manual_entry_date} - the current cycle "
               f"({saved_cycle['cycle_start_date']}) runs until then.")
@@ -1626,6 +1653,8 @@ def main():
     # Generate report summary
     summary = generate_report(stocks, cycle_start_date, is_new_cycle, previous_cycle)
     summary['stocks'] = stocks
+    summary['next_cycle_date'], summary['next_cycle_days_left'] = next_cycle_info(cycle_start_date, scheduled_date)
+    summary['cycle_end_date'] = summary['next_cycle_date']
 
     # Save cycle state for next run
     save_cycle_state({
@@ -1636,7 +1665,8 @@ def main():
     })
 
     print(f"\n✅ Report generated:")
-    print(f"   Cycle: {cycle_start_date} → {summary['cycle_end_date']}")
+    print(f"   Cycle: {cycle_start_date} → next cycle expected {summary['next_cycle_date']} "
+          f"({summary['next_cycle_days_left']} EGX trading days left)")
     print(f"   Portfolio P/L: {summary['portfolio_pnl_pct']:+.2f}% ({summary['portfolio_pnl_egp']:+,.0f} EGP)")
     print(f"   Status: {summary['open_count']} Open / {summary['stopped_count']} Stopped")
     print(f"   Last price update: {summary['latest_price_date']}")
