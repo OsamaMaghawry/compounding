@@ -90,7 +90,7 @@ BENCHMARK_SYMBOL = "EGX30.INDX"
 # ---------- FILTERS ----------
 MIN_CORRELATION = 0.4
 MIN_HISTORY_DAYS = 252
-MIN_LIQUIDITY = 2_000_000
+MIN_LIQUIDITY = 10_000_000          # EGP traded per day (20-day average of shares x price) - money, not shares
 MAX_RETURN_THRESHOLD = 100
 
 # Month Filters
