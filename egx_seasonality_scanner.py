@@ -70,7 +70,7 @@ MANUAL_CORPORATE_ACTIONS = [
     # {"ticker": "XXXX", "date": "YYYY-MM-DD", "genuine_move": True},  # checked: a real price move, not an action
 ]
 
-# ---------- EXECUTION FILE (execution.xlsx - internal, for placing the orders) ----------
+# ---------- EXECUTION FILE (execution.xlsx, attached to the report email) ----------
 # Quantity per stock = (amount / number of stocks) / (max execution price x (1 + commission)), rounded DOWN.
 # Max execution price = cycle price x (1 + slippage): the highest price to pay (use it as the limit price).
 # The three inputs are also editable inside the Excel file: change them there and every quantity recalculates.
@@ -79,8 +79,8 @@ EXECUTION_AMOUNT = 1_000_000            # EGP invested in the cycle, split equal
 EXECUTION_COMMISSION_PCT = 0.15         # commission + fees, % of trade value (set your broker's rate)
 EXECUTION_SLIPPAGE_PCT = 2.0            # % above the cycle price you accept paying
 EXECUTION_FILE = "execution.xlsx"
-SEND_EXECUTION_FILE = "new_cycle"       # "new_cycle" = email it when a new cycle starts, "always" = every run, "off"
-EXECUTION_EMAILS = [EMAIL_CONFIG["sender_email"]]   # who gets it (internal only - never the client list)
+SEND_EXECUTION_FILE = "always"          # attached to the report email: "new_cycle" = only when a new cycle starts,
+                                        # "always" = every email, "off" = never (the file is still saved)
 
 # ---------- DATA API ----------
 EODHD_API_KEY = os.environ.get("EODHD_API_KEY", "PUT_YOUR_EODHD_API_KEY_HERE")
@@ -1417,7 +1417,8 @@ def generate_email_html(summary: Dict, chart_cid: str, performance_html: str = "
 
 
 def send_email_report(html_content: str, chart_path: str, html_path: str = None, pdf_path: str = None,
-                      is_new_cycle: bool = False, perf_chart_path: str = None, perf_html_path: str = None):
+                      is_new_cycle: bool = False, perf_chart_path: str = None, perf_html_path: str = None,
+                      exec_path: str = None):
     """Send email with HTML content, chart image, HTML file attachment, and optional PDF attachment."""
     if not SEND_EMAIL_AUTOMATICALLY:
         print("📧 Email sending disabled")
@@ -1513,6 +1514,14 @@ Please view the HTML version or PDF attachment for complete details."""
             perf_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(perf_html_path))
             msg.attach(perf_attachment)
         print(f"📈 Performance report attached: {perf_html_path}")
+
+    # Execution file (execution.xlsx)
+    if exec_path and os.path.exists(exec_path):
+        with open(exec_path, 'rb') as fh:
+            part = MIMEApplication(fh.read(), _subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(exec_path))
+        msg.attach(part)
+        print(f"📗 Execution file attached: {exec_path}")
 
     # Attach PDF if it exists
     if pdf_path and os.path.exists(pdf_path):
@@ -1629,35 +1638,6 @@ def create_execution_file(stocks: List[Dict], cycle_start_date: str, path: str =
     except Exception as e:
         print(f"⚠️ execution.xlsx could not be created: {e}")
         return None
-
-
-def send_execution_file(path: Optional[str], cycle_start_date: str, is_new_cycle: bool):
-    """Emails execution.xlsx to EXECUTION_EMAILS only (internal, never the client list)."""
-    if not path or not os.path.exists(path) or SEND_EXECUTION_FILE == "off" or not EXECUTION_EMAILS:
-        return
-    if SEND_EXECUTION_FILE == "new_cycle" and not is_new_cycle:
-        return
-    msg = MIMEMultipart()
-    msg['From'] = f"{EMAIL_CONFIG['sender_name']} <{EMAIL_CONFIG['sender_email']}>"
-    msg['To'] = ', '.join(EXECUTION_EMAILS)
-    msg['Subject'] = (f"📗 INTERNAL | EGX execution file | {'NEW CYCLE ' if is_new_cycle else ''}"
-                      f"{cycle_start_date} | {datetime.now():%Y-%m-%d}")
-    msg.attach(MIMEText(f"Execution file for the cycle starting {cycle_start_date}.\n"
-                        f"Amount {EXECUTION_AMOUNT:,.0f} EGP | commission {EXECUTION_COMMISSION_PCT}% | "
-                        f"slippage {EXECUTION_SLIPPAGE_PCT}%.\nThe yellow cells in the file can be changed; "
-                        f"quantities recalculate.", 'plain'))
-    with open(path, 'rb') as fh:
-        part = MIMEApplication(fh.read(), _subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(path))
-    msg.attach(part)
-    try:
-        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'], timeout=30) as server:
-            server.starttls()
-            server.login(EMAIL_CONFIG['smtp_login'], EMAIL_CONFIG['smtp_password'])
-            server.send_message(msg)
-        print(f"✅ Execution file emailed to {', '.join(EXECUTION_EMAILS)}")
-    except Exception as e:
-        print(f"❌ Execution email failed: {e}")
 
 
 def send_internal_report():
@@ -1861,6 +1841,9 @@ def main():
         print("📄 PDF generation skipped (GENERATE_PDF = False)")
 
     # Send email with HTML body, HTML file attachment, and PDF attachment
+    exec_path = create_execution_file(stocks, cycle_start_date)
+    attach_exec = exec_path if (SEND_EXECUTION_FILE == "always" or
+                                (SEND_EXECUTION_FILE == "new_cycle" and is_new_cycle)) else None
     send_email_report(
         html_report,
         CHART_PATH,
@@ -1869,8 +1852,8 @@ def main():
         is_new_cycle=is_new_cycle,
         perf_chart_path=PERFORMANCE_CHART_PATH if performance_html else None,
         perf_html_path=PERFORMANCE_HTML_OUTPUT if performance_html else None,
+        exec_path=attach_exec,
     )
-    send_execution_file(create_execution_file(stocks, cycle_start_date), cycle_start_date, is_new_cycle)
     send_internal_report()
     print("\n✨ Done.")
 
