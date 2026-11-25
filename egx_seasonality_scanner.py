@@ -1571,7 +1571,14 @@ def main():
     print("🏦 EGX SEASONALITY LIVE SCANNER - Automatic Cycle Rollover")
     print("=" * 70)
 
-    manual_entry_date = CYCLE_ENTRY_DATE.strip() if CYCLE_ENTRY_DATE and CYCLE_ENTRY_DATE.strip() else None
+    manual_entry_date = None
+    if CYCLE_ENTRY_DATE not in (None, ""):
+        try:
+            manual_entry_date = datetime.strptime(str(CYCLE_ENTRY_DATE).strip(), '%Y-%m-%d').strftime('%Y-%m-%d')
+        except ValueError:
+            print(f"❌ CYCLE_ENTRY_DATE = {CYCLE_ENTRY_DATE!r} is not a valid date. Write it with quotes, "
+                  f'e.g. CYCLE_ENTRY_DATE = "2026-11-24" (or None for automatic). Nothing was changed.')
+            return
 
     print(f"Configuration:")
     print(f"   Number of stocks: {NUM_STOCKS}")
