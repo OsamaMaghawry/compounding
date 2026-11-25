@@ -1592,6 +1592,18 @@ def main():
     print(f"   Performance report: {'EVERY DAY' if SEND_PERFORMANCE_REPORT_DAILY else 'END OF CYCLE ONLY'}")
     print("=" * 70)
 
+    # Safety check BEFORE touching anything: without working price data, closing a cycle or scanning would
+    # book stale numbers. Stop here and change nothing.
+    if not EODHD_API_KEY or EODHD_API_KEY.startswith("PUT_YOUR"):
+        print("❌ EODHD_API_KEY is not filled in (it still says PUT_YOUR_EODHD_API_KEY_HERE). "
+              "Put your key in the configuration. Nothing was changed.")
+        return
+    probe_from = (datetime.now() - timedelta(days=15)).strftime('%Y-%m-%d')
+    if fetch_data(BENCHMARK_SYMBOL, probe_from, datetime.now().strftime('%Y-%m-%d'), is_index=True).empty:
+        print("❌ EODHD returned no data (wrong/expired API key, daily limit reached, or EODHD is down). "
+              "Nothing was changed - run again once EODHD answers.")
+        return
+
     saved_cycle = load_saved_cycle()
     scheduled_date = None
     previous_cycle = None
