@@ -1548,10 +1548,24 @@ def create_execution_file(stocks: List[Dict], cycle_start_date: str, path: str =
         return None
     path = path or EXECUTION_FILE
     try:
+        import openpyxl  # noqa: F401
+    except ImportError:
+        # The Excel library is not on this server yet: install it once, automatically (it stays installed)
+        import subprocess, importlib, site
+        print("📦 openpyxl (needed for execution.xlsx) is not installed - installing it now...")
+        for extra in (["--user"], []):
+            if subprocess.call([sys.executable, "-m", "pip", "install", "--quiet", *extra, "openpyxl"]) == 0:
+                break
+        user_site = site.getusersitepackages()
+        if user_site not in sys.path:
+            sys.path.append(user_site)
+        importlib.invalidate_caches()
+    try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     except ImportError:
-        print("⚠️ execution.xlsx not created: openpyxl is missing (pip install openpyxl)")
+        print("⚠️ execution.xlsx not created: openpyxl could not be installed automatically. In a PythonAnywhere "
+              f"Bash console run: {os.path.basename(sys.executable)} -m pip install --user openpyxl")
         return None
     try:
         wb = Workbook()
