@@ -70,6 +70,18 @@ MANUAL_CORPORATE_ACTIONS = [
     # {"ticker": "XXXX", "date": "YYYY-MM-DD", "genuine_move": True},  # checked: a real price move, not an action
 ]
 
+# ---------- EXECUTION FILE (execution.xlsx - internal, for placing the orders) ----------
+# Quantity per stock = (amount / number of stocks) / (max execution price x (1 + commission)), rounded DOWN.
+# Max execution price = cycle price x (1 + slippage): the highest price to pay (use it as the limit price).
+# The three inputs are also editable inside the Excel file: change them there and every quantity recalculates.
+CREATE_EXECUTION_FILE = True
+EXECUTION_AMOUNT = 1_000_000            # EGP invested in the cycle, split equally across the stocks
+EXECUTION_COMMISSION_PCT = 0.15         # commission + fees, % of trade value (set your broker's rate)
+EXECUTION_SLIPPAGE_PCT = 2.0            # % above the cycle price you accept paying
+EXECUTION_FILE = "execution.xlsx"
+SEND_EXECUTION_FILE = "new_cycle"       # "new_cycle" = email it when a new cycle starts, "always" = every run, "off"
+EXECUTION_EMAILS = [EMAIL_CONFIG["sender_email"]]   # who gets it (internal only - never the client list)
+
 # ---------- DATA API ----------
 EODHD_API_KEY = os.environ.get("EODHD_API_KEY", "PUT_YOUR_EODHD_API_KEY_HERE")
 EODHD_BASE_URL = "https://eodhd.com/api"
@@ -1529,6 +1541,111 @@ Please view the HTML version or PDF attachment for complete details."""
         print(f"❌ Email failed: {e}")
 
 
+def create_execution_file(stocks: List[Dict], cycle_start_date: str, path: str = None) -> Optional[str]:
+    """execution.xlsx: amount, commission and slippage inputs at the top; per stock the cycle price, the max
+    execution price (cycle price + slippage) and the number of shares, all as live Excel formulas."""
+    if not CREATE_EXECUTION_FILE or not stocks:
+        return None
+    path = path or EXECUTION_FILE
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        print("⚠️ execution.xlsx not created: openpyxl is missing (pip install openpyxl)")
+        return None
+    try:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Execution"
+        bold, white = Font(bold=True), Font(bold=True, color="FFFFFF")
+        head_fill, input_fill = PatternFill("solid", fgColor="1A5D7A"), PatternFill("solid", fgColor="FFF2CC")
+        thin = Border(*(Side(style="thin", color="BFBFBF"),) * 4)
+
+        ws["A1"] = f"EGX Seasonality - Execution | Cycle {cycle_start_date} | created {datetime.now():%Y-%m-%d %H:%M}"
+        ws["A1"].font = Font(bold=True, size=13)
+        inputs = [("Amount invested (EGP)", EXECUTION_AMOUNT, '#,##0'),
+                  ("Commission (% of trade value)", EXECUTION_COMMISSION_PCT / 100, '0.00%'),
+                  ("Slippage (% above cycle price)", EXECUTION_SLIPPAGE_PCT / 100, '0.00%'),
+                  ("Number of stocks", len(stocks), '0')]
+        for i, (label, value, fmt) in enumerate(inputs, start=3):
+            ws.cell(i, 1, label).font = bold
+            c = ws.cell(i, 2, value)
+            c.number_format, c.fill, c.border = fmt, input_fill, thin
+        ws["B7"] = "=B3/B6"
+        ws["A7"], ws["A7"].font, ws["B7"].number_format = "Amount per stock (EGP)", bold, '#,##0'
+        ws["C3"] = "← yellow cells can be changed; everything below recalculates"
+        ws["C3"].font = Font(italic=True, color="7F7F7F")
+
+        headers = ["Ticker", "Company", "Cycle Price", "Max Execution Price", "Quantity (shares)",
+                   "Value at Max Price", "Commission", "Total Cost", "Unused Cash", "Stop Loss", "Status"]
+        hr = 9
+        for j, h in enumerate(headers, start=1):
+            c = ws.cell(hr, j, h)
+            c.font, c.fill, c.border = white, head_fill, thin
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        r = hr
+        for r, s in enumerate(stocks, start=hr + 1):
+            price = float(s.get('entry_display') or s['entry_price'])
+            stop = float(s.get('stop_display') or s.get('stop_loss_price') or price * (1 - STOP_LOSS_PCT / 100))
+            row = [s['ticker'], s.get('name') if s.get('name') != s['ticker'] else '', round(price, 2),
+                   f"=ROUND(C{r}*(1+$B$5),2)",
+                   f"=IF(D{r}>0,INT($B$7/(D{r}*(1+$B$4))),0)",
+                   f"=E{r}*D{r}", f"=F{r}*$B$4", f"=F{r}+G{r}", f"=$B$7-H{r}",
+                   round(stop, 2), s.get('status', 'Open')]
+            for j, v in enumerate(row, start=1):
+                c = ws.cell(r, j, v)
+                c.border = thin
+                c.number_format = {3: '#,##0.00', 4: '#,##0.00', 5: '#,##0', 6: '#,##0.00', 7: '#,##0.00',
+                                   8: '#,##0.00', 9: '#,##0.00', 10: '#,##0.00'}.get(j, 'General')
+        t = r + 1
+        ws.cell(t, 1, "TOTAL").font = bold
+        for col in "FGHI":
+            c = ws[f"{col}{t}"]
+            c.value, c.font, c.number_format, c.border = f"=SUM({col}{hr + 1}:{col}{r})", bold, '#,##0.00', thin
+        ws.cell(t + 2, 1, "Quantity = Amount per stock / (Max Execution Price x (1 + Commission)), rounded down to "
+                          "whole shares. Use the Max Execution Price as the limit price.").font = Font(italic=True, color="7F7F7F")
+        for col, w in zip("ABCDEFGHIJK", [26, 30, 12, 14, 12, 15, 12, 15, 13, 11, 9]):
+            ws.column_dimensions[col].width = w
+        ws.row_dimensions[hr].height = 32
+        ws.freeze_panes = f"A{hr + 1}"
+        wb.save(path)
+        print(f"📗 Execution file saved: {path} ({len(stocks)} stocks, {EXECUTION_AMOUNT:,.0f} EGP, "
+              f"commission {EXECUTION_COMMISSION_PCT}%, slippage {EXECUTION_SLIPPAGE_PCT}%)")
+        return path
+    except Exception as e:
+        print(f"⚠️ execution.xlsx could not be created: {e}")
+        return None
+
+
+def send_execution_file(path: Optional[str], cycle_start_date: str, is_new_cycle: bool):
+    """Emails execution.xlsx to EXECUTION_EMAILS only (internal, never the client list)."""
+    if not path or not os.path.exists(path) or SEND_EXECUTION_FILE == "off" or not EXECUTION_EMAILS:
+        return
+    if SEND_EXECUTION_FILE == "new_cycle" and not is_new_cycle:
+        return
+    msg = MIMEMultipart()
+    msg['From'] = f"{EMAIL_CONFIG['sender_name']} <{EMAIL_CONFIG['sender_email']}>"
+    msg['To'] = ', '.join(EXECUTION_EMAILS)
+    msg['Subject'] = (f"📗 INTERNAL | EGX execution file | {'NEW CYCLE ' if is_new_cycle else ''}"
+                      f"{cycle_start_date} | {datetime.now():%Y-%m-%d}")
+    msg.attach(MIMEText(f"Execution file for the cycle starting {cycle_start_date}.\n"
+                        f"Amount {EXECUTION_AMOUNT:,.0f} EGP | commission {EXECUTION_COMMISSION_PCT}% | "
+                        f"slippage {EXECUTION_SLIPPAGE_PCT}%.\nThe yellow cells in the file can be changed; "
+                        f"quantities recalculate.", 'plain'))
+    with open(path, 'rb') as fh:
+        part = MIMEApplication(fh.read(), _subtype='vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(path))
+    msg.attach(part)
+    try:
+        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'], timeout=30) as server:
+            server.starttls()
+            server.login(EMAIL_CONFIG['smtp_login'], EMAIL_CONFIG['smtp_password'])
+            server.send_message(msg)
+        print(f"✅ Execution file emailed to {', '.join(EXECUTION_EMAILS)}")
+    except Exception as e:
+        print(f"❌ Execution email failed: {e}")
+
+
 def send_internal_report():
     """Separate data-check email to INTERNAL_ALERT_EMAILS only (never to clients)."""
     issues = list(dict.fromkeys(INTERNAL_ISSUES))
@@ -1739,6 +1856,7 @@ def main():
         perf_chart_path=PERFORMANCE_CHART_PATH if performance_html else None,
         perf_html_path=PERFORMANCE_HTML_OUTPUT if performance_html else None,
     )
+    send_execution_file(create_execution_file(stocks, cycle_start_date), cycle_start_date, is_new_cycle)
     send_internal_report()
     print("\n✨ Done.")
 
