@@ -260,8 +260,10 @@ def cached_json(name, path, params, kind):
         with gzip.open(file, "rt") as f:
             return json.load(f)
     data = eodhd_get(path, params, kind)
-    with gzip.open(file, "wt") as f:
+    tmp = file.with_name(file.name + ".part")          # written completely first, then renamed
+    with gzip.open(tmp, "wt") as f:
         json.dump(data, f)
+    os.replace(tmp, file)
     return data
 
 
@@ -312,7 +314,9 @@ def download_minutes(ticker, start_day, end_day):
         # Only regular-session bars are used, so only those are kept on disk
         t = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.tz_convert(TZ).dt.time
         df = df[(t >= SESSION_OPEN) & (t < SESSION_CLOSE)]
-    df.to_csv(file, index=False, compression="gzip")
+    tmp = file.with_name(file.name + ".part")          # written completely first, then renamed
+    df.to_csv(tmp, index=False, compression="gzip")
+    os.replace(tmp, file)
 
 
 def cached_ranges(ticker):
