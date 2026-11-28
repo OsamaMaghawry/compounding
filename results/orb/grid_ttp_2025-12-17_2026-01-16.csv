@@ -1,0 +1,1093 @@
+entry,exit,stocks_per_day,news,strategy,total_before,trades,win_pct,pf,without_best5,max_dd,worst_day,total_after,pf_after,max_dd_after,long_after,short_after
+"5-min range, 1-min close beyond (volume >= range avg)","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,-732.0,21,42.9,0.79,-3293.0,-1692.0,-577.0,-798.0,0.77,-1732.0,687.0,-1485.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-237.0,21,42.9,0.92,-2678.0,-1656.0,-545.0,-298.0,0.9,-1680.0,-298.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,-960.0,42,38.1,0.67,-2459.0,-1566.0,-399.0,-1042.0,0.65,-1619.0,132.0,-1175.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,-26.0,42,52.4,0.99,-1517.0,-687.0,-399.0,-112.0,0.95,-730.0,-112.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,-715.0,63,39.7,0.74,-1953.0,-751.0,-530.0,-828.0,0.71,-828.0,-196.0,-632.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,-365.0,61,45.9,0.85,-1626.0,-591.0,-530.0,-478.0,0.81,-620.0,-478.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.25 x daily ATR,1,no news,Long+short,-1022.0,21,28.6,0.51,-2069.0,-1022.0,-545.0,-1087.0,0.49,-1087.0,-250.0,-837.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.25 x daily ATR,1,no news,Long only,-976.0,21,23.8,0.45,-1780.0,-1140.0,-545.0,-1037.0,0.43,-1163.0,-1037.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.25 x daily ATR,2,no news,Long+short,-724.0,42,26.2,0.58,-1555.0,-953.0,-386.0,-806.0,0.54,-983.0,-114.0,-691.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.25 x daily ATR,2,no news,Long only,-574.0,42,28.6,0.62,-1333.0,-574.0,-386.0,-656.0,0.58,-656.0,-656.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.25 x daily ATR,3,no news,Long+short,-412.0,63,20.6,0.7,-1175.0,-598.0,-258.0,-520.0,0.64,-657.0,-69.0,-450.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.25 x daily ATR,3,no news,Long only,26.0,61,26.2,1.02,-890.0,-275.0,-258.0,-84.0,0.93,-285.0,-84.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.5R,1,no news,Long+short,-547.0,21,33.3,0.82,-2997.0,-1476.0,-577.0,-612.0,0.8,-1516.0,705.0,-1318.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.5R,1,no news,Long only,33.0,21,33.3,1.01,-2276.0,-1637.0,-545.0,-28.0,0.99,-1660.0,-28.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.5R,2,no news,Long+short,-631.0,42,28.6,0.73,-2131.0,-1308.0,-399.0,-711.0,0.71,-1361.0,221.0,-932.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.5R,2,no news,Long only,-187.0,42,33.3,0.9,-1668.0,-805.0,-399.0,-269.0,0.86,-858.0,-269.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.5R,3,no news,Long+short,-479.0,63,23.8,0.76,-1663.0,-645.0,-267.0,-585.0,0.72,-717.0,19.0,-604.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.5R,3,no news,Long only,7.0,61,29.5,1.0,-1255.0,-507.0,-267.0,-101.0,0.94,-532.0,-101.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.75R,1,no news,Long+short,-712.0,21,38.1,0.79,-3217.0,-1672.0,-577.0,-778.0,0.77,-1712.0,707.0,-1485.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.75R,1,no news,Long only,-217.0,21,38.1,0.92,-2584.0,-1637.0,-545.0,-279.0,0.9,-1660.0,-279.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.75R,2,no news,Long+short,-906.0,42,35.7,0.68,-2406.0,-1512.0,-399.0,-988.0,0.65,-1565.0,187.0,-1175.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.75R,2,no news,Long only,-99.0,42,45.2,0.95,-1579.0,-780.0,-399.0,-182.0,0.91,-806.0,-182.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.75R,3,no news,Long+short,-736.0,63,33.3,0.71,-1974.0,-856.0,-530.0,-845.0,0.68,-928.0,-209.0,-636.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 0.75R,3,no news,Long only,-334.0,61,39.3,0.85,-1596.0,-776.0,-530.0,-445.0,0.81,-802.0,-445.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 1.5R,1,no news,Long+short,-740.0,21,42.9,0.79,-3302.0,-1692.0,-577.0,-806.0,0.77,-1732.0,687.0,-1493.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 1.5R,1,no news,Long only,-237.0,21,42.9,0.92,-2678.0,-1656.0,-545.0,-298.0,0.9,-1680.0,-298.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 1.5R,2,no news,Long+short,-924.0,42,40.5,0.68,-2424.0,-1526.0,-399.0,-1007.0,0.66,-1580.0,172.0,-1179.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 1.5R,2,no news,Long only,128.0,42,57.1,1.06,-1377.0,-647.0,-399.0,41.0,1.02,-675.0,41.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 1.5R,3,no news,Long+short,-480.0,63,46.0,0.83,-1718.0,-724.0,-530.0,-597.0,0.79,-799.0,-169.0,-427.0
+"5-min range, 1-min close beyond (volume >= range avg)",BE at 1.5R,3,no news,Long only,-178.0,61,52.5,0.93,-1440.0,-591.0,-530.0,-296.0,0.88,-620.0,-296.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No breakeven,1,no news,Long+short,-740.0,21,42.9,0.79,-3302.0,-1692.0,-577.0,-806.0,0.77,-1732.0,687.0,-1493.0
+"5-min range, 1-min close beyond (volume >= range avg)",No breakeven,1,no news,Long only,-237.0,21,42.9,0.92,-2678.0,-1656.0,-545.0,-298.0,0.9,-1680.0,-298.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No breakeven,2,no news,Long+short,-924.0,42,40.5,0.68,-2424.0,-1526.0,-399.0,-1007.0,0.66,-1580.0,172.0,-1179.0
+"5-min range, 1-min close beyond (volume >= range avg)",No breakeven,2,no news,Long only,128.0,42,57.1,1.06,-1377.0,-647.0,-399.0,41.0,1.02,-675.0,41.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No breakeven,3,no news,Long+short,-457.0,63,46.0,0.83,-1695.0,-701.0,-530.0,-574.0,0.8,-776.0,-169.0,-404.0
+"5-min range, 1-min close beyond (volume >= range avg)",No breakeven,3,no news,Long only,-178.0,61,52.5,0.93,-1440.0,-591.0,-530.0,-296.0,0.88,-620.0,-296.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","BE at 1R, lock +0.25R",1,no news,Long+short,-741.0,21,47.6,0.79,-3302.0,-1736.0,-577.0,-805.0,0.77,-1776.0,628.0,-1433.0
+"5-min range, 1-min close beyond (volume >= range avg)","BE at 1R, lock +0.25R",1,no news,Long only,-298.0,21,42.9,0.9,-2739.0,-1656.0,-545.0,-358.0,0.88,-1680.0,-358.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","BE at 1R, lock +0.25R",2,no news,Long+short,-955.0,42,42.9,0.67,-2455.0,-1527.0,-399.0,-1036.0,0.65,-1580.0,164.0,-1200.0
+"5-min range, 1-min close beyond (volume >= range avg)","BE at 1R, lock +0.25R",2,no news,Long only,-12.0,42,57.1,0.99,-1503.0,-628.0,-399.0,-96.0,0.96,-685.0,-96.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","BE at 1R, lock +0.25R",3,no news,Long+short,-692.0,63,47.6,0.75,-1930.0,-739.0,-530.0,-803.0,0.71,-814.0,-196.0,-607.0
+"5-min range, 1-min close beyond (volume >= range avg)","BE at 1R, lock +0.25R",3,no news,Long only,-328.0,61,54.1,0.87,-1589.0,-591.0,-530.0,-440.0,0.83,-620.0,-440.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-520.0,21,61.9,0.76,-1474.0,-791.0,-545.0,-593.0,0.72,-826.0,77.0,-670.0
+"5-min range, 1-min close beyond (volume >= range avg)","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-392.0,21,61.9,0.79,-1307.0,-994.0,-545.0,-462.0,0.75,-1026.0,-462.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,-452.0,42,59.5,0.75,-977.0,-821.0,-386.0,-556.0,0.7,-875.0,95.0,-651.0
+"5-min range, 1-min close beyond (volume >= range avg)","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,-111.0,42,66.7,0.93,-645.0,-413.0,-386.0,-219.0,0.86,-461.0,-219.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,-65.0,63,65.1,0.96,-424.0,-321.0,-195.0,-217.0,0.86,-389.0,125.0,-341.0
+"5-min range, 1-min close beyond (volume >= range avg)","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,58.0,61,67.2,1.04,-301.0,-238.0,-191.0,-92.0,0.93,-294.0,-92.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,-169.0,21,42.9,0.95,-3191.0,-1905.0,-577.0,-232.0,0.93,-1943.0,953.0,-1185.0
+"5-min range, 1-min close beyond (volume >= range avg)",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,48.0,21,38.1,1.02,-2679.0,-1669.0,-545.0,-9.0,1.0,-1693.0,-9.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,-699.0,42,40.5,0.76,-2349.0,-1633.0,-399.0,-771.0,0.74,-1680.0,254.0,-1025.0
+"5-min range, 1-min close beyond (volume >= range avg)",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,127.0,42,54.8,1.06,-1443.0,-811.0,-399.0,55.0,1.02,-829.0,55.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,-531.0,63,46.0,0.81,-1742.0,-863.0,-530.0,-627.0,0.78,-925.0,-219.0,-407.0
+"5-min range, 1-min close beyond (volume >= range avg)",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,-395.0,61,52.5,0.84,-1593.0,-749.0,-530.0,-487.0,0.81,-771.0,-487.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-505.0,21,47.6,0.7,-1520.0,-628.0,-545.0,-570.0,0.67,-649.0,74.0,-644.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 100% ADR,1,no news,Long only,-175.0,21,52.4,0.85,-1046.0,-750.0,-545.0,-235.0,0.8,-782.0,-235.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-558.0,42,45.2,0.64,-1172.0,-721.0,-386.0,-637.0,0.6,-785.0,-366.0,-271.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 100% ADR,2,no news,Long only,34.0,42,59.5,1.03,-630.0,-390.0,-386.0,-47.0,0.96,-428.0,-47.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,-94.0,63,49.2,0.92,-558.0,-324.0,-287.0,-198.0,0.84,-387.0,-79.0,-118.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 100% ADR,3,no news,Long only,177.0,61,60.7,1.19,-265.0,-347.0,-287.0,75.0,1.08,-393.0,75.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-982.0,21,42.9,0.59,-2268.0,-982.0,-545.0,-1048.0,0.57,-1048.0,-198.0,-850.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-918.0,21,47.6,0.57,-2003.0,-1175.0,-545.0,-979.0,0.55,-1207.0,-979.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,-1034.0,42,42.9,0.54,-1846.0,-1202.0,-386.0,-1115.0,0.51,-1268.0,-434.0,-681.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 130% ADR,2,no news,Long only,-672.0,42,54.8,0.66,-1455.0,-672.0,-386.0,-755.0,0.62,-755.0,-755.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,-708.0,63,44.4,0.64,-1274.0,-768.0,-287.0,-814.0,0.6,-855.0,-468.0,-345.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out when the day's range reaches 130% ADR,3,no news,Long only,-609.0,61,50.8,0.67,-1166.0,-706.0,-287.0,-713.0,0.62,-792.0,-713.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,-662.0,21,42.9,0.81,-3290.0,-1625.0,-577.0,-728.0,0.79,-1665.0,743.0,-1471.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-178.0,21,42.9,0.94,-2672.0,-1656.0,-545.0,-239.0,0.92,-1680.0,-239.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,-899.0,42,38.1,0.69,-2461.0,-1503.0,-399.0,-981.0,0.67,-1557.0,187.0,-1168.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,29.0,42,52.4,1.01,-1517.0,-658.0,-399.0,-57.0,0.97,-686.0,-57.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,-642.0,63,39.7,0.77,-1950.0,-676.0,-530.0,-754.0,0.73,-754.0,-127.0,-627.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,-290.0,61,45.9,0.88,-1621.0,-569.0,-530.0,-404.0,0.84,-598.0,-404.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,-718.0,21,42.9,0.79,-3303.0,-1668.0,-577.0,-784.0,0.78,-1708.0,702.0,-1486.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-223.0,21,42.9,0.92,-2688.0,-1656.0,-545.0,-285.0,0.9,-1680.0,-285.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,-929.0,42,38.1,0.68,-2467.0,-1527.0,-399.0,-1012.0,0.66,-1581.0,163.0,-1175.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,9.0,42,52.4,1.0,-1525.0,-658.0,-399.0,-77.0,0.97,-687.0,-77.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,-662.0,63,39.7,0.76,-1955.0,-692.0,-530.0,-774.0,0.73,-774.0,-142.0,-632.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,-281.0,61,45.9,0.89,-1618.0,-570.0,-530.0,-395.0,0.85,-599.0,-395.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,-766.0,21,42.9,0.78,-3306.0,-1713.0,-577.0,-832.0,0.76,-1753.0,653.0,-1485.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-278.0,21,42.9,0.9,-2697.0,-1656.0,-545.0,-339.0,0.88,-1680.0,-339.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,-943.0,42,38.1,0.68,-2452.0,-1557.0,-399.0,-1025.0,0.66,-1610.0,149.0,-1175.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,-15.0,42,52.4,0.99,-1513.0,-670.0,-399.0,-101.0,0.96,-726.0,-101.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,-686.0,63,39.7,0.75,-1949.0,-726.0,-530.0,-798.0,0.72,-801.0,-166.0,-632.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,-317.0,61,45.9,0.87,-1620.0,-579.0,-530.0,-431.0,0.83,-607.0,-431.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,-974.0,21,38.1,0.72,-3329.0,-1908.0,-577.0,-1038.0,0.71,-1946.0,504.0,-1542.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-432.0,21,38.1,0.85,-2723.0,-1695.0,-545.0,-490.0,0.83,-1719.0,-490.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-1014.0,42,35.7,0.65,-2447.0,-1656.0,-399.0,-1090.0,0.63,-1705.0,112.0,-1203.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,-61.0,42,50.0,0.97,-1506.0,-744.0,-399.0,-140.0,0.94,-796.0,-140.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,-746.0,63,38.1,0.73,-1940.0,-805.0,-530.0,-851.0,0.7,-875.0,-225.0,-625.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,-375.0,61,44.3,0.85,-1618.0,-594.0,-530.0,-479.0,0.81,-620.0,-479.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,-985.0,21,42.9,0.72,-3277.0,-2082.0,-577.0,-1047.0,0.71,-2120.0,253.0,-1300.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-681.0,21,38.1,0.76,-2756.0,-1766.0,-545.0,-738.0,0.75,-1789.0,-738.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-796.0,42,40.5,0.73,-2259.0,-1568.0,-399.0,-868.0,0.71,-1615.0,247.0,-1115.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,33.0,42,54.8,1.01,-1430.0,-663.0,-399.0,-39.0,0.98,-712.0,-39.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,-638.0,63,42.9,0.77,-1790.0,-791.0,-530.0,-733.0,0.74,-854.0,-162.0,-571.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-225.0,61,50.8,0.91,-1499.0,-606.0,-530.0,-317.0,0.88,-629.0,-317.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-429.0,21,38.1,0.88,-3287.0,-1809.0,-577.0,-491.0,0.86,-1847.0,649.0,-1140.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-261.0,21,33.3,0.91,-2776.0,-1746.0,-545.0,-319.0,0.89,-1770.0,-319.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-869.0,42,38.1,0.71,-2424.0,-1597.0,-399.0,-941.0,0.69,-1645.0,87.0,-1028.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,-158.0,42,52.4,0.93,-1639.0,-826.0,-399.0,-230.0,0.9,-843.0,-230.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,-766.0,63,41.3,0.72,-1911.0,-891.0,-530.0,-861.0,0.7,-953.0,-347.0,-514.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,-461.0,61,49.2,0.82,-1668.0,-750.0,-530.0,-553.0,0.78,-772.0,-553.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,-572.0,21,47.6,0.84,-3147.0,-1796.0,-577.0,-638.0,0.82,-1836.0,734.0,-1372.0
+"5-min range, 1-min close beyond (volume >= range avg)","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-186.0,21,42.9,0.94,-2679.0,-1664.0,-545.0,-246.0,0.91,-1684.0,-246.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,-766.0,42,42.9,0.74,-2314.0,-1513.0,-399.0,-852.0,0.71,-1567.0,250.0,-1101.0
+"5-min range, 1-min close beyond (volume >= range avg)","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,98.0,42,57.1,1.04,-1428.0,-611.0,-399.0,10.0,1.0,-657.0,10.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,-613.0,63,47.6,0.78,-1854.0,-788.0,-530.0,-733.0,0.74,-866.0,-164.0,-569.0
+"5-min range, 1-min close beyond (volume >= range avg)","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,-289.0,61,54.1,0.88,-1581.0,-604.0,-530.0,-409.0,0.84,-634.0,-409.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,-692.0,21,47.6,0.8,-3186.0,-1843.0,-577.0,-760.0,0.78,-1884.0,664.0,-1423.0
+"5-min range, 1-min close beyond (volume >= range avg)","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-256.0,21,42.9,0.91,-2683.0,-1659.0,-545.0,-318.0,0.89,-1679.0,-318.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,-816.0,42,42.9,0.72,-2344.0,-1535.0,-399.0,-904.0,0.7,-1591.0,227.0,-1131.0
+"5-min range, 1-min close beyond (volume >= range avg)","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,69.0,42,57.1,1.03,-1446.0,-624.0,-399.0,-23.0,0.99,-684.0,-23.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,-677.0,63,47.6,0.75,-1895.0,-823.0,-530.0,-799.0,0.72,-901.0,-196.0,-603.0
+"5-min range, 1-min close beyond (volume >= range avg)","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,-339.0,61,54.1,0.86,-1608.0,-592.0,-530.0,-463.0,0.82,-621.0,-463.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,-689.0,21,42.9,0.8,-3334.0,-1608.0,-577.0,-753.0,0.79,-1647.0,775.0,-1528.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-146.0,21,42.9,0.95,-2714.0,-1659.0,-545.0,-206.0,0.93,-1682.0,-206.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,-888.0,42,38.1,0.7,-2475.0,-1479.0,-399.0,-966.0,0.67,-1529.0,229.0,-1195.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,59.0,42,52.4,1.03,-1531.0,-658.0,-399.0,-24.0,0.99,-679.0,-24.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,-695.0,63,39.7,0.75,-1986.0,-720.0,-530.0,-802.0,0.72,-802.0,-156.0,-646.0
+"5-min range, 1-min close beyond (volume >= range avg)","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,-282.0,61,45.9,0.89,-1616.0,-575.0,-530.0,-390.0,0.85,-601.0,-390.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,-557.0,21,42.9,0.84,-3159.0,-1781.0,-577.0,-623.0,0.82,-1821.0,722.0,-1344.0
+"5-min range, 1-min close beyond (volume >= range avg)","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-214.0,21,38.1,0.93,-2708.0,-1666.0,-545.0,-275.0,0.91,-1690.0,-275.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-774.0,42,40.5,0.74,-2307.0,-1523.0,-399.0,-859.0,0.71,-1578.0,228.0,-1087.0
+"5-min range, 1-min close beyond (volume >= range avg)","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,84.0,42,54.8,1.04,-1435.0,-614.0,-399.0,-4.0,1.0,-673.0,-4.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,-573.0,63,46.0,0.79,-1836.0,-749.0,-530.0,-692.0,0.75,-827.0,-132.0,-560.0
+"5-min range, 1-min close beyond (volume >= range avg)","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,-247.0,61,52.5,0.9,-1546.0,-602.0,-530.0,-368.0,0.86,-631.0,-368.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out on a close back through VWAP,1,no news,Long+short,401.0,21,38.1,1.21,-1843.0,-858.0,-331.0,337.0,1.18,-875.0,1045.0,-708.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out on a close back through VWAP,1,no news,Long only,648.0,21,38.1,1.45,-1436.0,-934.0,-331.0,589.0,1.4,-957.0,589.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out on a close back through VWAP,2,no news,Long+short,-210.0,42,33.3,0.88,-1556.0,-494.0,-227.0,-288.0,0.84,-523.0,296.0,-585.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out on a close back through VWAP,2,no news,Long only,252.0,42,35.7,1.2,-1085.0,-469.0,-227.0,172.0,1.13,-483.0,172.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out on a close back through VWAP,3,no news,Long+short,-24.0,63,33.3,0.98,-1135.0,-340.0,-181.0,-130.0,0.92,-368.0,217.0,-347.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + out on a close back through VWAP,3,no news,Long only,336.0,61,34.4,1.27,-853.0,-289.0,-181.0,229.0,1.17,-318.0,229.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails VWAP",1,no news,Long+short,-803.0,21,42.9,0.77,-3313.0,-1743.0,-577.0,-869.0,0.75,-1783.0,641.0,-1510.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails VWAP",1,no news,Long only,-297.0,21,42.9,0.9,-2711.0,-1656.0,-545.0,-358.0,0.88,-1680.0,-358.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails VWAP",2,no news,Long+short,-961.0,42,38.1,0.67,-2469.0,-1558.0,-399.0,-1043.0,0.65,-1611.0,143.0,-1187.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails VWAP",2,no news,Long only,-33.0,42,52.4,0.99,-1533.0,-671.0,-399.0,-119.0,0.95,-727.0,-119.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails VWAP",3,no news,Long+short,-722.0,63,39.7,0.74,-1975.0,-751.0,-530.0,-834.0,0.7,-834.0,-194.0,-640.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner trails VWAP",3,no news,Long only,-377.0,61,45.9,0.85,-1649.0,-579.0,-530.0,-491.0,0.81,-608.0,-491.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + entry only on the right side of VWAP,1,no news,Long+short,-732.0,21,42.9,0.79,-3293.0,-1692.0,-577.0,-798.0,0.77,-1732.0,687.0,-1485.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + entry only on the right side of VWAP,1,no news,Long only,-237.0,21,42.9,0.92,-2678.0,-1656.0,-545.0,-298.0,0.9,-1680.0,-298.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + entry only on the right side of VWAP,2,no news,Long+short,-960.0,42,38.1,0.67,-2459.0,-1566.0,-399.0,-1042.0,0.65,-1619.0,132.0,-1175.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + entry only on the right side of VWAP,2,no news,Long only,-26.0,42,52.4,0.99,-1517.0,-687.0,-399.0,-112.0,0.95,-730.0,-112.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + entry only on the right side of VWAP,3,no news,Long+short,-715.0,63,39.7,0.74,-1953.0,-751.0,-530.0,-828.0,0.71,-828.0,-196.0,-632.0
+"5-min range, 1-min close beyond (volume >= range avg)",Base + entry only on the right side of VWAP,3,no news,Long only,-365.0,61,45.9,0.85,-1626.0,-591.0,-530.0,-478.0,0.81,-620.0,-478.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,-698.0,21,42.9,0.8,-3295.0,-1657.0,-577.0,-764.0,0.78,-1697.0,706.0,-1470.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-218.0,21,42.9,0.92,-2680.0,-1656.0,-545.0,-280.0,0.9,-1680.0,-280.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,-915.0,42,38.1,0.69,-2461.0,-1519.0,-399.0,-998.0,0.66,-1573.0,170.0,-1167.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,17.0,42,52.4,1.01,-1519.0,-658.0,-399.0,-69.0,0.97,-685.0,-69.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,-652.0,63,39.7,0.76,-1946.0,-686.0,-530.0,-764.0,0.73,-764.0,-137.0,-627.0
+"5-min range, 1-min close beyond (volume >= range avg)","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,-294.0,61,45.9,0.88,-1611.0,-565.0,-530.0,-407.0,0.84,-594.0,-407.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,-350.0,21,42.9,0.9,-3204.0,-1833.0,-577.0,-413.0,0.88,-1871.0,686.0,-1099.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-223.0,21,38.1,0.92,-2693.0,-1750.0,-545.0,-280.0,0.9,-1774.0,-280.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,-838.0,42,40.5,0.71,-2379.0,-1638.0,-399.0,-910.0,0.69,-1686.0,86.0,-996.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,-167.0,42,54.8,0.93,-1596.0,-851.0,-399.0,-239.0,0.89,-869.0,-239.0,0.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,-746.0,63,42.9,0.73,-1885.0,-924.0,-530.0,-841.0,0.7,-986.0,-350.0,-491.0
+"5-min range, 1-min close beyond (volume >= range avg)",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,-547.0,61,52.5,0.78,-1730.0,-771.0,-530.0,-639.0,0.75,-794.0,-639.0,0.0
+"15-min range, 1-min close beyond","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,-1267.0,21,38.1,0.59,-2899.0,-2289.0,-800.0,-1313.0,0.58,-2306.0,147.0,-1461.0
+"15-min range, 1-min close beyond","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,-592.0,42,38.1,0.77,-1813.0,-1122.0,-544.0,-663.0,0.74,-1145.0,187.0,-850.0
+"15-min range, 1-min close beyond","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,-472.0,63,39.7,0.79,-1352.0,-972.0,-440.0,-572.0,0.76,-1008.0,365.0,-937.0
+"15-min range, 1-min close beyond","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,-503.0,60,33.3,0.79,-1511.0,-931.0,-252.0,-598.0,0.76,-954.0,-598.0,0.0
+"15-min range, 1-min close beyond",BE at 0.25 x daily ATR,1,no news,Long+short,137.0,21,19.0,1.15,-929.0,-585.0,-304.0,90.0,1.09,-607.0,117.0,-27.0
+"15-min range, 1-min close beyond",BE at 0.25 x daily ATR,1,no news,Long only,-439.0,21,14.3,0.63,-1183.0,-551.0,-283.0,-494.0,0.6,-562.0,-494.0,0.0
+"15-min range, 1-min close beyond",BE at 0.25 x daily ATR,2,no news,Long+short,218.0,42,21.4,1.21,-859.0,-366.0,-293.0,146.0,1.13,-393.0,114.0,32.0
+"15-min range, 1-min close beyond",BE at 0.25 x daily ATR,2,no news,Long only,-351.0,41,17.1,0.78,-1440.0,-541.0,-212.0,-420.0,0.74,-580.0,-420.0,0.0
+"15-min range, 1-min close beyond",BE at 0.25 x daily ATR,3,no news,Long+short,-90.0,63,19.0,0.93,-923.0,-611.0,-207.0,-189.0,0.85,-647.0,136.0,-325.0
+"15-min range, 1-min close beyond",BE at 0.25 x daily ATR,3,no news,Long only,-299.0,60,18.3,0.79,-1142.0,-465.0,-185.0,-394.0,0.74,-483.0,-394.0,0.0
+"15-min range, 1-min close beyond",BE at 0.5R,1,no news,Long+short,-1304.0,21,33.3,0.53,-2636.0,-2374.0,-800.0,-1351.0,0.51,-2396.0,346.0,-1697.0
+"15-min range, 1-min close beyond",BE at 0.5R,1,no news,Long only,-561.0,21,19.0,0.62,-1486.0,-653.0,-283.0,-617.0,0.6,-685.0,-617.0,0.0
+"15-min range, 1-min close beyond",BE at 0.5R,2,no news,Long+short,-648.0,42,28.6,0.69,-1799.0,-1338.0,-544.0,-720.0,0.67,-1364.0,229.0,-949.0
+"15-min range, 1-min close beyond",BE at 0.5R,2,no news,Long only,-301.0,41,22.0,0.84,-1549.0,-465.0,-212.0,-369.0,0.8,-482.0,-369.0,0.0
+"15-min range, 1-min close beyond",BE at 0.5R,3,no news,Long+short,-657.0,63,25.4,0.67,-1537.0,-1264.0,-440.0,-755.0,0.63,-1300.0,281.0,-1036.0
+"15-min range, 1-min close beyond",BE at 0.5R,3,no news,Long only,-234.0,60,21.7,0.87,-1242.0,-606.0,-241.0,-328.0,0.82,-624.0,-328.0,0.0
+"15-min range, 1-min close beyond",BE at 0.75R,1,no news,Long+short,-1267.0,21,38.1,0.59,-2899.0,-2289.0,-800.0,-1313.0,0.58,-2306.0,147.0,-1461.0
+"15-min range, 1-min close beyond",BE at 0.75R,1,no news,Long only,-290.0,21,28.6,0.83,-1590.0,-737.0,-283.0,-346.0,0.8,-748.0,-346.0,0.0
+"15-min range, 1-min close beyond",BE at 0.75R,2,no news,Long+short,-661.0,42,33.3,0.73,-1882.0,-1122.0,-544.0,-733.0,0.71,-1145.0,187.0,-920.0
+"15-min range, 1-min close beyond",BE at 0.75R,2,no news,Long only,-197.0,41,29.3,0.9,-1458.0,-558.0,-226.0,-266.0,0.87,-575.0,-266.0,0.0
+"15-min range, 1-min close beyond",BE at 0.75R,3,no news,Long+short,-524.0,63,34.9,0.77,-1404.0,-972.0,-440.0,-624.0,0.73,-1008.0,365.0,-989.0
+"15-min range, 1-min close beyond",BE at 0.75R,3,no news,Long only,-379.0,60,33.3,0.84,-1387.0,-931.0,-252.0,-474.0,0.8,-954.0,-474.0,0.0
+"15-min range, 1-min close beyond",BE at 1.5R,1,no news,Long+short,-1267.0,21,38.1,0.59,-2899.0,-2289.0,-800.0,-1313.0,0.58,-2306.0,147.0,-1461.0
+"15-min range, 1-min close beyond",BE at 1.5R,1,no news,Long only,-683.0,21,28.6,0.67,-1984.0,-1109.0,-374.0,-739.0,0.65,-1120.0,-739.0,0.0
+"15-min range, 1-min close beyond",BE at 1.5R,2,no news,Long+short,-602.0,42,38.1,0.76,-1823.0,-1132.0,-544.0,-674.0,0.74,-1156.0,176.0,-850.0
+"15-min range, 1-min close beyond",BE at 1.5R,2,no news,Long only,-394.0,41,29.3,0.82,-1655.0,-744.0,-226.0,-463.0,0.79,-761.0,-463.0,0.0
+"15-min range, 1-min close beyond",BE at 1.5R,3,no news,Long+short,-479.0,63,39.7,0.79,-1359.0,-979.0,-440.0,-579.0,0.75,-1015.0,358.0,-937.0
+"15-min range, 1-min close beyond",BE at 1.5R,3,no news,Long only,-551.0,60,33.3,0.78,-1559.0,-931.0,-252.0,-646.0,0.75,-954.0,-646.0,0.0
+"15-min range, 1-min close beyond",No breakeven,1,no news,Long+short,-1193.0,21,38.1,0.62,-2896.0,-2289.0,-800.0,-1240.0,0.61,-2306.0,147.0,-1387.0
+"15-min range, 1-min close beyond",No breakeven,1,no news,Long only,-702.0,21,28.6,0.66,-1984.0,-1109.0,-374.0,-758.0,0.64,-1120.0,-758.0,0.0
+"15-min range, 1-min close beyond",No breakeven,2,no news,Long+short,-566.0,42,38.1,0.78,-1787.0,-1132.0,-544.0,-638.0,0.75,-1156.0,176.0,-814.0
+"15-min range, 1-min close beyond",No breakeven,2,no news,Long only,-404.0,41,29.3,0.82,-1665.0,-744.0,-226.0,-473.0,0.79,-761.0,-473.0,0.0
+"15-min range, 1-min close beyond",No breakeven,3,no news,Long+short,-455.0,63,39.7,0.8,-1335.0,-979.0,-440.0,-554.0,0.76,-1015.0,358.0,-912.0
+"15-min range, 1-min close beyond",No breakeven,3,no news,Long only,-558.0,60,33.3,0.77,-1566.0,-937.0,-252.0,-653.0,0.74,-960.0,-653.0,0.0
+"15-min range, 1-min close beyond","BE at 1R, lock +0.25R",1,no news,Long+short,-1249.0,21,38.1,0.6,-2896.0,-2289.0,-800.0,-1296.0,0.59,-2306.0,147.0,-1443.0
+"15-min range, 1-min close beyond","BE at 1R, lock +0.25R",1,no news,Long only,-582.0,21,33.3,0.72,-1907.0,-1109.0,-374.0,-638.0,0.69,-1120.0,-638.0,0.0
+"15-min range, 1-min close beyond","BE at 1R, lock +0.25R",2,no news,Long+short,-591.0,42,40.5,0.77,-1812.0,-1129.0,-544.0,-663.0,0.74,-1153.0,179.0,-841.0
+"15-min range, 1-min close beyond","BE at 1R, lock +0.25R",2,no news,Long only,-379.0,41,31.7,0.83,-1640.0,-744.0,-226.0,-448.0,0.8,-761.0,-448.0,0.0
+"15-min range, 1-min close beyond","BE at 1R, lock +0.25R",3,no news,Long+short,-496.0,63,41.3,0.78,-1376.0,-977.0,-440.0,-595.0,0.75,-1013.0,360.0,-956.0
+"15-min range, 1-min close beyond","BE at 1R, lock +0.25R",3,no news,Long only,-490.0,60,36.7,0.8,-1498.0,-946.0,-252.0,-585.0,0.76,-970.0,-585.0,0.0
+"15-min range, 1-min close beyond","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-43.0,21,61.9,0.97,-766.0,-408.0,-346.0,-104.0,0.92,-426.0,193.0,-296.0
+"15-min range, 1-min close beyond","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-310.0,21,52.4,0.77,-1047.0,-706.0,-283.0,-374.0,0.72,-718.0,-374.0,0.0
+"15-min range, 1-min close beyond","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,203.0,42,61.9,1.15,-407.0,-408.0,-293.0,99.0,1.07,-437.0,-91.0,190.0
+"15-min range, 1-min close beyond","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,-620.0,41,46.3,0.63,-1108.0,-620.0,-212.0,-713.0,0.58,-713.0,-713.0,0.0
+"15-min range, 1-min close beyond","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,28.0,63,57.1,1.02,-445.0,-451.0,-207.0,-117.0,0.92,-513.0,83.0,-199.0
+"15-min range, 1-min close beyond","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,-286.0,60,50.0,0.82,-673.0,-414.0,-195.0,-422.0,0.74,-439.0,-422.0,0.0
+"15-min range, 1-min close beyond",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,-1040.0,21,38.1,0.67,-2986.0,-2289.0,-800.0,-1085.0,0.66,-2306.0,444.0,-1529.0
+"15-min range, 1-min close beyond",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-130.0,21,33.3,0.94,-1798.0,-1109.0,-374.0,-186.0,0.91,-1120.0,-186.0,0.0
+"15-min range, 1-min close beyond",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,-422.0,42,40.5,0.83,-1792.0,-1061.0,-544.0,-492.0,0.81,-1081.0,391.0,-883.0
+"15-min range, 1-min close beyond",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,-173.0,41,31.7,0.92,-1520.0,-744.0,-226.0,-241.0,0.89,-761.0,-241.0,0.0
+"15-min range, 1-min close beyond",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,-388.0,63,41.3,0.83,-1343.0,-934.0,-440.0,-482.0,0.79,-971.0,435.0,-917.0
+"15-min range, 1-min close beyond",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,-415.0,60,36.7,0.83,-1463.0,-901.0,-252.0,-506.0,0.8,-924.0,-506.0,0.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-520.0,21,52.4,0.45,-883.0,-520.0,-263.0,-566.0,0.42,-566.0,-325.0,-241.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 100% ADR,1,no news,Long only,-435.0,21,52.4,0.62,-1073.0,-477.0,-283.0,-491.0,0.58,-515.0,-491.0,0.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-462.0,42,54.8,0.53,-736.0,-462.0,-226.0,-533.0,0.47,-533.0,-451.0,-82.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 100% ADR,2,no news,Long only,-541.0,41,41.5,0.5,-919.0,-541.0,-226.0,-609.0,0.46,-609.0,-609.0,0.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,-513.0,63,50.8,0.51,-727.0,-513.0,-126.0,-610.0,0.44,-610.0,-400.0,-210.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 100% ADR,3,no news,Long only,-381.0,60,43.3,0.62,-676.0,-478.0,-242.0,-472.0,0.56,-528.0,-472.0,0.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-394.0,21,52.4,0.6,-901.0,-515.0,-263.0,-441.0,0.56,-558.0,-417.0,-24.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-1010.0,21,42.9,0.41,-1648.0,-1192.0,-374.0,-1066.0,0.39,-1221.0,-1066.0,0.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,-237.0,42,52.4,0.79,-743.0,-288.0,-226.0,-309.0,0.73,-310.0,-416.0,107.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 130% ADR,2,no news,Long only,-925.0,41,36.6,0.4,-1345.0,-929.0,-226.0,-994.0,0.38,-994.0,-994.0,0.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,-545.0,63,46.0,0.59,-950.0,-545.0,-218.0,-643.0,0.54,-643.0,-269.0,-374.0
+"15-min range, 1-min close beyond",Base + out when the day's range reaches 130% ADR,3,no news,Long only,-457.0,60,41.7,0.65,-838.0,-589.0,-242.0,-550.0,0.59,-641.0,-550.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,-1264.0,21,38.1,0.6,-2899.0,-2289.0,-800.0,-1310.0,0.58,-2306.0,147.0,-1458.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,-590.0,42,38.1,0.77,-1811.0,-1122.0,-544.0,-662.0,0.74,-1145.0,187.0,-848.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,-491.0,63,39.7,0.79,-1351.0,-972.0,-440.0,-590.0,0.75,-1008.0,346.0,-936.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,-519.0,60,33.3,0.79,-1511.0,-931.0,-252.0,-614.0,0.75,-954.0,-614.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,-1268.0,21,38.1,0.59,-2899.0,-2289.0,-800.0,-1314.0,0.58,-2306.0,147.0,-1462.0
+"15-min range, 1-min close beyond","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,-592.0,42,38.1,0.77,-1813.0,-1122.0,-544.0,-664.0,0.74,-1145.0,187.0,-851.0
+"15-min range, 1-min close beyond","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,-493.0,63,39.7,0.78,-1353.0,-972.0,-440.0,-592.0,0.75,-1008.0,345.0,-937.0
+"15-min range, 1-min close beyond","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,-522.0,60,33.3,0.79,-1515.0,-931.0,-252.0,-617.0,0.75,-954.0,-617.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,-1197.0,21,38.1,0.62,-2899.0,-2289.0,-800.0,-1244.0,0.6,-2306.0,147.0,-1391.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,-557.0,42,38.1,0.78,-1778.0,-1122.0,-544.0,-629.0,0.76,-1145.0,187.0,-815.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,-443.0,63,39.7,0.81,-1329.0,-972.0,-440.0,-542.0,0.77,-1008.0,372.0,-914.0
+"15-min range, 1-min close beyond","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,-499.0,60,33.3,0.79,-1514.0,-931.0,-252.0,-594.0,0.76,-954.0,-594.0,0.0
+"15-min range, 1-min close beyond","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,-1071.0,21,38.1,0.66,-2833.0,-2289.0,-800.0,-1118.0,0.64,-2306.0,147.0,-1265.0
+"15-min range, 1-min close beyond","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-605.0,21,28.6,0.71,-1962.0,-1109.0,-374.0,-661.0,0.68,-1120.0,-661.0,0.0
+"15-min range, 1-min close beyond","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-495.0,42,38.1,0.8,-1716.0,-1122.0,-544.0,-566.0,0.78,-1145.0,187.0,-752.0
+"15-min range, 1-min close beyond","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,-355.0,41,29.3,0.84,-1616.0,-744.0,-226.0,-424.0,0.81,-761.0,-424.0,0.0
+"15-min range, 1-min close beyond","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,-389.0,63,39.7,0.83,-1298.0,-972.0,-440.0,-486.0,0.79,-1008.0,385.0,-871.0
+"15-min range, 1-min close beyond","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,-469.0,60,33.3,0.81,-1506.0,-901.0,-252.0,-562.0,0.77,-924.0,-562.0,0.0
+"15-min range, 1-min close beyond",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,-827.0,21,38.1,0.73,-2872.0,-2289.0,-800.0,-873.0,0.72,-2306.0,294.0,-1167.0
+"15-min range, 1-min close beyond",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-409.0,21,33.3,0.8,-1838.0,-1109.0,-374.0,-464.0,0.78,-1120.0,-464.0,0.0
+"15-min range, 1-min close beyond",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-310.0,42,40.5,0.88,-1639.0,-1055.0,-544.0,-380.0,0.85,-1079.0,327.0,-707.0
+"15-min range, 1-min close beyond",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,-289.0,41,31.7,0.87,-1586.0,-744.0,-226.0,-356.0,0.84,-761.0,-356.0,0.0
+"15-min range, 1-min close beyond",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,-195.0,63,41.3,0.91,-1220.0,-927.0,-440.0,-290.0,0.88,-963.0,540.0,-830.0
+"15-min range, 1-min close beyond",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-349.0,60,36.7,0.86,-1485.0,-916.0,-252.0,-439.0,0.82,-939.0,-439.0,0.0
+"15-min range, 1-min close beyond",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-942.0,21,38.1,0.7,-2913.0,-2289.0,-800.0,-988.0,0.69,-2306.0,413.0,-1401.0
+"15-min range, 1-min close beyond",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-351.0,21,33.3,0.83,-1887.0,-1109.0,-374.0,-407.0,0.81,-1120.0,-407.0,0.0
+"15-min range, 1-min close beyond",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-412.0,42,40.5,0.84,-1775.0,-1067.0,-544.0,-482.0,0.81,-1091.0,342.0,-824.0
+"15-min range, 1-min close beyond",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,-293.0,41,31.7,0.87,-1602.0,-744.0,-226.0,-361.0,0.84,-761.0,-361.0,0.0
+"15-min range, 1-min close beyond",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,-343.0,63,41.3,0.85,-1306.0,-950.0,-440.0,-438.0,0.81,-987.0,448.0,-886.0
+"15-min range, 1-min close beyond",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,-439.0,60,36.7,0.82,-1505.0,-909.0,-252.0,-529.0,0.79,-931.0,-529.0,0.0
+"15-min range, 1-min close beyond","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,-1185.0,21,38.1,0.62,-2957.0,-2289.0,-800.0,-1232.0,0.61,-2306.0,233.0,-1466.0
+"15-min range, 1-min close beyond","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-615.0,21,33.3,0.7,-1919.0,-1109.0,-374.0,-672.0,0.68,-1120.0,-672.0,0.0
+"15-min range, 1-min close beyond","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,-501.0,42,40.5,0.8,-1790.0,-1066.0,-544.0,-578.0,0.78,-1092.0,270.0,-848.0
+"15-min range, 1-min close beyond","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,-359.0,41,31.7,0.84,-1650.0,-744.0,-226.0,-432.0,0.81,-761.0,-432.0,0.0
+"15-min range, 1-min close beyond","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,-394.0,63,41.3,0.83,-1323.0,-941.0,-440.0,-499.0,0.79,-980.0,419.0,-918.0
+"15-min range, 1-min close beyond","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,-468.0,60,36.7,0.81,-1510.0,-954.0,-252.0,-569.0,0.77,-978.0,-569.0,0.0
+"15-min range, 1-min close beyond","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,-1191.0,21,38.1,0.62,-2969.0,-2289.0,-800.0,-1239.0,0.61,-2306.0,212.0,-1451.0
+"15-min range, 1-min close beyond","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-659.0,21,33.3,0.68,-1953.0,-1109.0,-374.0,-717.0,0.66,-1120.0,-717.0,0.0
+"15-min range, 1-min close beyond","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,-516.0,42,40.5,0.8,-1789.0,-1080.0,-544.0,-594.0,0.77,-1106.0,248.0,-842.0
+"15-min range, 1-min close beyond","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,-382.0,41,31.7,0.83,-1665.0,-744.0,-226.0,-455.0,0.8,-761.0,-455.0,0.0
+"15-min range, 1-min close beyond","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,-384.0,63,41.3,0.83,-1324.0,-949.0,-440.0,-490.0,0.79,-988.0,429.0,-920.0
+"15-min range, 1-min close beyond","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,-468.0,60,36.7,0.81,-1525.0,-960.0,-252.0,-570.0,0.77,-984.0,-570.0,0.0
+"15-min range, 1-min close beyond","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,-1170.0,21,38.1,0.63,-2899.0,-2289.0,-800.0,-1216.0,0.61,-2306.0,147.0,-1364.0
+"15-min range, 1-min close beyond","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,-543.0,42,38.1,0.79,-1764.0,-1122.0,-544.0,-615.0,0.76,-1145.0,187.0,-802.0
+"15-min range, 1-min close beyond","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,-413.0,63,39.7,0.82,-1320.0,-972.0,-440.0,-512.0,0.78,-1008.0,393.0,-905.0
+"15-min range, 1-min close beyond","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,-505.0,60,33.3,0.79,-1540.0,-931.0,-252.0,-599.0,0.76,-954.0,-599.0,0.0
+"15-min range, 1-min close beyond","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,-1127.0,21,38.1,0.64,-2957.0,-2289.0,-800.0,-1175.0,0.63,-2306.0,233.0,-1408.0
+"15-min range, 1-min close beyond","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-615.0,21,33.3,0.7,-1919.0,-1109.0,-374.0,-672.0,0.68,-1120.0,-672.0,0.0
+"15-min range, 1-min close beyond","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-472.0,42,40.5,0.81,-1762.0,-1066.0,-544.0,-549.0,0.79,-1092.0,270.0,-819.0
+"15-min range, 1-min close beyond","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,-359.0,41,31.7,0.84,-1650.0,-744.0,-226.0,-432.0,0.81,-761.0,-432.0,0.0
+"15-min range, 1-min close beyond","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,-371.0,63,41.3,0.84,-1304.0,-941.0,-440.0,-477.0,0.8,-980.0,422.0,-899.0
+"15-min range, 1-min close beyond","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,-464.0,60,36.7,0.81,-1510.0,-954.0,-252.0,-565.0,0.77,-978.0,-565.0,0.0
+"15-min range, 1-min close beyond",Base + out on a close back through VWAP,1,no news,Long+short,-663.0,21,19.0,0.61,-1672.0,-1233.0,-221.0,-710.0,0.59,-1265.0,-279.0,-430.0
+"15-min range, 1-min close beyond",Base + out on a close back through VWAP,1,no news,Long only,-751.0,21,23.8,0.53,-1592.0,-967.0,-221.0,-806.0,0.51,-1006.0,-806.0,0.0
+"15-min range, 1-min close beyond",Base + out on a close back through VWAP,2,no news,Long+short,-598.0,42,19.0,0.66,-1642.0,-875.0,-237.0,-670.0,0.63,-901.0,-100.0,-570.0
+"15-min range, 1-min close beyond",Base + out on a close back through VWAP,2,no news,Long only,-277.0,41,22.0,0.82,-1324.0,-504.0,-149.0,-346.0,0.78,-521.0,-346.0,0.0
+"15-min range, 1-min close beyond",Base + out on a close back through VWAP,3,no news,Long+short,-399.0,63,20.6,0.75,-1255.0,-805.0,-183.0,-498.0,0.7,-841.0,119.0,-617.0
+"15-min range, 1-min close beyond",Base + out on a close back through VWAP,3,no news,Long only,-101.0,60,23.3,0.93,-1070.0,-478.0,-161.0,-196.0,0.88,-501.0,-196.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails VWAP",1,no news,Long+short,-1102.0,21,38.1,0.65,-2899.0,-2289.0,-800.0,-1149.0,0.63,-2306.0,147.0,-1296.0
+"15-min range, 1-min close beyond","Base, runner trails VWAP",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails VWAP",2,no news,Long+short,-509.0,42,38.1,0.8,-1730.0,-1122.0,-544.0,-581.0,0.77,-1145.0,187.0,-768.0
+"15-min range, 1-min close beyond","Base, runner trails VWAP",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","Base, runner trails VWAP",3,no news,Long+short,-411.0,63,39.7,0.82,-1298.0,-972.0,-440.0,-510.0,0.78,-1008.0,372.0,-882.0
+"15-min range, 1-min close beyond","Base, runner trails VWAP",3,no news,Long only,-503.0,60,33.3,0.79,-1518.0,-931.0,-252.0,-598.0,0.76,-954.0,-598.0,0.0
+"15-min range, 1-min close beyond",Base + entry only on the right side of VWAP,1,no news,Long+short,-1267.0,21,38.1,0.59,-2899.0,-2289.0,-800.0,-1313.0,0.58,-2306.0,147.0,-1461.0
+"15-min range, 1-min close beyond",Base + entry only on the right side of VWAP,1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond",Base + entry only on the right side of VWAP,2,no news,Long+short,-592.0,42,38.1,0.77,-1813.0,-1122.0,-544.0,-663.0,0.74,-1145.0,187.0,-850.0
+"15-min range, 1-min close beyond",Base + entry only on the right side of VWAP,2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond",Base + entry only on the right side of VWAP,3,no news,Long+short,-472.0,63,39.7,0.79,-1352.0,-972.0,-440.0,-572.0,0.76,-1008.0,365.0,-937.0
+"15-min range, 1-min close beyond",Base + entry only on the right side of VWAP,3,no news,Long only,-503.0,60,33.3,0.79,-1511.0,-931.0,-252.0,-598.0,0.76,-954.0,-598.0,0.0
+"15-min range, 1-min close beyond","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,-1263.0,21,38.1,0.6,-2899.0,-2289.0,-800.0,-1310.0,0.58,-2306.0,147.0,-1457.0
+"15-min range, 1-min close beyond","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-662.0,21,28.6,0.68,-1962.0,-1109.0,-374.0,-718.0,0.66,-1120.0,-718.0,0.0
+"15-min range, 1-min close beyond","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,-590.0,42,38.1,0.77,-1811.0,-1122.0,-544.0,-662.0,0.74,-1145.0,187.0,-848.0
+"15-min range, 1-min close beyond","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,-383.0,41,29.3,0.83,-1645.0,-744.0,-226.0,-452.0,0.8,-761.0,-452.0,0.0
+"15-min range, 1-min close beyond","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,-495.0,63,39.7,0.78,-1351.0,-972.0,-440.0,-594.0,0.75,-1008.0,342.0,-936.0
+"15-min range, 1-min close beyond","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,-524.0,60,33.3,0.78,-1516.0,-931.0,-252.0,-618.0,0.75,-954.0,-618.0,0.0
+"15-min range, 1-min close beyond",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,-956.0,21,38.1,0.69,-2895.0,-2289.0,-800.0,-1002.0,0.68,-2306.0,416.0,-1418.0
+"15-min range, 1-min close beyond",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-372.0,21,33.3,0.82,-1888.0,-1109.0,-374.0,-428.0,0.8,-1120.0,-428.0,0.0
+"15-min range, 1-min close beyond",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,-423.0,42,40.5,0.83,-1788.0,-1070.0,-544.0,-493.0,0.81,-1094.0,328.0,-821.0
+"15-min range, 1-min close beyond",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,-304.0,41,31.7,0.86,-1617.0,-744.0,-226.0,-372.0,0.83,-761.0,-372.0,0.0
+"15-min range, 1-min close beyond",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,-371.0,63,41.3,0.84,-1323.0,-960.0,-440.0,-466.0,0.8,-996.0,415.0,-881.0
+"15-min range, 1-min close beyond",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,-441.0,60,36.7,0.82,-1503.0,-901.0,-252.0,-532.0,0.79,-924.0,-532.0,0.0
+"5-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,2840.0,21,28.6,2.01,-2757.0,-1091.0,-628.0,2781.0,1.98,-1102.0,1175.0,1606.0
+"5-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-145.0,21,23.8,0.96,-3639.0,-2459.0,-628.0,-201.0,0.95,-2490.0,-201.0,0.0
+"5-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,1303.0,42,35.7,1.47,-1663.0,-910.0,-299.0,1223.0,1.43,-927.0,805.0,418.0
+"5-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,1662.0,42,40.5,1.74,-966.0,-867.0,-299.0,1578.0,1.69,-897.0,1578.0,0.0
+"5-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,1152.0,63,36.5,1.44,-918.0,-590.0,-318.0,1038.0,1.39,-617.0,631.0,407.0
+"5-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,359.0,63,38.1,1.15,-1394.0,-806.0,-287.0,245.0,1.1,-848.0,245.0,0.0
+"5-min range, stop order at the range edge",BE at 0.25 x daily ATR,1,no news,Long+short,3892.0,21,23.8,7.1,-638.0,-505.0,-263.0,3835.0,6.67,-539.0,2678.0,1157.0
+"5-min range, stop order at the range edge",BE at 0.25 x daily ATR,1,no news,Long only,1983.0,21,14.3,2.8,-1099.0,-993.0,-345.0,1927.0,2.68,-1029.0,1927.0,0.0
+"5-min range, stop order at the range edge",BE at 0.25 x daily ATR,2,no news,Long+short,2304.0,42,28.6,3.97,-388.0,-326.0,-265.0,2228.0,3.7,-335.0,1660.0,568.0
+"5-min range, stop order at the range edge",BE at 0.25 x daily ATR,2,no news,Long only,1934.0,42,28.6,3.23,-355.0,-207.0,-194.0,1853.0,3.02,-225.0,1853.0,0.0
+"5-min range, stop order at the range edge",BE at 0.25 x daily ATR,3,no news,Long+short,1537.0,63,27.0,2.58,-422.0,-339.0,-124.0,1428.0,2.37,-354.0,847.0,580.0
+"5-min range, stop order at the range edge",BE at 0.25 x daily ATR,3,no news,Long only,970.0,63,23.8,1.95,-557.0,-354.0,-159.0,860.0,1.78,-375.0,860.0,0.0
+"5-min range, stop order at the range edge",BE at 0.5R,1,no news,Long+short,2880.0,21,23.8,2.17,-2459.0,-891.0,-628.0,2822.0,2.13,-895.0,1011.0,1810.0
+"5-min range, stop order at the range edge",BE at 0.5R,1,no news,Long only,177.0,21,19.0,1.06,-2998.0,-2143.0,-628.0,121.0,1.04,-2179.0,121.0,0.0
+"5-min range, stop order at the range edge",BE at 0.5R,2,no news,Long+short,1817.0,42,31.0,1.9,-1148.0,-781.0,-265.0,1740.0,1.84,-796.0,1037.0,703.0
+"5-min range, stop order at the range edge",BE at 0.5R,2,no news,Long only,1414.0,42,33.3,1.77,-1018.0,-561.0,-260.0,1333.0,1.71,-583.0,1333.0,0.0
+"5-min range, stop order at the range edge",BE at 0.5R,3,no news,Long+short,1250.0,63,30.2,1.62,-771.0,-813.0,-250.0,1141.0,1.55,-837.0,494.0,647.0
+"5-min range, stop order at the range edge",BE at 0.5R,3,no news,Long only,233.0,63,27.0,1.11,-1388.0,-625.0,-250.0,124.0,1.06,-666.0,124.0,0.0
+"5-min range, stop order at the range edge",BE at 0.75R,1,no news,Long+short,2880.0,21,23.8,2.17,-2459.0,-891.0,-628.0,2822.0,2.13,-895.0,1011.0,1810.0
+"5-min range, stop order at the range edge",BE at 0.75R,1,no news,Long only,-309.0,21,19.0,0.91,-3485.0,-2629.0,-628.0,-365.0,0.9,-2665.0,-365.0,0.0
+"5-min range, stop order at the range edge",BE at 0.75R,2,no news,Long+short,1574.0,42,31.0,1.7,-1391.0,-781.0,-265.0,1497.0,1.65,-796.0,794.0,703.0
+"5-min range, stop order at the range edge",BE at 0.75R,2,no news,Long only,1651.0,42,38.1,1.79,-978.0,-797.0,-273.0,1567.0,1.73,-826.0,1567.0,0.0
+"5-min range, stop order at the range edge",BE at 0.75R,3,no news,Long+short,1400.0,63,33.3,1.64,-669.0,-502.0,-250.0,1288.0,1.57,-528.0,624.0,664.0
+"5-min range, stop order at the range edge",BE at 0.75R,3,no news,Long only,253.0,63,31.7,1.11,-1499.0,-787.0,-287.0,140.0,1.06,-828.0,140.0,0.0
+"5-min range, stop order at the range edge",BE at 1.5R,1,no news,Long+short,2938.0,21,42.9,2.03,-2659.0,-1091.0,-628.0,2880.0,2.0,-1102.0,1225.0,1654.0
+"5-min range, stop order at the range edge",BE at 1.5R,1,no news,Long only,-95.0,21,28.6,0.97,-3635.0,-2409.0,-628.0,-151.0,0.96,-2440.0,-151.0,0.0
+"5-min range, stop order at the range edge",BE at 1.5R,2,no news,Long+short,1285.0,42,42.9,1.44,-1680.0,-910.0,-299.0,1206.0,1.41,-927.0,764.0,442.0
+"5-min range, stop order at the range edge",BE at 1.5R,2,no news,Long only,1621.0,42,42.9,1.69,-1008.0,-908.0,-299.0,1537.0,1.65,-938.0,1537.0,0.0
+"5-min range, stop order at the range edge",BE at 1.5R,3,no news,Long+short,1151.0,63,42.9,1.43,-918.0,-590.0,-318.0,1037.0,1.38,-617.0,603.0,433.0
+"5-min range, stop order at the range edge",BE at 1.5R,3,no news,Long only,288.0,63,39.7,1.11,-1464.0,-834.0,-287.0,175.0,1.07,-875.0,175.0,0.0
+"5-min range, stop order at the range edge",No breakeven,1,no news,Long+short,2938.0,21,42.9,2.03,-2659.0,-1091.0,-628.0,2880.0,2.0,-1102.0,1225.0,1654.0
+"5-min range, stop order at the range edge",No breakeven,1,no news,Long only,-95.0,21,28.6,0.97,-3635.0,-2409.0,-628.0,-151.0,0.96,-2440.0,-151.0,0.0
+"5-min range, stop order at the range edge",No breakeven,2,no news,Long+short,1314.0,42,42.9,1.45,-1652.0,-910.0,-299.0,1235.0,1.42,-927.0,792.0,442.0
+"5-min range, stop order at the range edge",No breakeven,2,no news,Long only,1649.0,42,42.9,1.7,-979.0,-880.0,-299.0,1565.0,1.66,-909.0,1565.0,0.0
+"5-min range, stop order at the range edge",No breakeven,3,no news,Long+short,1170.0,63,42.9,1.44,-899.0,-590.0,-318.0,1056.0,1.39,-617.0,622.0,433.0
+"5-min range, stop order at the range edge",No breakeven,3,no news,Long only,307.0,63,39.7,1.12,-1445.0,-815.0,-287.0,194.0,1.07,-856.0,194.0,0.0
+"5-min range, stop order at the range edge","BE at 1R, lock +0.25R",1,no news,Long+short,2987.0,21,47.6,2.06,-2509.0,-1091.0,-628.0,2928.0,2.03,-1102.0,1209.0,1719.0
+"5-min range, stop order at the range edge","BE at 1R, lock +0.25R",1,no news,Long only,-112.0,21,33.3,0.97,-3566.0,-2324.0,-628.0,-168.0,0.95,-2356.0,-168.0,0.0
+"5-min range, stop order at the range edge","BE at 1R, lock +0.25R",2,no news,Long+short,1294.0,42,47.6,1.46,-1671.0,-910.0,-299.0,1215.0,1.43,-927.0,741.0,475.0
+"5-min range, stop order at the range edge","BE at 1R, lock +0.25R",2,no news,Long only,1523.0,42,47.6,1.68,-1105.0,-882.0,-299.0,1442.0,1.63,-910.0,1442.0,0.0
+"5-min range, stop order at the range edge","BE at 1R, lock +0.25R",3,no news,Long+short,1168.0,63,46.0,1.45,-902.0,-590.0,-318.0,1054.0,1.4,-617.0,588.0,466.0
+"5-min range, stop order at the range edge","BE at 1R, lock +0.25R",3,no news,Long only,289.0,63,46.0,1.12,-1464.0,-816.0,-287.0,178.0,1.07,-857.0,178.0,0.0
+"5-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,1107.0,21,71.4,2.58,96.0,-466.0,-263.0,1038.0,2.45,-470.0,627.0,411.0
+"5-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,73.0,21,57.1,1.06,-795.0,-653.0,-345.0,7.0,1.01,-666.0,7.0,0.0
+"5-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,865.0,42,66.7,1.91,227.0,-272.0,-235.0,754.0,1.77,-285.0,670.0,84.0
+"5-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,767.0,42,61.9,1.81,118.0,-194.0,-194.0,660.0,1.67,-197.0,660.0,0.0
+"5-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,507.0,63,60.3,1.44,45.0,-320.0,-122.0,351.0,1.29,-339.0,264.0,87.0
+"5-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,355.0,63,58.7,1.31,-84.0,-241.0,-144.0,202.0,1.17,-265.0,202.0,0.0
+"5-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,2280.0,21,38.1,1.81,-2301.0,-1091.0,-628.0,2224.0,1.78,-1102.0,1367.0,857.0
+"5-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,46.0,21,28.6,1.01,-3579.0,-2022.0,-628.0,-9.0,1.0,-2053.0,-9.0,0.0
+"5-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,832.0,42,42.9,1.3,-1514.0,-901.0,-299.0,762.0,1.27,-916.0,758.0,4.0
+"5-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,1258.0,42,42.9,1.56,-1082.0,-598.0,-299.0,1187.0,1.52,-611.0,1187.0,0.0
+"5-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,603.0,63,42.9,1.23,-982.0,-734.0,-318.0,508.0,1.19,-756.0,481.0,27.0
+"5-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,173.0,63,42.9,1.07,-1387.0,-585.0,-287.0,78.0,1.03,-621.0,78.0,0.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-397.0,21,42.9,0.73,-1382.0,-1024.0,-628.0,-453.0,0.7,-1055.0,-327.0,-126.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,1,no news,Long only,-649.0,21,47.6,0.6,-1555.0,-1161.0,-628.0,-704.0,0.58,-1192.0,-704.0,0.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,150.0,42,47.6,1.13,-663.0,-198.0,-119.0,78.0,1.07,-207.0,78.0,1.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,2,no news,Long only,175.0,42,45.2,1.14,-831.0,-341.0,-194.0,100.0,1.08,-363.0,100.0,0.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,81.0,63,44.4,1.07,-500.0,-234.0,-115.0,-20.0,0.98,-257.0,-173.0,153.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,3,no news,Long only,-24.0,63,46.0,0.98,-695.0,-382.0,-144.0,-126.0,0.91,-414.0,-126.0,0.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-198.0,21,42.9,0.87,-1309.0,-965.0,-628.0,-254.0,0.83,-996.0,-243.0,-11.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-814.0,21,42.9,0.59,-1864.0,-1411.0,-628.0,-869.0,0.57,-1443.0,-869.0,0.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,283.0,42,52.4,1.22,-705.0,-392.0,-265.0,211.0,1.16,-402.0,213.0,-2.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,2,no news,Long only,243.0,42,45.2,1.17,-938.0,-295.0,-194.0,167.0,1.11,-305.0,167.0,0.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,102.0,63,47.6,1.07,-669.0,-382.0,-131.0,1.0,1.0,-397.0,-186.0,187.0
+"5-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,3,no news,Long only,-213.0,63,46.0,0.87,-1000.0,-354.0,-144.0,-317.0,0.81,-385.0,-317.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,2931.0,21,28.6,2.04,-2757.0,-1091.0,-628.0,2872.0,2.01,-1102.0,1283.0,1589.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-37.0,21,23.8,0.99,-3639.0,-2459.0,-628.0,-93.0,0.97,-2490.0,-93.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,1369.0,42,35.7,1.49,-1663.0,-916.0,-299.0,1289.0,1.45,-933.0,885.0,404.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,1792.0,42,40.5,1.8,-953.0,-851.0,-299.0,1708.0,1.75,-881.0,1708.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,1270.0,63,36.5,1.49,-874.0,-564.0,-318.0,1156.0,1.43,-591.0,709.0,447.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,449.0,63,38.1,1.18,-1381.0,-792.0,-287.0,336.0,1.13,-833.0,336.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,2891.0,21,28.6,2.03,-2757.0,-1091.0,-628.0,2832.0,1.99,-1102.0,1251.0,1581.0
+"5-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-69.0,21,23.8,0.98,-3639.0,-2459.0,-628.0,-125.0,0.97,-2490.0,-125.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,1331.0,42,35.7,1.48,-1666.0,-916.0,-299.0,1252.0,1.44,-933.0,851.0,400.0
+"5-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,1741.0,42,40.5,1.78,-968.0,-860.0,-299.0,1657.0,1.72,-889.0,1657.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,1232.0,63,36.5,1.47,-890.0,-568.0,-318.0,1118.0,1.42,-595.0,685.0,433.0
+"5-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,413.0,63,38.1,1.17,-1393.0,-801.0,-287.0,299.0,1.12,-842.0,299.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,2841.0,21,28.6,2.01,-2757.0,-1091.0,-628.0,2782.0,1.98,-1102.0,1197.0,1585.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-123.0,21,23.8,0.97,-3639.0,-2459.0,-628.0,-179.0,0.95,-2490.0,-179.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,1305.0,42,35.7,1.47,-1680.0,-917.0,-299.0,1226.0,1.43,-934.0,825.0,401.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,1690.0,42,40.5,1.75,-983.0,-866.0,-299.0,1606.0,1.7,-895.0,1606.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,1189.0,63,36.5,1.46,-897.0,-577.0,-318.0,1075.0,1.4,-604.0,660.0,415.0
+"5-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,377.0,63,38.1,1.15,-1405.0,-805.0,-287.0,264.0,1.1,-847.0,264.0,0.0
+"5-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,2629.0,21,28.6,1.93,-2757.0,-1091.0,-628.0,2573.0,1.9,-1102.0,1151.0,1422.0
+"5-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-170.0,21,23.8,0.95,-3639.0,-2459.0,-628.0,-226.0,0.94,-2490.0,-226.0,0.0
+"5-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,1271.0,42,35.7,1.45,-1648.0,-930.0,-299.0,1196.0,1.42,-946.0,887.0,309.0
+"5-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,1583.0,42,40.5,1.7,-975.0,-795.0,-299.0,1505.0,1.66,-823.0,1505.0,0.0
+"5-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,1065.0,63,36.5,1.41,-898.0,-650.0,-318.0,959.0,1.36,-675.0,643.0,316.0
+"5-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,285.0,63,38.1,1.12,-1420.0,-772.0,-287.0,180.0,1.07,-811.0,180.0,0.0
+"5-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,3428.0,21,47.6,2.22,-2092.0,-1091.0,-628.0,3373.0,2.19,-1102.0,1459.0,1913.0
+"5-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,138.0,21,33.3,1.04,-3568.0,-2140.0,-628.0,83.0,1.02,-2171.0,83.0,0.0
+"5-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,1697.0,42,47.6,1.61,-1446.0,-939.0,-299.0,1627.0,1.58,-954.0,1119.0,508.0
+"5-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,1808.0,42,47.6,1.81,-901.0,-641.0,-299.0,1738.0,1.76,-668.0,1738.0,0.0
+"5-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,1353.0,63,46.0,1.52,-742.0,-676.0,-318.0,1259.0,1.47,-699.0,780.0,479.0
+"5-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,473.0,63,46.0,1.19,-1333.0,-689.0,-287.0,378.0,1.15,-725.0,378.0,0.0
+"5-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,3007.0,21,47.6,2.07,-2220.0,-1091.0,-628.0,2951.0,2.04,-1102.0,1054.0,1898.0
+"5-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-268.0,21,33.3,0.93,-3569.0,-2051.0,-628.0,-323.0,0.91,-2082.0,-323.0,0.0
+"5-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,1480.0,42,47.6,1.53,-1379.0,-971.0,-299.0,1410.0,1.5,-986.0,944.0,466.0
+"5-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,1650.0,42,47.6,1.74,-860.0,-614.0,-299.0,1580.0,1.69,-627.0,1580.0,0.0
+"5-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,1319.0,63,46.0,1.51,-612.0,-691.0,-318.0,1224.0,1.46,-714.0,695.0,530.0
+"5-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,416.0,63,46.0,1.17,-1257.0,-621.0,-287.0,321.0,1.13,-658.0,321.0,0.0
+"5-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,3036.0,21,47.6,2.08,-2425.0,-1091.0,-628.0,2977.0,2.05,-1102.0,1325.0,1651.0
+"5-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,6.0,21,33.3,1.0,-3560.0,-2278.0,-628.0,-51.0,0.99,-2310.0,-51.0,0.0
+"5-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,1271.0,42,47.6,1.46,-1669.0,-931.0,-299.0,1187.0,1.42,-948.0,776.0,411.0
+"5-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,1512.0,42,47.6,1.67,-1054.0,-897.0,-299.0,1425.0,1.63,-928.0,1425.0,0.0
+"5-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,1098.0,63,46.0,1.42,-922.0,-636.0,-318.0,976.0,1.37,-663.0,586.0,390.0
+"5-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,300.0,63,46.0,1.12,-1411.0,-835.0,-287.0,181.0,1.07,-879.0,181.0,0.0
+"5-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,3048.0,21,47.6,2.09,-2508.0,-1091.0,-628.0,2988.0,2.06,-1102.0,1264.0,1724.0
+"5-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-56.0,21,33.3,0.98,-3565.0,-2323.0,-628.0,-113.0,0.97,-2355.0,-113.0,0.0
+"5-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,1279.0,42,47.6,1.46,-1752.0,-937.0,-299.0,1194.0,1.42,-953.0,750.0,444.0
+"5-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,1500.0,42,47.6,1.67,-1085.0,-955.0,-299.0,1410.0,1.62,-986.0,1410.0,0.0
+"5-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,1067.0,63,46.0,1.41,-984.0,-642.0,-318.0,944.0,1.36,-669.0,569.0,375.0
+"5-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,280.0,63,46.0,1.11,-1443.0,-873.0,-287.0,158.0,1.06,-917.0,158.0,0.0
+"5-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,2756.0,21,28.6,1.98,-2757.0,-1091.0,-628.0,2699.0,1.95,-1102.0,1086.0,1613.0
+"5-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-235.0,21,23.8,0.94,-3639.0,-2459.0,-628.0,-291.0,0.92,-2490.0,-291.0,0.0
+"5-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,1332.0,42,35.7,1.48,-1659.0,-969.0,-299.0,1257.0,1.44,-985.0,892.0,365.0
+"5-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,1715.0,42,40.5,1.76,-963.0,-873.0,-299.0,1635.0,1.71,-902.0,1635.0,0.0
+"5-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,1165.0,63,36.5,1.45,-910.0,-666.0,-318.0,1058.0,1.4,-690.0,666.0,392.0
+"5-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,388.0,63,38.1,1.16,-1398.0,-817.0,-287.0,279.0,1.11,-856.0,279.0,0.0
+"5-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,3037.0,21,47.6,2.08,-2425.0,-1091.0,-628.0,2978.0,2.05,-1102.0,1355.0,1623.0
+"5-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,35.0,21,33.3,1.01,-3560.0,-2278.0,-628.0,-22.0,0.99,-2310.0,-22.0,0.0
+"5-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,1299.0,42,47.6,1.47,-1651.0,-927.0,-299.0,1215.0,1.43,-943.0,814.0,401.0
+"5-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,1619.0,42,47.6,1.72,-1017.0,-849.0,-299.0,1533.0,1.67,-881.0,1533.0,0.0
+"5-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,1176.0,63,46.0,1.45,-866.0,-606.0,-318.0,1055.0,1.4,-633.0,633.0,421.0
+"5-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,374.0,63,46.0,1.15,-1383.0,-801.0,-287.0,255.0,1.1,-844.0,255.0,0.0
+"5-min range, stop order at the range edge",Base + out on a close back through VWAP,1,no news,Long+short,2033.0,21,28.6,1.97,-1920.0,-723.0,-308.0,1976.0,1.93,-734.0,163.0,1813.0
+"5-min range, stop order at the range edge",Base + out on a close back through VWAP,1,no news,Long only,-280.0,21,19.0,0.86,-1975.0,-1410.0,-296.0,-335.0,0.83,-1441.0,-335.0,0.0
+"5-min range, stop order at the range edge",Base + out on a close back through VWAP,2,no news,Long+short,1231.0,42,31.0,1.76,-1061.0,-580.0,-191.0,1156.0,1.69,-595.0,350.0,806.0
+"5-min range, stop order at the range edge",Base + out on a close back through VWAP,2,no news,Long only,1150.0,42,28.6,1.81,-753.0,-387.0,-133.0,1070.0,1.73,-397.0,1070.0,0.0
+"5-min range, stop order at the range edge",Base + out on a close back through VWAP,3,no news,Long+short,1304.0,63,33.3,1.84,-447.0,-272.0,-168.0,1196.0,1.74,-286.0,356.0,841.0
+"5-min range, stop order at the range edge",Base + out on a close back through VWAP,3,no news,Long only,546.0,63,31.7,1.4,-722.0,-349.0,-100.0,438.0,1.3,-382.0,438.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails VWAP",1,no news,Long+short,2840.0,21,28.6,2.01,-2757.0,-1091.0,-628.0,2781.0,1.98,-1102.0,1175.0,1606.0
+"5-min range, stop order at the range edge","Base, runner trails VWAP",1,no news,Long only,-145.0,21,23.8,0.96,-3639.0,-2459.0,-628.0,-201.0,0.95,-2490.0,-201.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails VWAP",2,no news,Long+short,1278.0,42,35.7,1.46,-1701.0,-936.0,-299.0,1199.0,1.42,-952.0,806.0,393.0
+"5-min range, stop order at the range edge","Base, runner trails VWAP",2,no news,Long only,1621.0,42,40.5,1.72,-1009.0,-888.0,-299.0,1537.0,1.67,-917.0,1537.0,0.0
+"5-min range, stop order at the range edge","Base, runner trails VWAP",3,no news,Long+short,1178.0,63,36.5,1.45,-931.0,-611.0,-318.0,1064.0,1.4,-638.0,631.0,432.0
+"5-min range, stop order at the range edge","Base, runner trails VWAP",3,no news,Long only,328.0,63,38.1,1.13,-1425.0,-823.0,-287.0,215.0,1.08,-864.0,215.0,0.0
+"5-min range, stop order at the range edge",Base + entry only on the right side of VWAP,1,no news,Long+short,2840.0,21,28.6,2.01,-2757.0,-1091.0,-628.0,2781.0,1.98,-1102.0,1175.0,1606.0
+"5-min range, stop order at the range edge",Base + entry only on the right side of VWAP,1,no news,Long only,-145.0,21,23.8,0.96,-3639.0,-2459.0,-628.0,-201.0,0.95,-2490.0,-201.0,0.0
+"5-min range, stop order at the range edge",Base + entry only on the right side of VWAP,2,no news,Long+short,1190.0,42,35.7,1.41,-1776.0,-1023.0,-299.0,1111.0,1.38,-1040.0,805.0,306.0
+"5-min range, stop order at the range edge",Base + entry only on the right side of VWAP,2,no news,Long only,1662.0,42,40.5,1.74,-966.0,-867.0,-299.0,1578.0,1.69,-897.0,1578.0,0.0
+"5-min range, stop order at the range edge",Base + entry only on the right side of VWAP,3,no news,Long+short,1220.0,63,38.1,1.47,-850.0,-522.0,-318.0,1105.0,1.42,-549.0,660.0,445.0
+"5-min range, stop order at the range edge",Base + entry only on the right side of VWAP,3,no news,Long only,359.0,63,38.1,1.15,-1394.0,-806.0,-287.0,245.0,1.1,-848.0,245.0,0.0
+"5-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,2903.0,21,28.6,2.03,-2757.0,-1091.0,-628.0,2844.0,2.0,-1102.0,1261.0,1584.0
+"5-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-59.0,21,23.8,0.98,-3639.0,-2459.0,-628.0,-116.0,0.97,-2490.0,-116.0,0.0
+"5-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,1341.0,42,35.7,1.48,-1660.0,-912.0,-299.0,1262.0,1.44,-929.0,857.0,405.0
+"5-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,1735.0,42,40.5,1.77,-980.0,-858.0,-299.0,1651.0,1.72,-888.0,1651.0,0.0
+"5-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,1242.0,63,36.5,1.48,-884.0,-564.0,-318.0,1128.0,1.42,-591.0,688.0,439.0
+"5-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,411.0,63,38.1,1.17,-1399.0,-797.0,-287.0,297.0,1.12,-838.0,297.0,0.0
+"5-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,2764.0,21,47.6,1.98,-2136.0,-1091.0,-628.0,2708.0,1.96,-1102.0,1023.0,1685.0
+"5-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-298.0,21,33.3,0.92,-3566.0,-2078.0,-628.0,-353.0,0.9,-2109.0,-353.0,0.0
+"5-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,1387.0,42,47.6,1.5,-1400.0,-976.0,-299.0,1317.0,1.47,-992.0,965.0,351.0
+"5-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,1731.0,42,45.2,1.77,-809.0,-577.0,-299.0,1661.0,1.73,-590.0,1661.0,0.0
+"5-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,1302.0,63,46.0,1.5,-650.0,-653.0,-318.0,1207.0,1.45,-675.0,742.0,465.0
+"5-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,474.0,63,44.4,1.19,-1220.0,-598.0,-287.0,379.0,1.15,-634.0,379.0,0.0
+"5-min range, only in the gap direction","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,-677.0,21,38.1,0.82,-3473.0,-1668.0,-577.0,-746.0,0.8,-1702.0,1166.0,-1912.0
+"5-min range, only in the gap direction","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-364.0,20,35.0,0.89,-3125.0,-1235.0,-545.0,-423.0,0.87,-1252.0,-423.0,0.0
+"5-min range, only in the gap direction","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,-777.0,42,31.0,0.75,-2677.0,-1063.0,-399.0,-857.0,0.72,-1128.0,-521.0,-336.0
+"5-min range, only in the gap direction","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,-133.0,38,39.5,0.95,-1924.0,-699.0,-399.0,-208.0,0.92,-709.0,-208.0,0.0
+"5-min range, only in the gap direction","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,-199.0,62,40.3,0.92,-1592.0,-530.0,-530.0,-312.0,0.88,-534.0,-297.0,-14.0
+"5-min range, only in the gap direction","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,-362.0,56,42.9,0.86,-1654.0,-745.0,-530.0,-464.0,0.83,-776.0,-464.0,0.0
+"5-min range, only in the gap direction",BE at 0.25 x daily ATR,1,no news,Long+short,-688.0,21,28.6,0.67,-2052.0,-1025.0,-545.0,-758.0,0.65,-1063.0,249.0,-1007.0
+"5-min range, only in the gap direction",BE at 0.25 x daily ATR,1,no news,Long only,-787.0,20,25.0,0.62,-2078.0,-897.0,-545.0,-846.0,0.6,-929.0,-846.0,0.0
+"5-min range, only in the gap direction",BE at 0.25 x daily ATR,2,no news,Long+short,-0.0,42,23.8,1.0,-1261.0,-465.0,-386.0,-81.0,0.95,-497.0,-197.0,116.0
+"5-min range, only in the gap direction",BE at 0.25 x daily ATR,2,no news,Long only,-281.0,38,23.7,0.81,-1276.0,-455.0,-386.0,-352.0,0.76,-477.0,-352.0,0.0
+"5-min range, only in the gap direction",BE at 0.25 x daily ATR,3,no news,Long+short,300.0,62,25.8,1.26,-761.0,-300.0,-258.0,192.0,1.16,-344.0,-67.0,259.0
+"5-min range, only in the gap direction",BE at 0.25 x daily ATR,3,no news,Long only,39.0,56,25.0,1.03,-877.0,-396.0,-258.0,-60.0,0.95,-421.0,-60.0,0.0
+"5-min range, only in the gap direction",BE at 0.5R,1,no news,Long+short,-184.0,21,33.3,0.94,-2943.0,-1145.0,-577.0,-254.0,0.92,-1179.0,1205.0,-1458.0
+"5-min range, only in the gap direction",BE at 0.5R,1,no news,Long only,117.0,20,30.0,1.04,-2577.0,-1071.0,-545.0,58.0,1.02,-1088.0,58.0,0.0
+"5-min range, only in the gap direction",BE at 0.5R,2,no news,Long+short,-180.0,42,26.2,0.92,-2079.0,-897.0,-399.0,-260.0,0.89,-934.0,-150.0,-110.0
+"5-min range, only in the gap direction",BE at 0.5R,2,no news,Long only,72.0,38,28.9,1.03,-1718.0,-598.0,-399.0,-0.0,1.0,-608.0,-0.0,0.0
+"5-min range, only in the gap direction",BE at 0.5R,3,no news,Long+short,400.0,62,30.6,1.23,-992.0,-438.0,-267.0,291.0,1.16,-458.0,166.0,125.0
+"5-min range, only in the gap direction",BE at 0.5R,3,no news,Long only,191.0,56,30.4,1.11,-1101.0,-524.0,-267.0,91.0,1.05,-555.0,91.0,0.0
+"5-min range, only in the gap direction",BE at 0.75R,1,no news,Long+short,-513.0,21,38.1,0.85,-3309.0,-1504.0,-577.0,-582.0,0.84,-1538.0,1330.0,-1912.0
+"5-min range, only in the gap direction",BE at 0.75R,1,no news,Long only,-200.0,20,35.0,0.93,-2961.0,-1071.0,-545.0,-259.0,0.92,-1088.0,-259.0,0.0
+"5-min range, only in the gap direction",BE at 0.75R,2,no news,Long+short,-524.0,42,31.0,0.81,-2423.0,-907.0,-399.0,-604.0,0.79,-954.0,-268.0,-336.0
+"5-min range, only in the gap direction",BE at 0.75R,2,no news,Long only,16.0,38,36.8,1.01,-1774.0,-617.0,-399.0,-57.0,0.98,-627.0,-57.0,0.0
+"5-min range, only in the gap direction",BE at 0.75R,3,no news,Long+short,-88.0,62,35.5,0.96,-1481.0,-548.0,-530.0,-198.0,0.92,-557.0,-143.0,-55.0
+"5-min range, only in the gap direction",BE at 0.75R,3,no news,Long only,-148.0,56,39.3,0.94,-1440.0,-599.0,-530.0,-249.0,0.9,-629.0,-249.0,0.0
+"5-min range, only in the gap direction",BE at 1.5R,1,no news,Long+short,-685.0,21,38.1,0.81,-3481.0,-1668.0,-577.0,-754.0,0.8,-1702.0,1166.0,-1920.0
+"5-min range, only in the gap direction",BE at 1.5R,1,no news,Long only,-209.0,20,40.0,0.94,-3061.0,-1235.0,-545.0,-270.0,0.92,-1252.0,-270.0,0.0
+"5-min range, only in the gap direction",BE at 1.5R,2,no news,Long+short,-564.0,42,38.1,0.82,-2464.0,-934.0,-399.0,-646.0,0.79,-985.0,-482.0,-163.0
+"5-min range, only in the gap direction",BE at 1.5R,2,no news,Long only,31.0,38,47.4,1.01,-1760.0,-659.0,-399.0,-46.0,0.98,-670.0,-46.0,0.0
+"5-min range, only in the gap direction",BE at 1.5R,3,no news,Long+short,108.0,62,50.0,1.04,-1284.0,-530.0,-530.0,-9.0,1.0,-534.0,-240.0,231.0
+"5-min range, only in the gap direction",BE at 1.5R,3,no news,Long only,-253.0,56,48.2,0.91,-1544.0,-714.0,-530.0,-357.0,0.87,-745.0,-357.0,0.0
+"5-min range, only in the gap direction",No breakeven,1,no news,Long+short,-685.0,21,38.1,0.81,-3481.0,-1668.0,-577.0,-754.0,0.8,-1702.0,1166.0,-1920.0
+"5-min range, only in the gap direction",No breakeven,1,no news,Long only,-209.0,20,40.0,0.94,-3061.0,-1235.0,-545.0,-270.0,0.92,-1252.0,-270.0,0.0
+"5-min range, only in the gap direction",No breakeven,2,no news,Long+short,-564.0,42,38.1,0.82,-2464.0,-934.0,-399.0,-646.0,0.79,-985.0,-482.0,-163.0
+"5-min range, only in the gap direction",No breakeven,2,no news,Long only,31.0,38,47.4,1.01,-1760.0,-659.0,-399.0,-46.0,0.98,-670.0,-46.0,0.0
+"5-min range, only in the gap direction",No breakeven,3,no news,Long+short,131.0,62,50.0,1.05,-1261.0,-530.0,-530.0,14.0,1.01,-534.0,-240.0,254.0
+"5-min range, only in the gap direction",No breakeven,3,no news,Long only,-253.0,56,48.2,0.91,-1544.0,-714.0,-530.0,-357.0,0.87,-745.0,-357.0,0.0
+"5-min range, only in the gap direction","BE at 1R, lock +0.25R",1,no news,Long+short,-625.0,21,42.9,0.83,-3421.0,-1668.0,-577.0,-694.0,0.81,-1711.0,1166.0,-1860.0
+"5-min range, only in the gap direction","BE at 1R, lock +0.25R",1,no news,Long only,-340.0,20,40.0,0.89,-3101.0,-1235.0,-545.0,-399.0,0.88,-1252.0,-399.0,0.0
+"5-min range, only in the gap direction","BE at 1R, lock +0.25R",2,no news,Long+short,-739.0,42,40.5,0.76,-2639.0,-989.0,-399.0,-820.0,0.74,-1034.0,-493.0,-326.0
+"5-min range, only in the gap direction","BE at 1R, lock +0.25R",2,no news,Long only,-63.0,38,50.0,0.98,-1854.0,-638.0,-399.0,-138.0,0.95,-648.0,-138.0,0.0
+"5-min range, only in the gap direction","BE at 1R, lock +0.25R",3,no news,Long+short,-163.0,62,51.6,0.94,-1556.0,-530.0,-530.0,-276.0,0.9,-534.0,-273.0,-3.0
+"5-min range, only in the gap direction","BE at 1R, lock +0.25R",3,no news,Long only,-341.0,56,50.0,0.87,-1632.0,-726.0,-530.0,-443.0,0.84,-757.0,-443.0,0.0
+"5-min range, only in the gap direction","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-609.0,21,57.1,0.73,-1630.0,-857.0,-545.0,-686.0,0.7,-922.0,120.0,-806.0
+"5-min range, only in the gap direction","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-794.0,20,60.0,0.64,-1787.0,-995.0,-545.0,-862.0,0.61,-1037.0,-862.0,0.0
+"5-min range, only in the gap direction","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,-225.0,42,57.1,0.86,-759.0,-553.0,-386.0,-331.0,0.8,-642.0,-107.0,-224.0
+"5-min range, only in the gap direction","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,-268.0,38,63.2,0.83,-802.0,-448.0,-386.0,-365.0,0.77,-473.0,-365.0,0.0
+"5-min range, only in the gap direction","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,192.0,62,67.7,1.15,-166.0,-206.0,-206.0,39.0,1.03,-211.0,28.0,12.0
+"5-min range, only in the gap direction","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,-116.0,56,66.1,0.92,-475.0,-259.0,-191.0,-256.0,0.82,-297.0,-256.0,0.0
+"5-min range, only in the gap direction",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,-379.0,21,42.9,0.9,-3372.0,-2088.0,-577.0,-445.0,0.88,-2130.0,1103.0,-1548.0
+"5-min range, only in the gap direction",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-395.0,20,40.0,0.88,-3102.0,-1582.0,-545.0,-452.0,0.86,-1617.0,-452.0,0.0
+"5-min range, only in the gap direction",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,-326.0,42,40.5,0.89,-2308.0,-879.0,-399.0,-398.0,0.87,-923.0,-318.0,-80.0
+"5-min range, only in the gap direction",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,-111.0,38,50.0,0.96,-1778.0,-770.0,-399.0,-175.0,0.93,-787.0,-175.0,0.0
+"5-min range, only in the gap direction",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,-37.0,62,51.6,0.99,-1385.0,-530.0,-530.0,-131.0,0.95,-534.0,-352.0,222.0
+"5-min range, only in the gap direction",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,-511.0,56,50.0,0.81,-1709.0,-708.0,-530.0,-595.0,0.78,-735.0,-595.0,0.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-538.0,21,42.9,0.69,-1530.0,-652.0,-545.0,-607.0,0.66,-673.0,141.0,-748.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 100% ADR,1,no news,Long only,-48.0,20,45.0,0.96,-1001.0,-568.0,-545.0,-107.0,0.91,-604.0,-107.0,0.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-427.0,42,45.2,0.71,-1075.0,-561.0,-386.0,-502.0,0.67,-625.0,-219.0,-283.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 100% ADR,2,no news,Long only,-14.0,38,50.0,0.99,-677.0,-528.0,-386.0,-80.0,0.92,-556.0,-80.0,0.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,-26.0,62,46.8,0.98,-501.0,-287.0,-287.0,-126.0,0.89,-291.0,-122.0,-3.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 100% ADR,3,no news,Long only,-93.0,56,51.8,0.91,-561.0,-339.0,-287.0,-181.0,0.83,-376.0,-181.0,0.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-882.0,21,38.1,0.64,-2277.0,-882.0,-545.0,-951.0,0.62,-951.0,-4.0,-947.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-1262.0,20,35.0,0.52,-2582.0,-1262.0,-545.0,-1320.0,0.5,-1320.0,-1320.0,0.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,-991.0,42,40.5,0.56,-1803.0,-1179.0,-386.0,-1067.0,0.54,-1243.0,-764.0,-303.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 130% ADR,2,no news,Long only,-985.0,38,42.1,0.56,-1820.0,-1007.0,-386.0,-1051.0,0.54,-1062.0,-1051.0,0.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,-398.0,62,45.2,0.77,-1006.0,-513.0,-287.0,-499.0,0.72,-599.0,-587.0,87.0
+"5-min range, only in the gap direction",Base + out when the day's range reaches 130% ADR,3,no news,Long only,-710.0,56,46.4,0.62,-1267.0,-710.0,-287.0,-801.0,0.58,-801.0,-801.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,-586.0,21,38.1,0.84,-3482.0,-1629.0,-577.0,-656.0,0.82,-1663.0,1269.0,-1925.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-260.0,20,35.0,0.92,-3133.0,-1176.0,-545.0,-319.0,0.9,-1194.0,-319.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,-716.0,42,31.0,0.77,-2687.0,-1031.0,-399.0,-796.0,0.74,-1096.0,-470.0,-326.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,-85.0,38,39.5,0.97,-1942.0,-699.0,-399.0,-160.0,0.94,-709.0,-160.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,-126.0,62,40.3,0.95,-1578.0,-530.0,-530.0,-238.0,0.91,-534.0,-221.0,-17.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,-291.0,56,42.9,0.89,-1662.0,-757.0,-530.0,-393.0,0.86,-788.0,-393.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,-619.0,21,38.1,0.83,-3481.0,-1657.0,-577.0,-688.0,0.81,-1691.0,1237.0,-1925.0
+"5-min range, only in the gap direction","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-293.0,20,35.0,0.91,-3131.0,-1182.0,-545.0,-352.0,0.89,-1199.0,-352.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,-750.0,42,31.0,0.75,-2686.0,-1063.0,-399.0,-830.0,0.73,-1128.0,-486.0,-344.0
+"5-min range, only in the gap direction","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,-56.0,38,39.5,0.98,-1924.0,-699.0,-399.0,-131.0,0.95,-709.0,-131.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,-151.0,62,40.3,0.94,-1587.0,-530.0,-530.0,-263.0,0.9,-534.0,-235.0,-28.0
+"5-min range, only in the gap direction","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,-271.0,56,42.9,0.9,-1624.0,-749.0,-530.0,-373.0,0.86,-779.0,-373.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,-614.0,21,38.1,0.83,-3438.0,-1681.0,-577.0,-684.0,0.82,-1715.0,1219.0,-1903.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-311.0,20,35.0,0.9,-3118.0,-1196.0,-545.0,-370.0,0.89,-1213.0,-370.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,-704.0,42,31.0,0.77,-2654.0,-1039.0,-399.0,-784.0,0.75,-1076.0,-495.0,-290.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,-98.0,38,39.5,0.96,-1903.0,-699.0,-399.0,-173.0,0.93,-709.0,-173.0,0.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,-150.0,62,40.3,0.94,-1554.0,-530.0,-530.0,-263.0,0.9,-534.0,-273.0,10.0
+"5-min range, only in the gap direction","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,-314.0,56,42.9,0.88,-1620.0,-730.0,-530.0,-416.0,0.85,-761.0,-416.0,0.0
+"5-min range, only in the gap direction","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,-655.0,21,38.1,0.82,-3405.0,-1754.0,-577.0,-723.0,0.8,-1787.0,1156.0,-1879.0
+"5-min range, only in the gap direction","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-375.0,20,35.0,0.88,-3118.0,-1225.0,-545.0,-433.0,0.87,-1261.0,-433.0,0.0
+"5-min range, only in the gap direction","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-695.0,42,31.0,0.77,-2624.0,-1075.0,-399.0,-772.0,0.75,-1111.0,-525.0,-247.0
+"5-min range, only in the gap direction","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,-143.0,38,39.5,0.94,-1873.0,-699.0,-399.0,-213.0,0.92,-709.0,-213.0,0.0
+"5-min range, only in the gap direction","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,-254.0,62,40.3,0.9,-1602.0,-530.0,-530.0,-359.0,0.87,-534.0,-355.0,-4.0
+"5-min range, only in the gap direction","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,-378.0,56,42.9,0.86,-1621.0,-708.0,-530.0,-473.0,0.83,-738.0,-473.0,0.0
+"5-min range, only in the gap direction",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,-332.0,21,42.9,0.91,-3188.0,-1788.0,-577.0,-398.0,0.89,-1821.0,1143.0,-1541.0
+"5-min range, only in the gap direction",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-387.0,20,35.0,0.88,-3116.0,-1246.0,-545.0,-444.0,0.86,-1282.0,-444.0,0.0
+"5-min range, only in the gap direction",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-231.0,42,40.5,0.92,-2279.0,-934.0,-399.0,-303.0,0.9,-968.0,-423.0,120.0
+"5-min range, only in the gap direction",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,101.0,38,47.4,1.04,-1607.0,-615.0,-399.0,38.0,1.01,-622.0,38.0,0.0
+"5-min range, only in the gap direction",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,-29.0,62,46.8,0.99,-1478.0,-530.0,-530.0,-123.0,0.95,-534.0,-302.0,179.0
+"5-min range, only in the gap direction",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-220.0,56,48.2,0.92,-1494.0,-617.0,-530.0,-305.0,0.89,-644.0,-305.0,0.0
+"5-min range, only in the gap direction",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-471.0,21,42.9,0.87,-3347.0,-1909.0,-577.0,-537.0,0.85,-1951.0,973.0,-1510.0
+"5-min range, only in the gap direction",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-557.0,20,35.0,0.83,-3139.0,-1550.0,-545.0,-614.0,0.81,-1567.0,-614.0,0.0
+"5-min range, only in the gap direction",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-373.0,42,40.5,0.88,-2342.0,-801.0,-399.0,-446.0,0.86,-835.0,-436.0,-10.0
+"5-min range, only in the gap direction",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,-25.0,38,47.4,0.99,-1779.0,-625.0,-399.0,-88.0,0.97,-642.0,-88.0,0.0
+"5-min range, only in the gap direction",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,-92.0,62,46.8,0.96,-1466.0,-530.0,-530.0,-186.0,0.93,-534.0,-337.0,152.0
+"5-min range, only in the gap direction",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,-357.0,56,48.2,0.87,-1628.0,-701.0,-530.0,-442.0,0.84,-728.0,-442.0,0.0
+"5-min range, only in the gap direction","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,-405.0,21,42.9,0.89,-3340.0,-1761.0,-577.0,-475.0,0.87,-1795.0,1282.0,-1757.0
+"5-min range, only in the gap direction","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-222.0,20,40.0,0.93,-3092.0,-1187.0,-545.0,-281.0,0.91,-1203.0,-281.0,0.0
+"5-min range, only in the gap direction","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,-500.0,42,40.5,0.84,-2432.0,-959.0,-399.0,-585.0,0.81,-998.0,-366.0,-219.0
+"5-min range, only in the gap direction","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,49.0,38,50.0,1.02,-1790.0,-618.0,-399.0,-30.0,0.99,-628.0,-30.0,0.0
+"5-min range, only in the gap direction","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,-102.0,62,51.6,0.96,-1466.0,-530.0,-530.0,-224.0,0.92,-534.0,-278.0,55.0
+"5-min range, only in the gap direction","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,-318.0,56,50.0,0.88,-1610.0,-720.0,-530.0,-428.0,0.84,-753.0,-428.0,0.0
+"5-min range, only in the gap direction","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,-450.0,21,42.9,0.88,-3348.0,-1770.0,-577.0,-522.0,0.86,-1805.0,1251.0,-1773.0
+"5-min range, only in the gap direction","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-258.0,20,40.0,0.92,-3098.0,-1156.0,-545.0,-318.0,0.9,-1194.0,-318.0,0.0
+"5-min range, only in the gap direction","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,-493.0,42,40.5,0.84,-2480.0,-994.0,-399.0,-581.0,0.81,-1034.0,-406.0,-175.0
+"5-min range, only in the gap direction","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,9.0,38,50.0,1.0,-1800.0,-638.0,-399.0,-73.0,0.97,-649.0,-73.0,0.0
+"5-min range, only in the gap direction","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,-124.0,62,51.6,0.95,-1482.0,-530.0,-530.0,-248.0,0.91,-534.0,-331.0,82.0
+"5-min range, only in the gap direction","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,-365.0,56,50.0,0.86,-1633.0,-705.0,-530.0,-478.0,0.82,-739.0,-478.0,0.0
+"5-min range, only in the gap direction","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,-448.0,21,38.1,0.88,-3469.0,-1533.0,-577.0,-516.0,0.86,-1567.0,1389.0,-1906.0
+"5-min range, only in the gap direction","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-141.0,20,35.0,0.96,-3121.0,-1145.0,-545.0,-199.0,0.94,-1162.0,-199.0,0.0
+"5-min range, only in the gap direction","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,-619.0,42,31.0,0.8,-2671.0,-965.0,-399.0,-698.0,0.78,-1015.0,-408.0,-290.0
+"5-min range, only in the gap direction","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,-19.0,38,39.5,0.99,-1907.0,-699.0,-399.0,-91.0,0.97,-709.0,-91.0,0.0
+"5-min range, only in the gap direction","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,-144.0,62,40.3,0.95,-1575.0,-530.0,-530.0,-251.0,0.91,-534.0,-273.0,22.0
+"5-min range, only in the gap direction","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,-279.0,56,42.9,0.9,-1612.0,-727.0,-530.0,-376.0,0.86,-757.0,-376.0,0.0
+"5-min range, only in the gap direction","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,-448.0,21,42.9,0.88,-3346.0,-1746.0,-577.0,-518.0,0.86,-1780.0,1225.0,-1742.0
+"5-min range, only in the gap direction","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-280.0,20,40.0,0.91,-3108.0,-1223.0,-545.0,-339.0,0.9,-1240.0,-339.0,0.0
+"5-min range, only in the gap direction","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-469.0,42,40.5,0.85,-2435.0,-952.0,-399.0,-555.0,0.82,-991.0,-395.0,-159.0
+"5-min range, only in the gap direction","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,12.0,38,50.0,1.0,-1784.0,-618.0,-399.0,-68.0,0.97,-628.0,-68.0,0.0
+"5-min range, only in the gap direction","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,-43.0,62,51.6,0.98,-1430.0,-530.0,-530.0,-165.0,0.94,-534.0,-252.0,87.0
+"5-min range, only in the gap direction","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,-276.0,56,50.0,0.9,-1574.0,-727.0,-530.0,-386.0,0.86,-760.0,-386.0,0.0
+"5-min range, only in the gap direction",Base + out on a close back through VWAP,1,no news,Long+short,677.0,21,33.3,1.35,-1833.0,-539.0,-331.0,608.0,1.31,-549.0,1527.0,-919.0
+"5-min range, only in the gap direction",Base + out on a close back through VWAP,1,no news,Long only,995.0,20,30.0,1.67,-1472.0,-462.0,-331.0,936.0,1.62,-475.0,936.0,0.0
+"5-min range, only in the gap direction",Base + out on a close back through VWAP,2,no news,Long+short,355.0,42,33.3,1.21,-1436.0,-427.0,-227.0,275.0,1.16,-437.0,130.0,145.0
+"5-min range, only in the gap direction",Base + out on a close back through VWAP,2,no news,Long only,775.0,38,36.8,1.59,-907.0,-429.0,-227.0,702.0,1.52,-441.0,702.0,0.0
+"5-min range, only in the gap direction",Base + out on a close back through VWAP,3,no news,Long+short,653.0,62,37.1,1.49,-667.0,-360.0,-181.0,543.0,1.39,-389.0,487.0,56.0
+"5-min range, only in the gap direction",Base + out on a close back through VWAP,3,no news,Long only,777.0,56,37.5,1.67,-443.0,-224.0,-181.0,676.0,1.56,-233.0,676.0,0.0
+"5-min range, only in the gap direction","Base, runner trails VWAP",1,no news,Long+short,-567.0,21,38.1,0.85,-3437.0,-1661.0,-577.0,-636.0,0.83,-1695.0,1241.0,-1878.0
+"5-min range, only in the gap direction","Base, runner trails VWAP",1,no news,Long only,-288.0,20,35.0,0.91,-3118.0,-1168.0,-545.0,-347.0,0.89,-1185.0,-347.0,0.0
+"5-min range, only in the gap direction","Base, runner trails VWAP",2,no news,Long+short,-698.0,42,31.0,0.77,-2642.0,-1029.0,-399.0,-778.0,0.75,-1082.0,-484.0,-294.0
+"5-min range, only in the gap direction","Base, runner trails VWAP",2,no news,Long only,-109.0,38,39.5,0.96,-1905.0,-699.0,-399.0,-184.0,0.93,-709.0,-184.0,0.0
+"5-min range, only in the gap direction","Base, runner trails VWAP",3,no news,Long+short,-159.0,62,40.3,0.94,-1551.0,-530.0,-530.0,-271.0,0.9,-534.0,-284.0,13.0
+"5-min range, only in the gap direction","Base, runner trails VWAP",3,no news,Long only,-350.0,56,42.9,0.87,-1651.0,-726.0,-530.0,-452.0,0.83,-757.0,-452.0,0.0
+"5-min range, only in the gap direction",Base + entry only on the right side of VWAP,1,no news,Long+short,-677.0,21,38.1,0.82,-3473.0,-1668.0,-577.0,-746.0,0.8,-1702.0,1166.0,-1912.0
+"5-min range, only in the gap direction",Base + entry only on the right side of VWAP,1,no news,Long only,-364.0,20,35.0,0.89,-3125.0,-1235.0,-545.0,-423.0,0.87,-1252.0,-423.0,0.0
+"5-min range, only in the gap direction",Base + entry only on the right side of VWAP,2,no news,Long+short,-777.0,42,31.0,0.75,-2677.0,-1063.0,-399.0,-857.0,0.72,-1128.0,-521.0,-336.0
+"5-min range, only in the gap direction",Base + entry only on the right side of VWAP,2,no news,Long only,-133.0,38,39.5,0.95,-1924.0,-699.0,-399.0,-208.0,0.92,-709.0,-208.0,0.0
+"5-min range, only in the gap direction",Base + entry only on the right side of VWAP,3,no news,Long+short,-199.0,62,40.3,0.92,-1592.0,-530.0,-530.0,-312.0,0.88,-534.0,-297.0,-14.0
+"5-min range, only in the gap direction",Base + entry only on the right side of VWAP,3,no news,Long only,-362.0,56,42.9,0.86,-1654.0,-745.0,-530.0,-464.0,0.83,-776.0,-464.0,0.0
+"5-min range, only in the gap direction","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,-607.0,21,38.1,0.83,-3476.0,-1653.0,-577.0,-677.0,0.82,-1687.0,1240.0,-1917.0
+"5-min range, only in the gap direction","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-289.0,20,35.0,0.91,-3129.0,-1177.0,-545.0,-348.0,0.89,-1194.0,-348.0,0.0
+"5-min range, only in the gap direction","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,-738.0,42,31.0,0.76,-2681.0,-1053.0,-399.0,-818.0,0.74,-1118.0,-484.0,-334.0
+"5-min range, only in the gap direction","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,-95.0,38,39.5,0.96,-1934.0,-699.0,-399.0,-170.0,0.94,-709.0,-170.0,0.0
+"5-min range, only in the gap direction","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,-141.0,62,40.3,0.95,-1578.0,-530.0,-530.0,-253.0,0.91,-534.0,-232.0,-22.0
+"5-min range, only in the gap direction","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,-293.0,56,42.9,0.89,-1648.0,-756.0,-530.0,-396.0,0.85,-787.0,-396.0,0.0
+"5-min range, only in the gap direction",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,-454.0,21,42.9,0.88,-3304.0,-1918.0,-577.0,-520.0,0.86,-1960.0,909.0,-1430.0
+"5-min range, only in the gap direction",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-642.0,20,40.0,0.8,-3138.0,-1578.0,-545.0,-699.0,0.79,-1595.0,-699.0,0.0
+"5-min range, only in the gap direction",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,-503.0,42,40.5,0.84,-2339.0,-885.0,-399.0,-575.0,0.81,-929.0,-488.0,-87.0
+"5-min range, only in the gap direction",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,-243.0,38,50.0,0.91,-1889.0,-641.0,-399.0,-307.0,0.88,-657.0,-307.0,0.0
+"5-min range, only in the gap direction",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,-179.0,62,48.4,0.93,-1465.0,-530.0,-530.0,-273.0,0.9,-534.0,-375.0,102.0
+"5-min range, only in the gap direction",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,-509.0,56,50.0,0.81,-1773.0,-725.0,-530.0,-594.0,0.78,-752.0,-594.0,0.0
+"15-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,127.0,21,38.1,1.05,-2370.0,-1833.0,-627.0,74.0,1.03,-1857.0,259.0,-185.0
+"15-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,277.0,42,45.2,1.12,-1145.0,-1160.0,-362.0,204.0,1.09,-1196.0,482.0,-278.0
+"15-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,-58.0,41,34.1,0.97,-1507.0,-671.0,-297.0,-131.0,0.94,-688.0,-131.0,0.0
+"15-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,236.0,63,41.3,1.11,-785.0,-765.0,-315.0,132.0,1.06,-819.0,175.0,-43.0
+"15-min range, stop order at the range edge","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,-244.0,60,30.0,0.88,-1278.0,-531.0,-217.0,-341.0,0.84,-554.0,-341.0,0.0
+"15-min range, stop order at the range edge",BE at 0.25 x daily ATR,1,no news,Long+short,-1100.0,21,9.5,0.22,-1398.0,-1100.0,-470.0,-1153.0,0.2,-1153.0,-364.0,-789.0
+"15-min range, stop order at the range edge",BE at 0.25 x daily ATR,1,no news,Long only,223.0,21,14.3,1.18,-1217.0,-786.0,-393.0,170.0,1.13,-810.0,170.0,0.0
+"15-min range, stop order at the range edge",BE at 0.25 x daily ATR,2,no news,Long+short,15.0,42,16.7,1.02,-866.0,-256.0,-180.0,-58.0,0.94,-293.0,83.0,-141.0
+"15-min range, stop order at the range edge",BE at 0.25 x daily ATR,2,no news,Long only,385.0,41,19.5,1.3,-1019.0,-530.0,-270.0,312.0,1.23,-539.0,312.0,0.0
+"15-min range, stop order at the range edge",BE at 0.25 x daily ATR,3,no news,Long+short,429.0,63,20.6,1.47,-416.0,-336.0,-187.0,326.0,1.33,-350.0,169.0,157.0
+"15-min range, stop order at the range edge",BE at 0.25 x daily ATR,3,no news,Long only,161.0,60,18.3,1.14,-834.0,-355.0,-181.0,64.0,1.05,-369.0,64.0,0.0
+"15-min range, stop order at the range edge",BE at 0.5R,1,no news,Long+short,227.0,21,28.6,1.11,-1938.0,-1307.0,-470.0,173.0,1.08,-1345.0,-269.0,442.0
+"15-min range, stop order at the range edge",BE at 0.5R,1,no news,Long only,-484.0,21,28.6,0.78,-2225.0,-997.0,-554.0,-537.0,0.77,-1021.0,-537.0,0.0
+"15-min range, stop order at the range edge",BE at 0.5R,2,no news,Long+short,276.0,42,33.3,1.15,-1146.0,-918.0,-256.0,203.0,1.11,-954.0,312.0,-110.0
+"15-min range, stop order at the range edge",BE at 0.5R,2,no news,Long only,101.0,41,29.3,1.06,-1303.0,-561.0,-297.0,28.0,1.01,-570.0,28.0,0.0
+"15-min range, stop order at the range edge",BE at 0.5R,3,no news,Long+short,444.0,63,30.2,1.27,-576.0,-644.0,-206.0,342.0,1.2,-683.0,290.0,53.0
+"15-min range, stop order at the range edge",BE at 0.5R,3,no news,Long only,69.0,60,26.7,1.04,-965.0,-433.0,-217.0,-28.0,0.98,-446.0,-28.0,0.0
+"15-min range, stop order at the range edge",BE at 0.75R,1,no news,Long+short,127.0,21,38.1,1.05,-2370.0,-1833.0,-627.0,74.0,1.03,-1857.0,259.0,-185.0
+"15-min range, stop order at the range edge",BE at 0.75R,1,no news,Long only,44.0,21,38.1,1.02,-2038.0,-881.0,-554.0,-10.0,1.0,-891.0,-10.0,0.0
+"15-min range, stop order at the range edge",BE at 0.75R,2,no news,Long+short,344.0,42,42.9,1.16,-1078.0,-1160.0,-362.0,271.0,1.12,-1196.0,576.0,-305.0
+"15-min range, stop order at the range edge",BE at 0.75R,2,no news,Long only,206.0,41,34.1,1.1,-1244.0,-561.0,-297.0,132.0,1.07,-570.0,132.0,0.0
+"15-min range, stop order at the range edge",BE at 0.75R,3,no news,Long+short,431.0,63,38.1,1.22,-590.0,-825.0,-315.0,327.0,1.16,-864.0,350.0,-23.0
+"15-min range, stop order at the range edge",BE at 0.75R,3,no news,Long only,-69.0,60,30.0,0.96,-1102.0,-482.0,-217.0,-165.0,0.92,-496.0,-165.0,0.0
+"15-min range, stop order at the range edge",BE at 1.5R,1,no news,Long+short,212.0,21,47.6,1.08,-2285.0,-1756.0,-627.0,159.0,1.06,-1780.0,336.0,-177.0
+"15-min range, stop order at the range edge",BE at 1.5R,1,no news,Long only,-432.0,21,42.9,0.84,-2514.0,-973.0,-554.0,-486.0,0.83,-987.0,-486.0,0.0
+"15-min range, stop order at the range edge",BE at 1.5R,2,no news,Long+short,319.0,42,50.0,1.14,-1103.0,-1121.0,-362.0,246.0,1.11,-1157.0,520.0,-274.0
+"15-min range, stop order at the range edge",BE at 1.5R,2,no news,Long only,-32.0,41,36.6,0.99,-1482.0,-671.0,-297.0,-106.0,0.95,-688.0,-106.0,0.0
+"15-min range, stop order at the range edge",BE at 1.5R,3,no news,Long+short,264.0,63,44.4,1.12,-756.0,-739.0,-315.0,160.0,1.07,-793.0,200.0,-40.0
+"15-min range, stop order at the range edge",BE at 1.5R,3,no news,Long only,-228.0,60,31.7,0.89,-1261.0,-531.0,-217.0,-324.0,0.85,-554.0,-324.0,0.0
+"15-min range, stop order at the range edge",No breakeven,1,no news,Long+short,212.0,21,47.6,1.08,-2285.0,-1756.0,-627.0,159.0,1.06,-1780.0,336.0,-177.0
+"15-min range, stop order at the range edge",No breakeven,1,no news,Long only,-432.0,21,42.9,0.84,-2514.0,-973.0,-554.0,-486.0,0.83,-987.0,-486.0,0.0
+"15-min range, stop order at the range edge",No breakeven,2,no news,Long+short,319.0,42,50.0,1.14,-1103.0,-1121.0,-362.0,246.0,1.11,-1157.0,520.0,-274.0
+"15-min range, stop order at the range edge",No breakeven,2,no news,Long only,-32.0,41,36.6,0.99,-1482.0,-671.0,-297.0,-106.0,0.95,-688.0,-106.0,0.0
+"15-min range, stop order at the range edge",No breakeven,3,no news,Long+short,291.0,63,44.4,1.13,-729.0,-739.0,-315.0,188.0,1.08,-793.0,200.0,-13.0
+"15-min range, stop order at the range edge",No breakeven,3,no news,Long only,-228.0,60,31.7,0.89,-1261.0,-531.0,-217.0,-324.0,0.85,-554.0,-324.0,0.0
+"15-min range, stop order at the range edge","BE at 1R, lock +0.25R",1,no news,Long+short,162.0,21,47.6,1.06,-2335.0,-1813.0,-627.0,109.0,1.04,-1837.0,279.0,-170.0
+"15-min range, stop order at the range edge","BE at 1R, lock +0.25R",1,no news,Long only,-399.0,21,47.6,0.86,-2481.0,-973.0,-554.0,-453.0,0.84,-987.0,-453.0,0.0
+"15-min range, stop order at the range edge","BE at 1R, lock +0.25R",2,no news,Long+short,294.0,42,50.0,1.13,-1128.0,-1150.0,-362.0,221.0,1.1,-1186.0,492.0,-270.0
+"15-min range, stop order at the range edge","BE at 1R, lock +0.25R",2,no news,Long only,-16.0,41,39.0,0.99,-1465.0,-671.0,-297.0,-89.0,0.96,-688.0,-89.0,0.0
+"15-min range, stop order at the range edge","BE at 1R, lock +0.25R",3,no news,Long+short,253.0,63,44.4,1.11,-767.0,-758.0,-315.0,149.0,1.07,-812.0,181.0,-32.0
+"15-min range, stop order at the range edge","BE at 1R, lock +0.25R",3,no news,Long only,-362.0,60,33.3,0.83,-1380.0,-548.0,-217.0,-459.0,0.79,-585.0,-459.0,0.0
+"15-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-84.0,21,57.1,0.95,-1149.0,-599.0,-470.0,-149.0,0.91,-630.0,158.0,-307.0
+"15-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-368.0,21,57.1,0.78,-1154.0,-859.0,-393.0,-435.0,0.74,-879.0,-435.0,0.0
+"15-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,375.0,42,66.7,1.34,-158.0,-376.0,-179.0,268.0,1.24,-389.0,144.0,124.0
+"15-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,-448.0,41,46.3,0.68,-840.0,-630.0,-270.0,-547.0,0.62,-666.0,-547.0,0.0
+"15-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,256.0,63,61.9,1.24,-98.0,-436.0,-251.0,103.0,1.09,-455.0,-150.0,253.0
+"15-min range, stop order at the range edge","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,-321.0,60,45.0,0.74,-634.0,-520.0,-155.0,-458.0,0.64,-573.0,-458.0,0.0
+"15-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,90.0,21,47.6,1.03,-2370.0,-1780.0,-627.0,37.0,1.01,-1803.0,312.0,-275.0
+"15-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-188.0,21,47.6,0.93,-2315.0,-973.0,-554.0,-241.0,0.91,-987.0,-241.0,0.0
+"15-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,216.0,42,50.0,1.09,-1222.0,-1160.0,-362.0,148.0,1.06,-1194.0,495.0,-347.0
+"15-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,-172.0,41,39.0,0.92,-1397.0,-671.0,-297.0,-240.0,0.9,-688.0,-240.0,0.0
+"15-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,44.0,63,44.4,1.02,-913.0,-877.0,-315.0,-51.0,0.98,-927.0,92.0,-144.0
+"15-min range, stop order at the range edge",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,-403.0,60,33.3,0.81,-1302.0,-531.0,-217.0,-493.0,0.77,-559.0,-493.0,0.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-659.0,21,33.3,0.42,-1106.0,-825.0,-237.0,-713.0,0.39,-865.0,-230.0,-482.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,1,no news,Long only,173.0,21,61.9,1.3,-453.0,-361.0,-191.0,121.0,1.2,-394.0,121.0,0.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-327.0,42,42.9,0.62,-617.0,-470.0,-120.0,-396.0,0.56,-517.0,-72.0,-324.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,2,no news,Long only,-25.0,41,61.0,0.96,-406.0,-170.0,-139.0,-94.0,0.86,-208.0,-94.0,0.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,-19.0,63,49.2,0.97,-306.0,-225.0,-95.0,-115.0,0.85,-281.0,-72.0,-44.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 100% ADR,3,no news,Long only,-197.0,60,53.3,0.73,-466.0,-282.0,-127.0,-289.0,0.63,-344.0,-289.0,0.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-909.0,21,33.3,0.38,-1424.0,-939.0,-470.0,-962.0,0.36,-991.0,-85.0,-876.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-530.0,21,57.1,0.51,-982.0,-570.0,-339.0,-582.0,0.47,-582.0,-582.0,0.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,-400.0,42,42.9,0.65,-825.0,-411.0,-186.0,-469.0,0.61,-477.0,-301.0,-167.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,2,no news,Long only,-824.0,41,46.3,0.39,-1192.0,-824.0,-266.0,-893.0,0.36,-893.0,-893.0,0.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,-414.0,63,44.4,0.66,-729.0,-420.0,-192.0,-511.0,0.6,-513.0,-403.0,-108.0
+"15-min range, stop order at the range edge",Base + out when the day's range reaches 130% ADR,3,no news,Long only,-852.0,60,41.7,0.37,-1125.0,-852.0,-166.0,-944.0,0.33,-944.0,-944.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,130.0,21,38.1,1.05,-2367.0,-1833.0,-627.0,77.0,1.03,-1857.0,259.0,-182.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,253.0,42,45.2,1.11,-1140.0,-1156.0,-362.0,180.0,1.08,-1192.0,452.0,-272.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,-79.0,41,34.1,0.96,-1505.0,-671.0,-297.0,-153.0,0.93,-688.0,-153.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,224.0,63,41.3,1.1,-790.0,-758.0,-315.0,120.0,1.05,-812.0,159.0,-39.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,-259.0,60,30.0,0.88,-1291.0,-531.0,-217.0,-355.0,0.84,-554.0,-355.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,126.0,21,38.1,1.05,-2371.0,-1833.0,-627.0,73.0,1.03,-1857.0,259.0,-186.0
+"15-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,247.0,42,45.2,1.11,-1146.0,-1158.0,-362.0,174.0,1.08,-1194.0,451.0,-276.0
+"15-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,-85.0,41,34.1,0.96,-1507.0,-671.0,-297.0,-158.0,0.93,-688.0,-158.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,218.0,63,41.3,1.1,-794.0,-761.0,-315.0,114.0,1.05,-815.0,156.0,-42.0
+"15-min range, stop order at the range edge","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,-263.0,60,30.0,0.88,-1293.0,-531.0,-217.0,-359.0,0.84,-554.0,-359.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,196.0,21,38.1,1.07,-2300.0,-1833.0,-627.0,143.0,1.05,-1857.0,259.0,-115.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,318.0,42,45.2,1.14,-1113.0,-1162.0,-362.0,245.0,1.11,-1199.0,491.0,-246.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,-23.0,41,34.1,0.99,-1508.0,-671.0,-297.0,-96.0,0.96,-688.0,-96.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,281.0,63,41.3,1.13,-763.0,-749.0,-315.0,177.0,1.08,-803.0,199.0,-22.0
+"15-min range, stop order at the range edge","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,-221.0,60,30.0,0.9,-1279.0,-531.0,-217.0,-318.0,0.85,-554.0,-318.0,0.0
+"15-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,262.0,21,38.1,1.1,-2288.0,-1833.0,-627.0,209.0,1.08,-1857.0,259.0,-50.0
+"15-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-473.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-527.0,0.81,-987.0,-527.0,0.0
+"15-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,385.0,42,45.2,1.17,-1092.0,-1174.0,-362.0,314.0,1.14,-1209.0,538.0,-223.0
+"15-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,26.0,41,34.1,1.01,-1555.0,-671.0,-297.0,-45.0,0.98,-688.0,-45.0,0.0
+"15-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,347.0,63,41.3,1.15,-747.0,-778.0,-315.0,246.0,1.11,-817.0,250.0,-4.0
+"15-min range, stop order at the range edge","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,-189.0,60,30.0,0.91,-1310.0,-531.0,-217.0,-283.0,0.87,-554.0,-283.0,0.0
+"15-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,502.0,21,47.6,1.19,-2194.0,-1767.0,-627.0,450.0,1.17,-1790.0,325.0,124.0
+"15-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-183.0,21,47.6,0.93,-2380.0,-973.0,-554.0,-236.0,0.92,-987.0,-236.0,0.0
+"15-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,710.0,42,50.0,1.31,-963.0,-1131.0,-362.0,642.0,1.28,-1165.0,767.0,-125.0
+"15-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,387.0,41,39.0,1.17,-1482.0,-671.0,-297.0,319.0,1.14,-688.0,319.0,0.0
+"15-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,585.0,63,44.4,1.26,-712.0,-765.0,-315.0,490.0,1.21,-801.0,476.0,14.0
+"15-min range, stop order at the range edge",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-44.0,60,33.3,0.98,-1342.0,-531.0,-217.0,-134.0,0.94,-554.0,-134.0,0.0
+"15-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,211.0,21,47.6,1.08,-2270.0,-1775.0,-627.0,158.0,1.06,-1799.0,316.0,-159.0
+"15-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-70.0,21,47.6,0.97,-2355.0,-973.0,-554.0,-123.0,0.96,-987.0,-123.0,0.0
+"15-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,414.0,42,50.0,1.18,-1149.0,-1184.0,-362.0,346.0,1.15,-1218.0,661.0,-315.0
+"15-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,195.0,41,39.0,1.09,-1448.0,-671.0,-297.0,127.0,1.06,-688.0,127.0,0.0
+"15-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,345.0,63,44.4,1.15,-817.0,-795.0,-315.0,250.0,1.11,-831.0,343.0,-93.0
+"15-min range, stop order at the range edge",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,-177.0,60,33.3,0.92,-1325.0,-531.0,-217.0,-268.0,0.88,-554.0,-268.0,0.0
+"15-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,178.0,21,47.6,1.07,-2303.0,-1806.0,-627.0,123.0,1.05,-1831.0,285.0,-162.0
+"15-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-432.0,21,47.6,0.84,-2453.0,-973.0,-554.0,-487.0,0.83,-987.0,-487.0,0.0
+"15-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,320.0,42,50.0,1.14,-1123.0,-1156.0,-362.0,244.0,1.11,-1193.0,523.0,-279.0
+"15-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,1.0,41,39.0,1.0,-1465.0,-671.0,-297.0,-75.0,0.97,-688.0,-75.0,0.0
+"15-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,263.0,63,44.4,1.12,-802.0,-751.0,-315.0,155.0,1.07,-795.0,229.0,-74.0
+"15-min range, stop order at the range edge","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,-222.0,60,33.3,0.9,-1251.0,-531.0,-217.0,-322.0,0.85,-554.0,-322.0,0.0
+"15-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,204.0,21,47.6,1.08,-2281.0,-1813.0,-627.0,148.0,1.06,-1837.0,278.0,-130.0
+"15-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-458.0,21,47.6,0.83,-2481.0,-973.0,-554.0,-513.0,0.82,-987.0,-513.0,0.0
+"15-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,394.0,42,50.0,1.17,-1104.0,-1152.0,-362.0,315.0,1.14,-1189.0,572.0,-257.0
+"15-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,82.0,41,39.0,1.04,-1467.0,-671.0,-297.0,4.0,1.0,-688.0,4.0,0.0
+"15-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,330.0,63,44.4,1.15,-789.0,-745.0,-315.0,218.0,1.1,-786.0,277.0,-59.0
+"15-min range, stop order at the range edge","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,-164.0,60,33.3,0.92,-1249.0,-531.0,-217.0,-265.0,0.88,-554.0,-265.0,0.0
+"15-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,224.0,21,38.1,1.08,-2288.0,-1833.0,-627.0,171.0,1.06,-1857.0,259.0,-88.0
+"15-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,385.0,42,45.2,1.17,-1078.0,-1140.0,-362.0,312.0,1.13,-1176.0,522.0,-210.0
+"15-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,56.0,41,34.1,1.03,-1504.0,-671.0,-297.0,-16.0,0.99,-688.0,-16.0,0.0
+"15-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,355.0,63,41.3,1.16,-739.0,-733.0,-315.0,251.0,1.11,-772.0,249.0,3.0
+"15-min range, stop order at the range edge","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,-168.0,60,30.0,0.92,-1276.0,-531.0,-217.0,-264.0,0.88,-554.0,-264.0,0.0
+"15-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,243.0,21,47.6,1.09,-2242.0,-1806.0,-627.0,188.0,1.07,-1831.0,285.0,-97.0
+"15-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-432.0,21,47.6,0.84,-2453.0,-973.0,-554.0,-487.0,0.83,-987.0,-487.0,0.0
+"15-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,356.0,42,50.0,1.16,-1107.0,-1172.0,-362.0,280.0,1.12,-1209.0,542.0,-263.0
+"15-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,-7.0,41,39.0,1.0,-1466.0,-671.0,-297.0,-83.0,0.96,-688.0,-83.0,0.0
+"15-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,269.0,63,44.4,1.12,-792.0,-768.0,-315.0,161.0,1.07,-824.0,225.0,-64.0
+"15-min range, stop order at the range edge","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,-227.0,60,33.3,0.89,-1252.0,-531.0,-217.0,-327.0,0.85,-554.0,-327.0,0.0
+"15-min range, stop order at the range edge",Base + out on a close back through VWAP,1,no news,Long+short,387.0,21,33.3,1.26,-1435.0,-949.0,-299.0,333.0,1.22,-987.0,-594.0,927.0
+"15-min range, stop order at the range edge",Base + out on a close back through VWAP,1,no news,Long only,150.0,21,33.3,1.1,-1476.0,-749.0,-299.0,97.0,1.06,-773.0,97.0,0.0
+"15-min range, stop order at the range edge",Base + out on a close back through VWAP,2,no news,Long+short,348.0,42,31.0,1.24,-1016.0,-692.0,-216.0,275.0,1.19,-712.0,10.0,265.0
+"15-min range, stop order at the range edge",Base + out on a close back through VWAP,2,no news,Long only,-122.0,41,24.4,0.91,-1172.0,-460.0,-221.0,-194.0,0.87,-493.0,-194.0,0.0
+"15-min range, stop order at the range edge",Base + out on a close back through VWAP,3,no news,Long+short,135.0,63,28.6,1.1,-779.0,-711.0,-192.0,34.0,1.02,-768.0,-260.0,293.0
+"15-min range, stop order at the range edge",Base + out on a close back through VWAP,3,no news,Long only,-117.0,60,23.3,0.91,-952.0,-362.0,-145.0,-212.0,0.84,-408.0,-212.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails VWAP",1,no news,Long+short,291.0,21,38.1,1.11,-2288.0,-1833.0,-627.0,238.0,1.09,-1857.0,259.0,-20.0
+"15-min range, stop order at the range edge","Base, runner trails VWAP",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails VWAP",2,no news,Long+short,377.0,42,45.2,1.17,-1055.0,-1151.0,-362.0,304.0,1.13,-1188.0,492.0,-187.0
+"15-min range, stop order at the range edge","Base, runner trails VWAP",2,no news,Long only,-27.0,41,34.1,0.99,-1507.0,-671.0,-297.0,-100.0,0.96,-688.0,-100.0,0.0
+"15-min range, stop order at the range edge","Base, runner trails VWAP",3,no news,Long+short,317.0,63,41.3,1.14,-724.0,-745.0,-315.0,213.0,1.09,-799.0,195.0,18.0
+"15-min range, stop order at the range edge","Base, runner trails VWAP",3,no news,Long only,-224.0,60,30.0,0.89,-1278.0,-531.0,-217.0,-320.0,0.85,-554.0,-320.0,0.0
+"15-min range, stop order at the range edge",Base + entry only on the right side of VWAP,1,no news,Long+short,127.0,21,38.1,1.05,-2370.0,-1833.0,-627.0,74.0,1.03,-1857.0,259.0,-185.0
+"15-min range, stop order at the range edge",Base + entry only on the right side of VWAP,1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge",Base + entry only on the right side of VWAP,2,no news,Long+short,277.0,42,45.2,1.12,-1145.0,-1160.0,-362.0,204.0,1.09,-1196.0,482.0,-278.0
+"15-min range, stop order at the range edge",Base + entry only on the right side of VWAP,2,no news,Long only,-58.0,41,34.1,0.97,-1507.0,-671.0,-297.0,-131.0,0.94,-688.0,-131.0,0.0
+"15-min range, stop order at the range edge",Base + entry only on the right side of VWAP,3,no news,Long+short,236.0,63,41.3,1.11,-785.0,-765.0,-315.0,132.0,1.06,-819.0,175.0,-43.0
+"15-min range, stop order at the range edge",Base + entry only on the right side of VWAP,3,no news,Long only,-244.0,60,30.0,0.88,-1278.0,-531.0,-217.0,-341.0,0.84,-554.0,-341.0,0.0
+"15-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,130.0,21,38.1,1.05,-2367.0,-1833.0,-627.0,77.0,1.03,-1857.0,259.0,-181.0
+"15-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-483.0,21,38.1,0.83,-2565.0,-973.0,-554.0,-536.0,0.81,-987.0,-536.0,0.0
+"15-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,247.0,42,45.2,1.11,-1146.0,-1155.0,-362.0,174.0,1.08,-1191.0,446.0,-272.0
+"15-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,-86.0,41,34.1,0.96,-1505.0,-671.0,-297.0,-159.0,0.93,-688.0,-159.0,0.0
+"15-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,220.0,63,41.3,1.1,-794.0,-758.0,-315.0,116.0,1.05,-812.0,155.0,-38.0
+"15-min range, stop order at the range edge","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,-263.0,60,30.0,0.88,-1295.0,-531.0,-217.0,-360.0,0.84,-554.0,-360.0,0.0
+"15-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,239.0,21,47.6,1.09,-2242.0,-1774.0,-627.0,186.0,1.07,-1797.0,318.0,-132.0
+"15-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-281.0,21,47.6,0.9,-2384.0,-973.0,-554.0,-334.0,0.88,-987.0,-334.0,0.0
+"15-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,306.0,42,50.0,1.13,-1171.0,-1219.0,-362.0,238.0,1.1,-1253.0,576.0,-338.0
+"15-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,55.0,41,39.0,1.02,-1463.0,-671.0,-297.0,-13.0,0.99,-688.0,-13.0,0.0
+"15-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,273.0,63,44.4,1.12,-838.0,-812.0,-315.0,178.0,1.08,-848.0,293.0,-115.0
+"15-min range, stop order at the range edge",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,-276.0,60,33.3,0.87,-1340.0,-546.0,-217.0,-366.0,0.83,-582.0,-366.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,-997.0,21,38.1,0.59,-2352.0,-1832.0,-582.0,-1051.0,0.57,-1848.0,-556.0,-495.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-658.0,20,35.0,0.7,-2115.0,-1765.0,-582.0,-710.0,0.68,-1785.0,-710.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,123.0,41,36.6,1.06,-1620.0,-654.0,-363.0,43.0,1.02,-681.0,260.0,-217.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,877.0,39,41.0,1.51,-968.0,-525.0,-353.0,800.0,1.45,-533.0,800.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,814.0,61,42.6,1.46,-731.0,-306.0,-206.0,704.0,1.38,-320.0,367.0,337.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,522.0,57,43.9,1.29,-762.0,-619.0,-392.0,417.0,1.22,-653.0,417.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,1,no news,Long+short,149.0,21,23.8,1.18,-814.0,-333.0,-208.0,97.0,1.11,-344.0,678.0,-581.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,1,no news,Long only,380.0,20,10.0,1.9,-419.0,-201.0,-177.0,330.0,1.7,-213.0,330.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,2,no news,Long+short,709.0,41,26.8,1.87,-549.0,-227.0,-164.0,632.0,1.73,-244.0,432.0,200.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,2,no news,Long only,1040.0,39,20.5,2.96,-348.0,-182.0,-137.0,967.0,2.66,-196.0,967.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,3,no news,Long+short,1194.0,61,27.9,2.78,-100.0,-233.0,-163.0,1087.0,2.47,-247.0,496.0,591.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,3,no news,Long only,909.0,57,22.8,2.86,-182.0,-197.0,-118.0,810.0,2.46,-211.0,810.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,1,no news,Long+short,-1268.0,21,28.6,0.44,-2268.0,-1759.0,-582.0,-1320.0,0.43,-1775.0,-739.0,-581.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,1,no news,Long only,-794.0,20,20.0,0.58,-1894.0,-1643.0,-582.0,-845.0,0.56,-1663.0,-845.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,2,no news,Long+short,451.0,41,31.7,1.28,-1263.0,-528.0,-363.0,373.0,1.22,-552.0,266.0,107.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,2,no news,Long only,827.0,39,28.2,1.58,-1018.0,-429.0,-353.0,753.0,1.51,-433.0,753.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,3,no news,Long+short,961.0,61,32.8,1.7,-583.0,-233.0,-206.0,853.0,1.6,-247.0,306.0,547.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,3,no news,Long only,522.0,57,29.8,1.38,-762.0,-428.0,-236.0,422.0,1.3,-456.0,422.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,1,no news,Long+short,-1022.0,21,33.3,0.55,-2237.0,-1770.0,-582.0,-1075.0,0.54,-1786.0,-494.0,-581.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,1,no news,Long only,-596.0,20,35.0,0.72,-2053.0,-1703.0,-582.0,-648.0,0.7,-1723.0,-648.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,2,no news,Long+short,380.0,41,34.1,1.21,-1363.0,-654.0,-363.0,301.0,1.16,-677.0,291.0,10.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,2,no news,Long only,785.0,39,35.9,1.46,-1060.0,-525.0,-353.0,710.0,1.41,-530.0,710.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,3,no news,Long+short,920.0,61,37.7,1.59,-624.0,-306.0,-206.0,811.0,1.5,-320.0,347.0,464.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,3,no news,Long only,451.0,57,38.6,1.26,-832.0,-601.0,-392.0,348.0,1.2,-632.0,348.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,1,no news,Long+short,-636.0,21,47.6,0.74,-2077.0,-1832.0,-582.0,-690.0,0.72,-1848.0,-195.0,-495.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,1,no news,Long only,-296.0,20,45.0,0.87,-1815.0,-1765.0,-582.0,-349.0,0.84,-1785.0,-349.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,2,no news,Long+short,664.0,41,43.9,1.31,-1344.0,-652.0,-363.0,583.0,1.26,-675.0,440.0,143.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,2,no news,Long only,890.0,39,46.2,1.47,-955.0,-525.0,-353.0,812.0,1.42,-533.0,812.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,3,no news,Long+short,1063.0,61,47.5,1.56,-515.0,-238.0,-206.0,951.0,1.49,-253.0,374.0,576.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,3,no news,Long only,530.0,57,47.4,1.28,-753.0,-672.0,-392.0,424.0,1.22,-709.0,424.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,1,no news,Long+short,-636.0,21,47.6,0.74,-2077.0,-1832.0,-582.0,-690.0,0.72,-1848.0,-195.0,-495.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,1,no news,Long only,-296.0,20,45.0,0.87,-1815.0,-1765.0,-582.0,-349.0,0.84,-1785.0,-349.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,2,no news,Long+short,664.0,41,43.9,1.31,-1344.0,-652.0,-363.0,583.0,1.26,-675.0,440.0,143.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,2,no news,Long only,890.0,39,46.2,1.47,-955.0,-525.0,-353.0,812.0,1.42,-533.0,812.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,3,no news,Long+short,1063.0,61,47.5,1.56,-515.0,-238.0,-206.0,951.0,1.49,-253.0,374.0,576.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,3,no news,Long only,530.0,57,47.4,1.28,-753.0,-672.0,-392.0,424.0,1.22,-709.0,424.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",1,no news,Long+short,-1234.0,21,47.6,0.49,-2243.0,-1832.0,-582.0,-1287.0,0.47,-1848.0,-741.0,-546.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",1,no news,Long only,-843.0,20,45.0,0.62,-2006.0,-1765.0,-582.0,-895.0,0.6,-1785.0,-895.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",2,no news,Long+short,70.0,41,46.3,1.03,-1526.0,-630.0,-363.0,-9.0,1.0,-653.0,168.0,-177.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",2,no news,Long only,846.0,39,51.3,1.49,-852.0,-525.0,-353.0,770.0,1.44,-533.0,770.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",3,no news,Long+short,794.0,61,52.5,1.45,-653.0,-295.0,-232.0,686.0,1.38,-308.0,346.0,339.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",3,no news,Long only,363.0,57,50.9,1.2,-878.0,-619.0,-392.0,260.0,1.14,-649.0,260.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-21.0,21,57.1,0.98,-824.0,-611.0,-246.0,-84.0,0.93,-629.0,330.0,-414.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,472.0,20,65.0,1.53,-359.0,-390.0,-246.0,408.0,1.45,-412.0,408.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,110.0,41,48.8,1.1,-399.0,-387.0,-164.0,12.0,1.01,-402.0,209.0,-198.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,649.0,39,64.1,1.78,85.0,-352.0,-215.0,549.0,1.64,-362.0,549.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,695.0,61,59.0,1.81,290.0,-231.0,-163.0,550.0,1.61,-240.0,538.0,12.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,722.0,57,64.9,1.98,309.0,-254.0,-118.0,581.0,1.75,-264.0,581.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,-1159.0,21,47.6,0.52,-2166.0,-1832.0,-582.0,-1211.0,0.5,-1848.0,-653.0,-558.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-649.0,20,45.0,0.7,-1840.0,-1765.0,-582.0,-700.0,0.69,-1785.0,-700.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,-389.0,41,41.5,0.82,-1590.0,-847.0,-363.0,-459.0,0.79,-870.0,-28.0,-430.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,2,no news,Long only,609.0,39,48.7,1.35,-737.0,-586.0,-353.0,544.0,1.31,-594.0,544.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,486.0,61,49.2,1.27,-597.0,-383.0,-220.0,395.0,1.21,-415.0,295.0,100.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,3,no news,Long only,210.0,57,49.1,1.12,-759.0,-728.0,-392.0,125.0,1.07,-755.0,125.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-380.0,21,38.1,0.6,-905.0,-435.0,-208.0,-432.0,0.57,-470.0,112.0,-544.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,1,no news,Long only,195.0,20,35.0,1.55,-297.0,-142.0,-97.0,145.0,1.37,-155.0,145.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-30.0,41,41.5,0.96,-446.0,-226.0,-139.0,-105.0,0.87,-258.0,171.0,-276.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,2,no news,Long only,450.0,39,51.3,1.89,-85.0,-176.0,-115.0,382.0,1.71,-183.0,382.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,3,no news,Long+short,300.0,61,47.5,1.46,-77.0,-187.0,-118.0,202.0,1.29,-196.0,296.0,-95.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,3,no news,Long only,472.0,57,54.4,1.92,36.0,-188.0,-118.0,382.0,1.69,-197.0,382.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,1,no news,Long+short,234.0,21,47.6,1.26,-610.0,-341.0,-208.0,182.0,1.2,-352.0,663.0,-481.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,1,no news,Long only,417.0,20,50.0,1.68,-374.0,-263.0,-195.0,366.0,1.58,-271.0,366.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,2,no news,Long+short,189.0,41,43.9,1.21,-296.0,-270.0,-182.0,114.0,1.12,-288.0,375.0,-261.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,2,no news,Long only,703.0,39,53.8,1.94,5.0,-235.0,-234.0,633.0,1.82,-243.0,633.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,3,no news,Long+short,630.0,61,52.5,1.87,234.0,-187.0,-118.0,530.0,1.69,-196.0,537.0,-7.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,3,no news,Long only,802.0,57,59.6,2.16,220.0,-188.0,-156.0,708.0,1.97,-197.0,708.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,-1001.0,21,38.1,0.59,-2352.0,-1832.0,-582.0,-1054.0,0.57,-1848.0,-568.0,-486.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-670.0,20,35.0,0.7,-2115.0,-1765.0,-582.0,-722.0,0.68,-1785.0,-722.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,111.0,41,36.6,1.05,-1620.0,-654.0,-363.0,32.0,1.01,-683.0,258.0,-226.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",2,no news,Long only,853.0,39,41.0,1.49,-970.0,-526.0,-353.0,776.0,1.44,-536.0,776.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,829.0,61,42.6,1.46,-721.0,-306.0,-206.0,719.0,1.39,-320.0,370.0,349.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",3,no news,Long only,494.0,57,43.9,1.27,-747.0,-610.0,-392.0,389.0,1.21,-643.0,389.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,-1005.0,21,38.1,0.59,-2352.0,-1832.0,-582.0,-1058.0,0.57,-1848.0,-569.0,-489.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-671.0,20,35.0,0.7,-2115.0,-1765.0,-582.0,-723.0,0.68,-1785.0,-723.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,105.0,41,36.6,1.05,-1625.0,-664.0,-363.0,26.0,1.01,-692.0,250.0,-224.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",2,no news,Long only,840.0,39,41.0,1.49,-976.0,-535.0,-353.0,764.0,1.43,-545.0,764.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,820.0,61,42.6,1.46,-729.0,-306.0,-206.0,711.0,1.39,-320.0,365.0,346.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",3,no news,Long only,501.0,57,43.9,1.28,-757.0,-622.0,-392.0,396.0,1.21,-656.0,396.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,-1025.0,21,38.1,0.58,-2352.0,-1832.0,-582.0,-1078.0,0.56,-1848.0,-584.0,-494.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-686.0,20,35.0,0.69,-2115.0,-1765.0,-582.0,-739.0,0.67,-1785.0,-739.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,84.0,41,36.6,1.04,-1638.0,-664.0,-363.0,5.0,1.0,-692.0,241.0,-237.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,828.0,39,41.0,1.48,-983.0,-535.0,-353.0,751.0,1.43,-545.0,751.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,798.0,61,42.6,1.45,-753.0,-306.0,-206.0,689.0,1.37,-320.0,361.0,328.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,490.0,57,43.9,1.27,-771.0,-625.0,-392.0,385.0,1.21,-659.0,385.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,-1350.0,21,38.1,0.45,-2352.0,-1832.0,-582.0,-1402.0,0.43,-1848.0,-897.0,-505.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-999.0,20,35.0,0.55,-2115.0,-1765.0,-582.0,-1051.0,0.53,-1785.0,-1051.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-262.0,41,36.6,0.88,-1705.0,-743.0,-363.0,-336.0,0.85,-771.0,-5.0,-332.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,559.0,39,41.0,1.32,-1038.0,-552.0,-353.0,488.0,1.28,-561.0,488.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,491.0,61,42.6,1.27,-798.0,-306.0,-180.0,388.0,1.21,-325.0,192.0,196.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,221.0,57,43.9,1.12,-875.0,-689.0,-392.0,124.0,1.07,-720.0,124.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,-1407.0,21,42.9,0.42,-2238.0,-1832.0,-582.0,-1459.0,0.4,-1848.0,-948.0,-511.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-986.0,20,40.0,0.55,-2000.0,-1765.0,-582.0,-1036.0,0.54,-1785.0,-1036.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-600.0,41,39.0,0.73,-1703.0,-961.0,-363.0,-669.0,0.7,-988.0,-308.0,-361.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,-56.0,39,41.0,0.97,-1035.0,-666.0,-353.0,-122.0,0.93,-692.0,-122.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,97.0,61,44.3,1.05,-872.0,-534.0,-211.0,6.0,1.0,-570.0,-102.0,108.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-197.0,57,43.9,0.89,-914.0,-852.0,-392.0,-283.0,0.85,-879.0,-283.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-1180.0,21,47.6,0.51,-2259.0,-1832.0,-582.0,-1231.0,0.5,-1848.0,-657.0,-575.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-639.0,20,45.0,0.71,-1945.0,-1765.0,-582.0,-689.0,0.69,-1785.0,-689.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-330.0,41,41.5,0.85,-1737.0,-752.0,-363.0,-399.0,0.82,-779.0,37.0,-436.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,329.0,39,43.6,1.19,-973.0,-586.0,-353.0,263.0,1.15,-594.0,263.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,411.0,61,45.9,1.23,-784.0,-319.0,-209.0,319.0,1.17,-355.0,156.0,163.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,101.0,57,45.6,1.06,-828.0,-705.0,-392.0,15.0,1.01,-736.0,15.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,-841.0,21,47.6,0.65,-2220.0,-1832.0,-582.0,-896.0,0.63,-1848.0,-433.0,-463.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-490.0,20,45.0,0.78,-1983.0,-1765.0,-582.0,-544.0,0.76,-1785.0,-544.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,66.0,41,46.3,1.03,-1493.0,-755.0,-363.0,-16.0,0.99,-781.0,163.0,-180.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,817.0,39,51.3,1.48,-801.0,-526.0,-353.0,736.0,1.42,-536.0,736.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,796.0,61,52.5,1.45,-572.0,-291.0,-222.0,679.0,1.37,-305.0,353.0,326.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,472.0,57,50.9,1.26,-686.0,-738.0,-392.0,360.0,1.2,-769.0,360.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,-853.0,21,47.6,0.65,-2253.0,-1832.0,-582.0,-910.0,0.63,-1848.0,-446.0,-464.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-512.0,20,45.0,0.77,-2016.0,-1765.0,-582.0,-568.0,0.74,-1785.0,-568.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,45.0,41,46.3,1.02,-1541.0,-770.0,-363.0,-40.0,0.98,-796.0,146.0,-187.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,825.0,39,51.3,1.48,-835.0,-530.0,-353.0,742.0,1.42,-540.0,742.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,774.0,61,52.5,1.43,-629.0,-295.0,-225.0,654.0,1.36,-309.0,327.0,327.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,493.0,57,50.9,1.27,-720.0,-754.0,-392.0,379.0,1.21,-784.0,379.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,-889.0,21,38.1,0.63,-2352.0,-1832.0,-582.0,-943.0,0.62,-1848.0,-524.0,-419.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-626.0,20,35.0,0.72,-2115.0,-1765.0,-582.0,-678.0,0.7,-1785.0,-678.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,101.0,41,36.6,1.05,-1662.0,-681.0,-363.0,24.0,1.01,-708.0,250.0,-225.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,875.0,39,41.0,1.51,-973.0,-552.0,-353.0,803.0,1.45,-561.0,803.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,786.0,61,42.6,1.44,-745.0,-306.0,-206.0,680.0,1.37,-320.0,348.0,333.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,519.0,57,43.9,1.29,-793.0,-650.0,-392.0,420.0,1.23,-680.0,420.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,-960.0,21,47.6,0.6,-2220.0,-1832.0,-582.0,-1015.0,0.58,-1848.0,-511.0,-504.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-568.0,20,45.0,0.74,-1983.0,-1765.0,-582.0,-622.0,0.72,-1785.0,-622.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-19.0,41,46.3,0.99,-1520.0,-755.0,-363.0,-102.0,0.95,-781.0,131.0,-233.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,772.0,39,51.3,1.45,-828.0,-526.0,-353.0,691.0,1.39,-536.0,691.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,739.0,61,52.5,1.42,-638.0,-291.0,-222.0,622.0,1.34,-305.0,341.0,281.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,444.0,57,50.9,1.25,-685.0,-718.0,-392.0,333.0,1.18,-748.0,333.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,1,no news,Long+short,-961.0,21,19.0,0.37,-1516.0,-961.0,-229.0,-1013.0,0.35,-1013.0,-608.0,-405.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,1,no news,Long only,-1327.0,20,5.0,0.22,-1645.0,-1327.0,-229.0,-1378.0,0.21,-1378.0,-1378.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,2,no news,Long+short,361.0,41,26.8,1.27,-1124.0,-340.0,-201.0,285.0,1.21,-365.0,223.0,61.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,2,no news,Long only,668.0,39,25.6,1.54,-965.0,-355.0,-167.0,593.0,1.46,-368.0,593.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,3,no news,Long+short,715.0,61,29.5,1.57,-688.0,-320.0,-122.0,609.0,1.46,-338.0,112.0,497.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,3,no news,Long only,502.0,57,26.3,1.44,-682.0,-229.0,-120.0,401.0,1.33,-242.0,401.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",1,no news,Long+short,-943.0,21,38.1,0.61,-2352.0,-1832.0,-582.0,-997.0,0.6,-1848.0,-559.0,-438.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",1,no news,Long only,-662.0,20,35.0,0.7,-2115.0,-1765.0,-582.0,-714.0,0.68,-1785.0,-714.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",2,no news,Long+short,97.0,41,36.6,1.04,-1632.0,-664.0,-363.0,17.0,1.01,-692.0,249.0,-231.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",2,no news,Long only,839.0,39,41.0,1.49,-986.0,-535.0,-353.0,762.0,1.43,-545.0,762.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",3,no news,Long+short,794.0,61,42.6,1.44,-751.0,-306.0,-206.0,684.0,1.37,-320.0,359.0,325.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",3,no news,Long only,492.0,57,43.9,1.27,-792.0,-640.0,-392.0,387.0,1.21,-675.0,387.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,1,no news,Long+short,-997.0,21,38.1,0.59,-2352.0,-1832.0,-582.0,-1051.0,0.57,-1848.0,-556.0,-495.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,1,no news,Long only,-658.0,20,35.0,0.7,-2115.0,-1765.0,-582.0,-710.0,0.68,-1785.0,-710.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,2,no news,Long+short,123.0,41,36.6,1.06,-1620.0,-654.0,-363.0,43.0,1.02,-681.0,260.0,-217.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,2,no news,Long only,877.0,39,41.0,1.51,-968.0,-525.0,-353.0,800.0,1.45,-533.0,800.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,3,no news,Long+short,814.0,61,42.6,1.46,-731.0,-306.0,-206.0,704.0,1.38,-320.0,367.0,337.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,3,no news,Long only,522.0,57,43.9,1.29,-762.0,-619.0,-392.0,417.0,1.22,-653.0,417.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,-1000.0,21,38.1,0.59,-2352.0,-1832.0,-582.0,-1054.0,0.57,-1848.0,-566.0,-487.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-669.0,20,35.0,0.7,-2115.0,-1765.0,-582.0,-721.0,0.68,-1785.0,-721.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,121.0,41,36.6,1.06,-1618.0,-664.0,-363.0,42.0,1.02,-692.0,252.0,-211.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",2,no news,Long only,846.0,39,41.0,1.49,-975.0,-535.0,-353.0,769.0,1.44,-545.0,769.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,832.0,61,42.6,1.47,-721.0,-306.0,-206.0,722.0,1.39,-320.0,370.0,353.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",3,no news,Long only,485.0,57,43.9,1.27,-757.0,-621.0,-392.0,380.0,1.21,-655.0,380.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,-1139.0,21,47.6,0.53,-2226.0,-1832.0,-582.0,-1191.0,0.51,-1848.0,-631.0,-560.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-600.0,20,45.0,0.73,-1906.0,-1765.0,-582.0,-651.0,0.71,-1785.0,-651.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,-155.0,41,41.5,0.93,-1607.0,-764.0,-363.0,-225.0,0.9,-791.0,50.0,-275.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,357.0,39,46.2,1.2,-934.0,-586.0,-353.0,292.0,1.16,-594.0,292.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,563.0,61,47.5,1.31,-628.0,-316.0,-204.0,472.0,1.26,-347.0,206.0,265.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,122.0,57,47.4,1.07,-809.0,-709.0,-392.0,37.0,1.02,-736.0,37.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,-1401.0,15,33.3,0.4,-2341.0,-2032.0,-601.0,-1438.0,0.39,-2053.0,-72.0,-1366.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,209.0,10,50.0,1.22,-952.0,-773.0,-410.0,181.0,1.19,-783.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,-339.0,26,42.3,0.77,-1200.0,-1108.0,-450.0,-391.0,0.73,-1130.0,109.0,-501.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,433.0,14,64.3,1.91,-224.0,-289.0,-205.0,402.0,1.83,-298.0,402.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,-16.0,32,50.0,0.98,-598.0,-650.0,-278.0,-79.0,0.92,-677.0,259.0,-337.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,349.0,15,66.7,2.1,-92.0,-193.0,-137.0,317.0,1.98,-201.0,317.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,1,no news,Long+short,-1040.0,15,26.7,0.44,-1846.0,-1838.0,-601.0,-1077.0,0.42,-1852.0,39.0,-1116.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,1,no news,Long only,498.0,10,50.0,1.75,-662.0,-658.0,-410.0,470.0,1.7,-665.0,470.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,2,no news,Long+short,-79.0,26,34.6,0.91,-817.0,-858.0,-301.0,-132.0,0.86,-872.0,254.0,-386.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,2,no news,Long only,493.0,14,57.1,2.48,-164.0,-267.0,-205.0,462.0,2.35,-273.0,462.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,3,no news,Long+short,95.0,32,37.5,1.16,-411.0,-485.0,-178.0,34.0,1.05,-503.0,299.0,-266.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,3,no news,Long only,328.0,15,53.3,2.48,-110.0,-178.0,-137.0,297.0,2.28,-183.0,297.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,1,no news,Long+short,-1570.0,15,20.0,0.3,-2230.0,-1976.0,-601.0,-1607.0,0.29,-1990.0,-107.0,-1499.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,1,no news,Long only,173.0,10,40.0,1.21,-841.0,-728.0,-410.0,146.0,1.17,-734.0,146.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,2,no news,Long+short,-431.0,26,30.8,0.65,-1162.0,-893.0,-324.0,-480.0,0.61,-907.0,93.0,-573.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,2,no news,Long only,330.0,14,50.0,1.78,-327.0,-267.0,-205.0,301.0,1.69,-273.0,301.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,3,no news,Long+short,-133.0,32,37.5,0.83,-646.0,-506.0,-178.0,-192.0,0.77,-524.0,192.0,-384.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,3,no news,Long only,220.0,15,46.7,1.78,-219.0,-178.0,-137.0,190.0,1.65,-183.0,190.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,1,no news,Long+short,-1534.0,15,26.7,0.35,-2341.0,-2032.0,-601.0,-1571.0,0.34,-2053.0,-72.0,-1499.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,1,no news,Long only,209.0,10,50.0,1.22,-952.0,-773.0,-410.0,181.0,1.19,-783.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,2,no news,Long+short,-218.0,26,38.5,0.83,-1080.0,-923.0,-324.0,-271.0,0.79,-945.0,109.0,-380.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,2,no news,Long only,433.0,14,64.3,1.91,-224.0,-289.0,-205.0,402.0,1.83,-298.0,402.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,3,no news,Long+short,64.0,32,46.9,1.08,-517.0,-527.0,-178.0,1.0,1.0,-554.0,259.0,-257.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,3,no news,Long only,288.0,15,60.0,1.91,-150.0,-193.0,-137.0,256.0,1.78,-201.0,256.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,1,no news,Long+short,-1104.0,15,46.7,0.54,-2309.0,-1831.0,-601.0,-1142.0,0.53,-1856.0,-72.0,-1070.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,1,no news,Long only,209.0,10,50.0,1.22,-952.0,-773.0,-410.0,181.0,1.19,-783.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,2,no news,Long+short,-190.0,26,50.0,0.87,-1080.0,-992.0,-450.0,-244.0,0.84,-1014.0,109.0,-353.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,2,no news,Long only,433.0,14,64.3,1.91,-224.0,-289.0,-205.0,402.0,1.83,-298.0,402.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,3,no news,Long+short,67.0,32,56.2,1.07,-526.0,-589.0,-278.0,4.0,1.0,-616.0,259.0,-255.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,3,no news,Long only,349.0,15,66.7,2.1,-92.0,-193.0,-137.0,317.0,1.98,-201.0,317.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,1,no news,Long+short,-983.0,15,46.7,0.59,-2343.0,-1865.0,-601.0,-1022.0,0.58,-1891.0,-72.0,-950.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,1,no news,Long only,209.0,10,50.0,1.22,-952.0,-773.0,-410.0,181.0,1.19,-783.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,2,no news,Long+short,-125.0,26,50.0,0.92,-1054.0,-987.0,-450.0,-179.0,0.88,-1009.0,114.0,-294.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,2,no news,Long only,539.0,14,64.3,2.13,-219.0,-284.0,-205.0,508.0,2.05,-293.0,508.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,3,no news,Long+short,178.0,32,56.2,1.18,-491.0,-518.0,-278.0,114.0,1.11,-545.0,329.0,-216.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,3,no news,Long only,420.0,15,66.7,2.32,-89.0,-190.0,-137.0,388.0,2.19,-198.0,388.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",1,no news,Long+short,-1247.0,15,53.3,0.47,-2202.0,-1975.0,-601.0,-1285.0,0.45,-1995.0,-72.0,-1212.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",1,no news,Long only,209.0,10,50.0,1.22,-952.0,-773.0,-410.0,181.0,1.19,-783.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",2,no news,Long+short,-191.0,26,57.7,0.87,-1053.0,-1012.0,-450.0,-244.0,0.83,-1031.0,120.0,-364.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",2,no news,Long only,458.0,14,64.3,1.96,-214.0,-279.0,-205.0,427.0,1.88,-288.0,427.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",3,no news,Long+short,104.0,32,65.6,1.11,-482.0,-576.0,-278.0,41.0,1.04,-598.0,275.0,-234.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",3,no news,Long only,365.0,15,66.7,2.15,-85.0,-186.0,-137.0,334.0,2.03,-194.0,334.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-1096.0,15,66.7,0.41,-1653.0,-1699.0,-601.0,-1141.0,0.39,-1713.0,-490.0,-651.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-38.0,10,80.0,0.94,-573.0,-656.0,-410.0,-70.0,0.89,-661.0,-70.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,1.0,26,76.9,1.0,-468.0,-730.0,-264.0,-69.0,0.93,-750.0,-31.0,-38.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,197.0,14,85.7,1.6,-146.0,-279.0,-205.0,159.0,1.48,-285.0,159.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,186.0,32,81.2,1.3,-126.0,-409.0,-147.0,102.0,1.16,-434.0,95.0,8.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,183.0,15,86.7,1.84,-64.0,-186.0,-137.0,143.0,1.64,-192.0,143.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,-1324.0,15,53.3,0.43,-2222.0,-1817.0,-601.0,-1358.0,0.42,-1837.0,-436.0,-923.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-171.0,10,50.0,0.82,-952.0,-773.0,-410.0,-196.0,0.8,-783.0,-196.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,117.0,26,57.7,1.08,-931.0,-911.0,-450.0,74.0,1.05,-931.0,-34.0,108.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,205.0,14,64.3,1.43,-343.0,-248.0,-205.0,181.0,1.37,-257.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,267.0,32,65.6,1.28,-431.0,-499.0,-278.0,219.0,1.23,-519.0,115.0,104.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,200.0,15,66.7,1.63,-189.0,-166.0,-137.0,178.0,1.55,-173.0,178.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,260.0,15,60.0,1.79,-223.0,-180.0,-86.0,224.0,1.66,-187.0,11.0,213.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,1,no news,Long only,314.0,10,60.0,2.77,-170.0,-178.0,-72.0,288.0,2.55,-186.0,288.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,333.0,26,65.4,2.61,-9.0,-64.0,-35.0,285.0,2.29,-69.0,162.0,123.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,2,no news,Long only,312.0,14,71.4,4.51,-6.0,-70.0,-36.0,285.0,4.0,-78.0,285.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,354.0,32,68.8,3.52,99.0,-26.0,-23.0,300.0,2.9,-32.0,183.0,117.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,3,no news,Long only,249.0,15,73.3,5.21,16.0,-47.0,-24.0,223.0,4.41,-54.0,223.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,179.0,15,73.3,1.24,-472.0,-743.0,-410.0,143.0,1.19,-749.0,-325.0,468.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-223.0,10,50.0,0.72,-802.0,-668.0,-410.0,-249.0,0.69,-674.0,-249.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,367.0,26,69.2,1.77,-69.0,-288.0,-205.0,319.0,1.65,-296.0,-55.0,374.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,2,no news,Long only,109.0,14,64.3,1.27,-307.0,-264.0,-205.0,81.0,1.2,-271.0,81.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,401.0,32,71.9,2.24,89.0,-162.0,-137.0,345.0,2.02,-173.0,47.0,298.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,3,no news,Long only,156.0,15,66.7,1.58,-160.0,-176.0,-137.0,129.0,1.47,-182.0,129.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,-1369.0,15,33.3,0.41,-2341.0,-2028.0,-601.0,-1407.0,0.4,-2049.0,-44.0,-1363.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,223.0,10,50.0,1.23,-952.0,-773.0,-410.0,195.0,1.2,-783.0,195.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,-347.0,26,42.3,0.76,-1198.0,-1106.0,-450.0,-400.0,0.73,-1128.0,116.0,-516.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,448.0,14,64.3,1.94,-224.0,-289.0,-205.0,416.0,1.86,-298.0,416.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,-17.0,32,50.0,0.98,-596.0,-649.0,-278.0,-79.0,0.92,-676.0,268.0,-347.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,358.0,15,66.7,2.13,-91.0,-193.0,-137.0,327.0,2.01,-201.0,327.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,-1383.0,15,33.3,0.41,-2341.0,-2032.0,-601.0,-1421.0,0.4,-2053.0,-54.0,-1366.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,213.0,10,50.0,1.22,-952.0,-773.0,-410.0,185.0,1.19,-783.0,185.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,-391.0,26,42.3,0.73,-1201.0,-1108.0,-450.0,-444.0,0.7,-1130.0,111.0,-555.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,440.0,14,64.3,1.93,-224.0,-289.0,-205.0,409.0,1.85,-298.0,409.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,-48.0,32,50.0,0.95,-598.0,-650.0,-278.0,-110.0,0.89,-677.0,263.0,-374.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,353.0,15,66.7,2.11,-92.0,-193.0,-137.0,322.0,1.99,-201.0,322.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,-1441.0,15,33.3,0.38,-2341.0,-2031.0,-601.0,-1478.0,0.37,-2051.0,-114.0,-1365.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,177.0,10,50.0,1.19,-952.0,-773.0,-410.0,149.0,1.15,-783.0,149.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,-409.0,26,42.3,0.72,-1204.0,-1107.0,-450.0,-461.0,0.69,-1129.0,94.0,-555.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,415.0,14,64.3,1.87,-228.0,-289.0,-205.0,384.0,1.79,-298.0,384.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,-64.0,32,50.0,0.93,-600.0,-650.0,-278.0,-126.0,0.87,-677.0,247.0,-373.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,337.0,15,66.7,2.06,-94.0,-193.0,-137.0,305.0,1.94,-201.0,305.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,-1447.0,15,33.3,0.38,-2341.0,-2036.0,-601.0,-1481.0,0.37,-2056.0,-141.0,-1340.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,188.0,10,50.0,1.2,-952.0,-773.0,-410.0,162.0,1.17,-783.0,162.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-365.0,26,42.3,0.75,-1136.0,-1068.0,-450.0,-414.0,0.72,-1090.0,143.0,-557.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,521.0,14,64.3,2.09,-180.0,-248.0,-205.0,492.0,2.02,-257.0,492.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,4.0,32,50.0,1.0,-541.0,-583.0,-278.0,-53.0,0.95,-609.0,320.0,-373.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,407.0,15,66.7,2.28,-60.0,-165.0,-137.0,379.0,2.17,-173.0,379.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,-1326.0,15,46.7,0.43,-2254.0,-2003.0,-601.0,-1360.0,0.42,-2023.0,-102.0,-1258.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,265.0,10,50.0,1.28,-952.0,-773.0,-410.0,240.0,1.25,-783.0,240.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-99.0,26,50.0,0.93,-994.0,-1015.0,-450.0,-141.0,0.9,-1032.0,163.0,-305.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,474.0,14,64.3,2.0,-222.0,-268.0,-205.0,451.0,1.93,-277.0,451.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,160.0,32,59.4,1.17,-439.0,-565.0,-278.0,111.0,1.11,-585.0,295.0,-184.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,389.0,15,66.7,2.23,-87.0,-179.0,-137.0,367.0,2.13,-186.0,367.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-1169.0,15,53.3,0.5,-2193.0,-1902.0,-601.0,-1204.0,0.49,-1922.0,-112.0,-1092.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,168.0,10,50.0,1.18,-952.0,-773.0,-410.0,143.0,1.15,-783.0,143.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-98.0,26,57.7,0.93,-1025.0,-989.0,-450.0,-141.0,0.9,-1006.0,90.0,-231.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,401.0,14,64.3,1.84,-319.0,-293.0,-205.0,378.0,1.78,-301.0,378.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,176.0,32,65.6,1.18,-482.0,-526.0,-278.0,128.0,1.13,-545.0,246.0,-118.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,350.0,15,66.7,2.1,-173.0,-195.0,-137.0,327.0,2.01,-203.0,327.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,-1308.0,15,53.3,0.44,-2202.0,-1940.0,-601.0,-1347.0,0.43,-1961.0,-166.0,-1181.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,106.0,10,50.0,1.11,-952.0,-773.0,-410.0,78.0,1.08,-783.0,78.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,-269.0,26,57.7,0.81,-1091.0,-1042.0,-450.0,-324.0,0.78,-1065.0,23.0,-348.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,264.0,14,64.3,1.56,-321.0,-324.0,-205.0,233.0,1.48,-334.0,233.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,-9.0,32,65.6,0.99,-557.0,-637.0,-278.0,-75.0,0.92,-660.0,146.0,-221.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,239.0,15,66.7,1.75,-169.0,-216.0,-137.0,207.0,1.64,-224.0,207.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,-1338.0,15,53.3,0.43,-2237.0,-1961.0,-601.0,-1379.0,0.41,-1983.0,-142.0,-1237.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,129.0,10,50.0,1.14,-952.0,-773.0,-410.0,99.0,1.1,-783.0,99.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,-268.0,26,57.7,0.81,-1122.0,-1060.0,-450.0,-327.0,0.78,-1085.0,26.0,-353.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,254.0,14,64.3,1.53,-327.0,-338.0,-205.0,221.0,1.46,-351.0,221.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,-22.0,32,65.6,0.98,-594.0,-655.0,-278.0,-92.0,0.91,-679.0,138.0,-229.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,232.0,15,66.7,1.73,-173.0,-221.0,-137.0,198.0,1.61,-229.0,198.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,-1445.0,15,33.3,0.38,-2341.0,-2018.0,-601.0,-1481.0,0.37,-2038.0,-129.0,-1352.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,176.0,10,50.0,1.18,-952.0,-773.0,-410.0,149.0,1.15,-783.0,149.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,-337.0,26,42.3,0.77,-1189.0,-1101.0,-450.0,-389.0,0.74,-1123.0,94.0,-482.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,400.0,14,64.3,1.84,-225.0,-289.0,-205.0,370.0,1.76,-298.0,370.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,-26.0,32,50.0,0.97,-596.0,-645.0,-278.0,-87.0,0.91,-672.0,238.0,-325.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,326.0,15,66.7,2.03,-94.0,-193.0,-137.0,296.0,1.91,-201.0,296.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,-1320.0,15,53.3,0.43,-2207.0,-1959.0,-601.0,-1360.0,0.42,-1980.0,-160.0,-1200.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,90.0,10,50.0,1.09,-952.0,-773.0,-410.0,63.0,1.06,-783.0,63.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-335.0,26,57.7,0.77,-1085.0,-1051.0,-450.0,-391.0,0.73,-1075.0,16.0,-406.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,265.0,14,64.3,1.56,-310.0,-324.0,-205.0,233.0,1.48,-334.0,233.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,-47.0,32,65.6,0.95,-553.0,-643.0,-278.0,-113.0,0.88,-666.0,146.0,-260.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,240.0,15,66.7,1.76,-161.0,-216.0,-137.0,207.0,1.64,-224.0,207.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,1,no news,Long+short,-412.0,15,33.3,0.65,-1167.0,-935.0,-424.0,-448.0,0.62,-959.0,225.0,-673.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,1,no news,Long only,237.0,10,30.0,1.34,-602.0,-474.0,-225.0,210.0,1.29,-487.0,210.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,2,no news,Long+short,-163.0,26,38.5,0.82,-852.0,-668.0,-252.0,-214.0,0.77,-691.0,107.0,-321.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,2,no news,Long only,266.0,14,35.7,1.62,-428.0,-243.0,-80.0,237.0,1.54,-253.0,237.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,3,no news,Long+short,-7.0,32,40.6,0.99,-542.0,-417.0,-197.0,-66.0,0.91,-440.0,150.0,-216.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,3,no news,Long only,157.0,15,33.3,1.51,-306.0,-162.0,-53.0,128.0,1.4,-171.0,128.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",1,no news,Long+short,-1449.0,15,33.3,0.38,-2341.0,-2030.0,-601.0,-1486.0,0.37,-2050.0,-122.0,-1364.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",1,no news,Long only,144.0,10,50.0,1.15,-952.0,-773.0,-410.0,116.0,1.12,-783.0,116.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",2,no news,Long+short,-328.0,26,42.3,0.77,-1217.0,-1107.0,-450.0,-381.0,0.74,-1129.0,77.0,-457.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",2,no news,Long only,390.0,14,64.3,1.82,-241.0,-289.0,-205.0,359.0,1.74,-298.0,359.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",3,no news,Long+short,-16.0,32,50.0,0.98,-610.0,-649.0,-278.0,-79.0,0.92,-676.0,230.0,-309.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",3,no news,Long only,320.0,15,66.7,2.01,-104.0,-193.0,-137.0,289.0,1.89,-201.0,289.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,1,no news,Long+short,-1401.0,15,33.3,0.4,-2341.0,-2032.0,-601.0,-1438.0,0.39,-2053.0,-72.0,-1366.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,1,no news,Long only,209.0,10,50.0,1.22,-952.0,-773.0,-410.0,181.0,1.19,-783.0,181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,2,no news,Long+short,-339.0,26,42.3,0.77,-1200.0,-1108.0,-450.0,-391.0,0.73,-1130.0,109.0,-501.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,2,no news,Long only,433.0,14,64.3,1.91,-224.0,-289.0,-205.0,402.0,1.83,-298.0,402.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,3,no news,Long+short,-18.0,31,48.4,0.98,-599.0,-652.0,-278.0,-79.0,0.92,-677.0,259.0,-337.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,3,no news,Long only,349.0,15,66.7,2.1,-92.0,-193.0,-137.0,317.0,1.98,-201.0,317.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,-1378.0,15,33.3,0.41,-2341.0,-2031.0,-601.0,-1415.0,0.4,-2052.0,-49.0,-1366.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,232.0,10,50.0,1.24,-952.0,-773.0,-410.0,203.0,1.21,-783.0,203.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,-343.0,26,42.3,0.76,-1199.0,-1108.0,-450.0,-396.0,0.73,-1130.0,121.0,-516.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,450.0,14,64.3,1.95,-224.0,-289.0,-205.0,419.0,1.87,-298.0,419.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,-15.0,32,50.0,0.98,-597.0,-650.0,-278.0,-78.0,0.92,-677.0,270.0,-348.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,360.0,15,66.7,2.14,-91.0,-193.0,-137.0,329.0,2.01,-201.0,329.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,-1073.0,15,53.3,0.54,-2180.0,-1866.0,-601.0,-1108.0,0.53,-1886.0,-89.0,-1019.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,240.0,10,50.0,1.25,-952.0,-773.0,-410.0,215.0,1.22,-783.0,215.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,157.0,26,57.7,1.11,-986.0,-971.0,-450.0,114.0,1.08,-988.0,126.0,-12.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,429.0,14,64.3,1.9,-324.0,-293.0,-205.0,405.0,1.84,-302.0,405.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,336.0,32,65.6,1.35,-448.0,-514.0,-278.0,288.0,1.3,-533.0,265.0,23.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,364.0,15,66.7,2.15,-176.0,-196.0,-137.0,341.0,2.05,-203.0,341.0,0.0
