@@ -51,6 +51,7 @@ EXIT_TIME = "15:55"
 NEWS_REQUIRED = True
 NEWS_UNTIL = "09:45"                # news must be published before this time on the trade day
 NEWS_CALL_CAP = 20_000              # EODHD calls allowed for news in one run
+FETCH_NEWS = False                  # False = no EODHD calls at all: the news check is left out
 
 CAPITAL = 10_000                    # allocated capital ($)
 SLIPPAGE_PCT = 0.02                 # % per fill
@@ -362,7 +363,11 @@ def main():
             if i % 500 == 0:
                 print(f"   scanned {i:,}/{len(tickers):,} ({time.time() - t0:.0f}s, {len(trades):,} breakouts)", flush=True)
     print(f"✅ {len(trades):,} breakout trades found ({time.time() - t0:.0f}s)", flush=True)
-    trades = add_news_flags(trades, days)
+    if NEWS_REQUIRED and FETCH_NEWS:
+        trades = add_news_flags(trades, days)
+    else:
+        for t in trades:
+            t["news"] = None   # news not checked yet (no EODHD calls)
     out = Path(OUT_DIR)
     out.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(trades).to_csv(out / "all_breakouts.csv.gz", index=False)
