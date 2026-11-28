@@ -100,7 +100,7 @@ def manage(s, entry, R, adr, bars, j0, ser, x, datr=None):
 
     for j in range(j0, len(bars)):
         m, op, h, l, c = bars[j, :5]
-        if m >= EXIT_AT:
+        if m >= x.get("exit_at_m", EXIT_AT):
             close_all(op, m); break
         adverse, fav = (l, h) if s == 1 else (h, l)
         if (adverse - stop) * s <= 0:
@@ -247,6 +247,11 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             R = orh - orl
             sf = x.get("stop_frac", 0.0)             # 0 = other side of the range, 0.5 = middle
             stop = own_stop if own_stop is not None else ((orl + R * sf) if s == 1 else (orh - R * sf))
+            if x.get("stop_atr"):                    # stop a multiple of the daily ATR from the entry
+                d_atr0 = (datr_tab or {}).get((cand["ticker"], cand["day"]))
+                if not d_atr0:
+                    continue
+                stop = entry - s * x["stop_atr"] * d_atr0
             risk = (entry - stop) * s
             if risk <= 0:
                 continue
@@ -257,7 +262,8 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             out.append({"ticker": cand["ticker"], "day": cand["day"], "side": side, "entry_m": int(m),
                         "entry": entry, "risk": risk, "pnl_ps": pnl, "r": pnl / risk, "exit_m": int(exit_m),
                         "rvol": cand["rvol5"] if ENTRY["or"] == 5 else cand["rvol"], "gap": cand["gap"],
-                        "fills": fills, "R": R, "adr": a_})
+                        "fills": fills, "R": R, "adr": a_, "price5": cand.get("price5"),
+                        "gap_thru": cand.get("gap_thru", {}).get(side, False)})
     return out
 
 

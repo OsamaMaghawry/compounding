@@ -124,14 +124,21 @@ def find_entries(cand, e):
     start = after_idx[0]
     out = {}
     if e.get("type") == "stop_order":                      # buy stop at the range high / sell stop at the low
+        R = orh - orl
+        b_pct, b_r = e.get("buffer_pct", 0.0) / 100, e.get("buffer_r", 0.0)
+        hi_lvl = orh * (1 + b_pct) + b_r * R               # optional buffer beyond the range edge
+        lo_lvl = orl * (1 - b_pct) - b_r * R
+        gap_thru = cand.setdefault("gap_thru", {})
         for j in range(start, len(a)):
             m, op, h, l, c, v = a[j]
             if m > LAST_ENTRY:
                 break
-            if "long" not in out and h > orh:
-                out["long"] = (m, max(op, orh) * (1 + SLIP), orh, orl, j + 1)
-            if "short" not in out and l < orl:
-                out["short"] = (m, min(op, orl) * (1 - SLIP), orh, orl, j + 1)
+            if "long" not in out and h > hi_lvl:
+                out["long"] = (m, max(op, hi_lvl) * (1 + SLIP), orh, orl, j + 1)
+                gap_thru["long"] = op > hi_lvl             # the bar opened already beyond the entry level
+            if "short" not in out and l < lo_lvl:
+                out["short"] = (m, min(op, lo_lvl) * (1 - SLIP), orh, orl, j + 1)
+                gap_thru["short"] = op < lo_lvl
             if len(out) == 2:
                 break
         return out
