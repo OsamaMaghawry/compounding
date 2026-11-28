@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""
+ORB exit variants with the entry fixed: 5-minute opening range, 1-minute close beyond it (volume >= range average),
+stop at the other side of the range. Same stocks, dates and news as orb_variants.py; saved data only (no EODHD calls).
+Writes results/orb/exits_<start>_<end>.md and .csv.
+"""
+import gzip
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+import orb_backtest as o
+import orb_variants as v
+
+ENTRY = {"name": "5-min range, 1-min close beyond, volume >= range average", "or": 5, "bar": 1, "vol": 1.0}
+SLIP = o.SLIPPAGE_PCT / 100
+EXIT_AT = o.hm(o.EXIT_TIME)
+ADR_DAYS = 14
+
+
+def ema(x, n):
+    out, k = np.empty(len(x)), 2 / (n + 1)
+    out[0] = x[0]
+    for i in range(1, len(x)):
+        out[i] = x[i] * k + out[i - 1] * (1 - k)
+    return out
+
+
+def adr_table():
+    """Average daily range ($) of the previous ADR_DAYS days, per ticker and day."""
+    out = {}
+    for f in Path(o.DATA_DIR, "json").glob("eod_*_*.json.gz"):
+        t = f.name[4:].rsplit("_", 2)[0]
+        rows = sorted(json.load(gzip.open(f)), key=lambda r: r["date"])
+        rng = [(r["date"], (r["high"] or 0) - (r["low"] or 0)) for r in rows if r.get("high")]
+        for i in range(ADR_DAYS, len(rng)):
+            out[(t, rng[i][0])] = float(np.mean([x for _, x in rng[i - ADR_DAYS:i]]))
+    return out
+
+
+def series(bars):
+    c, h, l, vol = bars[:, 4], bars[:, 2], bars[:, 3], bars[:, 5]
+    tp = (h + l + c) / 3
+    vwap = np.cumsum(tp * vol) / np.maximum(np.cumsum(vol), 1)
+    # 5-minute closes and their EMA 9, known only at the close of each 5-minute bar
+    bucket = (bars[:, 0] // 5).astype(int)
+    last_in_bucket = np.r_[bucket[1:] != bucket[:-1], True]
+    c5 = c[last_in_bucket]
+    e5 = ema(c5, 9)
+    ema9_5 = np.full(len(c), np.nan)
+    ema9_5[np.where(last_in_bucket)[0]] = e5
+    tr = np.maximum.reduce([h - l, np.abs(h - np.r_[c[0], c[:-1]]), np.abs(l - np.r_[c[0], c[:-1]])])
+    atr = ema(tr, 14)
+    return {"ema9": ema(c, 9), "ema20": ema(c, 20), "vwap": vwap, "ema9_5": ema9_5, "atr": atr}
+
+
+def manage(s, entry, R, adr, bars, j0, ser, x):
+    """Runs exit rules x from bar j0. Units: 'R' = range size, 'ADR' = average daily range."""
+    unit = {"R": R, "ADR": adr}
+    stop = x["stop"]
+    tgts = [(entry + s * k * unit[u], frac) for k, frac, u in x.get("targets", [])]
+    remaining, pnl, hit, be, best, exit_m = 1.0, 0.0, 0, False, entry, None
+    day_hi, day_lo = bars[:j0, 2].max(), bars[:j0, 3].min()
+
+    def close_all(price, m):
+        nonlocal pnl, remaining, exit_m
+        pnl += remaining * (price * (1 - s * SLIP) - entry) * s
+        remaining, exit_m = 0.0, m
+
+    def active(rule):
+        start = rule.get("start", "entry")
+        if start == "entry":
+            return True
+        if start == "be":
+            return be
+        if start.startswith("t"):
+            return hit >= int(start[1:])
+        if start.startswith("R"):
+            return (best - entry) * s >= float(start[1:]) * R
+        return False
+
+    for j in range(j0, len(bars)):
+        m, op, h, l, c = bars[j, :5]
+        if m >= EXIT_AT:
+            close_all(op, m); break
+        adverse, fav = (l, h) if s == 1 else (h, l)
+        if (adverse - stop) * s <= 0:
+            close_all(op if (op - stop) * s <= 0 else stop, m); break
+        best = max(best, fav) if s == 1 else min(best, fav)
+        day_hi, day_lo = max(day_hi, h), min(day_lo, l)
+        for i in range(hit, len(tgts)):
+            price, frac = tgts[i]
+            if (fav - price) * s < 0:
+                break
+            fill = op if (op - price) * s >= 0 else price
+            pnl += frac * (fill * (1 - s * SLIP) - entry) * s
+            remaining -= frac
+            hit = i + 1
+            if x.get("step"):                    # stop to the previous target (entry after the first)
+                lvl = entry if i == 0 else tgts[i - 1][0]
+                stop = max(stop, lvl) if s == 1 else min(stop, lvl)
+        if remaining <= 1e-9:
+            exit_m = m; break
+        if x.get("be") is not None and not be and (fav - (entry + s * x["be"] * R)) * s >= 0:
+            lvl = entry + s * x.get("be_lock", 0) * R
+            stop = max(stop, lvl) if s == 1 else min(stop, lvl); be = True
+        for rule in x.get("trail", []):
+            if not active(rule):
+                continue
+            kind = rule["type"]
+            if kind in ("R", "ADR", "ATR"):      # price trail from the best price
+                dist = rule["k"] * (ser["atr"][j] if kind == "ATR" else unit[kind])
+                t = best - s * dist
+                stop = max(stop, t) if s == 1 else min(stop, t)
+            else:                                # close-based: EMA / VWAP cross
+                line = ser[kind][j]
+                if not np.isnan(line) and (c - line) * s < 0:
+                    close_all(c, m); break
+        if remaining <= 1e-9:
+            break
+        if x.get("adr_exhaust") and (day_hi - day_lo) >= x["adr_exhaust"] * adr:
+            close_all(c, m); break
+    if remaining > 1e-9:
+        close_all(bars[-1, 4], bars[-1, 0])
+    return pnl, exit_m
+
+
+def trades(cands, x, adr, vwap_filter=False):
+    out = []
+    for cand in cands:
+        a_ = adr.get((cand["ticker"], cand["day"]))
+        if not a_:
+            continue
+        ents = v.find_entries(cand, ENTRY)
+        if not ents:
+            continue
+        bars = cand["bars"]
+        ser = series(bars)
+        for side, (m, entry, orh, orl, nxt) in ents.items():
+            s = 1 if side == "long" else -1
+            if nxt >= len(bars):
+                continue
+            if vwap_filter and (bars[nxt - 1, 4] - ser["vwap"][nxt - 1]) * s < 0:
+                continue
+            R = orh - orl
+            stop = orl if s == 1 else orh
+            risk = (entry - stop) * s
+            if risk <= 0:
+                continue
+            pnl, exit_m = manage(s, entry, R, a_, bars, nxt, ser, dict(x, stop=stop))
+            out.append({"ticker": cand["ticker"], "day": cand["day"], "side": side, "entry_m": int(m),
+                        "entry": entry, "risk": risk, "pnl_ps": pnl, "r": pnl / risk, "exit_m": int(exit_m),
+                        "rvol": cand["rvol"], "gap": cand["gap"]})
+    return out
+
+
+T = lambda k, f, u="R": (k, f, u)
+BASE = {"be": 1.0, "targets": [T(1.5, .5), T(2.0, .25)], "trail": [{"type": "R", "k": 1.0, "start": "t2"}]}
+EXITS = [
+    ("Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R", BASE, {}),
+    # breakeven timing
+    ("BE at 0.5R", dict(BASE, be=0.5), {}),
+    ("BE at 0.75R", dict(BASE, be=0.75), {}),
+    ("BE at 1.5R", dict(BASE, be=1.5), {}),
+    ("No breakeven", dict(BASE, be=None), {}),
+    ("BE at 1R, lock +0.25R", dict(BASE, be_lock=0.25), {}),
+    # ADR
+    ("ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR", {"be": 1.0, "targets": [T(.25, .5, "ADR"), T(.5, .25, "ADR")],
+     "trail": [{"type": "ADR", "k": .15, "start": "t2"}]}, {}),
+    ("ADR trail only: trail 25% ADR once at BE", {"be": 1.0, "trail": [{"type": "ADR", "k": .25, "start": "be"}]}, {}),
+    ("Base + out when the day's range reaches 100% ADR", dict(BASE, adr_exhaust=1.0), {}),
+    ("Base + out when the day's range reaches 130% ADR", dict(BASE, adr_exhaust=1.3), {}),
+    # moving averages
+    ("Base, runner trails 9 EMA (1-min close)", dict(BASE, trail=[{"type": "ema9", "start": "t2"}]), {}),
+    ("Base, runner trails 20 EMA (1-min close)", dict(BASE, trail=[{"type": "ema20", "start": "t2"}]), {}),
+    ("Base, runner trails 9 EMA on 5-min bars", dict(BASE, trail=[{"type": "ema9_5", "start": "t2"}]), {}),
+    ("50% at 1.5R, rest trails 9 EMA 5-min", {"be": 1.0, "targets": [T(1.5, .5)], "trail": [{"type": "ema9_5", "start": "t1"}]}, {}),
+    ("No targets: all trails 9 EMA 5-min once at BE", {"be": 1.0, "trail": [{"type": "ema9_5", "start": "be"}]}, {}),
+    ("No targets: all trails 20 EMA 1-min once at BE", {"be": 1.0, "trail": [{"type": "ema20", "start": "be"}]}, {}),
+    # portions / steps
+    ("Thirds at 1R, 2R, 3R, stop steps up", {"be": 1.0, "targets": [T(1, 1/3), T(2, 1/3), T(3, 1/3)], "step": True}, {}),
+    ("Quarters at 1R, 2R, 3R, 4R, stop steps up", {"be": 1.0, "targets": [T(1, .25), T(2, .25), T(3, .25), T(4, .25)], "step": True}, {}),
+    ("50% 1.5R, 25% 3R, runner trail 1.5R", {"be": 1.0, "targets": [T(1.5, .5), T(3, .25)], "trail": [{"type": "R", "k": 1.5, "start": "t2"}]}, {}),
+    ("33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps", {"be": 1.0, "targets": [T(1, 1/3), T(2, 1/3)], "step": True,
+     "trail": [{"type": "ema9_5", "start": "t2"}]}, {}),
+    # VWAP
+    ("Base + out on a close back through VWAP", dict(BASE, trail=BASE["trail"] + [{"type": "vwap", "start": "entry"}]), {}),
+    ("Base, runner trails VWAP", dict(BASE, trail=[{"type": "vwap", "start": "t2"}]), {}),
+    ("Base + entry only on the right side of VWAP", BASE, {"vwap_filter": True}),
+    # ATR
+    ("Base, runner chandelier 3x 1-min ATR", dict(BASE, trail=[{"type": "ATR", "k": 3, "start": "t2"}]), {}),
+    ("No targets: chandelier 3x 1-min ATR once at BE", {"be": 1.0, "trail": [{"type": "ATR", "k": 3, "start": "be"}]}, {}),
+]
+
+
+def main():
+    cands = v.load_candidates()
+    o.NEWS_CALL_CAP = 0                        # saved news only - no EODHD calls
+    flagged = o.add_news_flags([{"ticker": c["ticker"], "day": c["day"]} for c in cands], o.trading_days())
+    news = {(t["ticker"], t["day"]): t["news"] for t in flagged}
+    adr = adr_table()
+    rows = []
+    for name, x, kw in EXITS:
+        ts = trades(cands, x, adr, **kw)
+        for t in ts:
+            t["news"] = news.get((t["ticker"], t["day"]))
+        for need_news in (True, False):
+            for long_only, label in ((False, "Long+short"), (True, "Long only")):
+                st = o.stats(o.portfolio(ts, 5, long_only, news_required=need_news), v.DAYS)
+                rows.append({"exit": name, "news": "news" if need_news else "no news", "strategy": label, **st})
+    df = pd.DataFrame(rows)
+    df.to_csv(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.csv", index=False)
+    cols = ["exit", "news", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
+            "worst_day", "max_dd"]
+    with open(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.md", "w") as f:
+        f.write(f"# ORB exit variants - {o.TEST_START} to {o.TEST_END}\n\nEntry fixed: {ENTRY['name']}; stop at the other "
+                f"side of the range. Stocks above ${o.MIN_PRICE:.0f}, RVOL >= {o.MIN_RVOL}, news, 5 slots, ${o.CAPITAL:,}.\n\n")
+        f.write(df[cols].to_markdown(index=False))
+
+
+if __name__ == "__main__":
+    main()
