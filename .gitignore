@@ -12,3 +12,4 @@ results/orb/run_tickers.log
 results/orb/run_tune.log
 results/orb/run_tune2.log
 results/orb/run_tune_*.log
+results/orb/run_frozen.log
