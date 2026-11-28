@@ -25,6 +25,12 @@ VERSIONS = {
                       "exit": ("ADR targets 20%/40%, trail 25%", (0.20, 0.40, 0.25)), "time_exit": ("12:00", "12:00")},
                      dict(tu.BASE_FILT, range_max_adr=0.5), True),
 }
+VERSIONS["A + SPY: long+short"] = (VERSIONS["A: long+short"][0], dict(VERSIONS["A: long+short"][1], spy="SPY vs VWAP"), False)
+VERSIONS["B + SPY: long only"] = (VERSIONS["B: long only"][0], dict(VERSIONS["B: long only"][1], spy="SPY vs VWAP"), True)
+import os
+if os.environ.get("ORB_VERSIONS"):              # e.g. "SPY" = only the versions with the SPY filter
+    VERSIONS = {k: val for k, val in VERSIONS.items() if (os.environ["ORB_VERSIONS"] == "SPY") == ("SPY" in k)}
+OUT_SUFFIX = os.environ.get("ORB_OUT_SUFFIX", "")
 
 
 def scan_candidates():
@@ -44,7 +50,7 @@ def ticker_candidates():
     return {t: v.candidate_days(t) for t in MAG7 + ["TQQQ"]}
 
 
-def run(cands, sim, filt, long_only, adr, datr, rvol_price_filters=True):
+def run(cands, sim, filt, long_only, adr, datr, rvol_price_filters=True, spy=None):
     o.MIN_PRICE, o.MIN_RVOL = (10.0, 2.0) if rvol_price_filters else (0.0, 0.0)
     ox.ENTRY = {"name": "stop", "or": 5, "type": "stop_order"}
     ox.ENTRY_MODE = "breakout"
@@ -53,12 +59,13 @@ def run(cands, sim, filt, long_only, adr, datr, rvol_price_filters=True):
     ts = ox.trades(cands, tu.exit_rule(sim), adr, datr_tab=datr)
     f = dict(filt) if rvol_price_filters else dict(filt, rvol_min=0.0, price_min=0.0)
     ts = [dict(t, news=None, t1_dist=sim["exit"][1][0] * t["adr"]) for t in ts]
-    ts = [t for t in ts if tu.keep(t, f, {})]
+    ts = [t for t in ts if tu.keep(t, f, spy or {})]
     return o.portfolio(ts, 1, long_only, news_required=False, commission_pct="TTP", max_per_day=1)
 
 
 def main():
     adr, datr = ox.adr_table(), ox.atr_table()
+    spy = tu.spy_state()
     scan = scan_candidates()
     tick = ticker_candidates()
     groups = {"Full scan (1 stock/day)": (scan, True), "TQQQ": (tick["TQQQ"], False), "NVDA": (tick["NVDA"], False),
@@ -66,7 +73,7 @@ def main():
     rows, all_trades = [], []
     for vname, (sim, filt, lo) in VERSIONS.items():
         for gname, (cands, rp) in groups.items():
-            taken = run(cands, sim, filt, lo, adr, datr, rvol_price_filters=rp)
+            taken = run(cands, sim, filt, lo, adr, datr, rvol_price_filters=rp, spy=spy)
             df = pd.DataFrame(taken)
             r = {"version": vname, "group": gname}
             for (s, e), mn in zip(MONTHS, MONTH_NAMES):
@@ -80,9 +87,9 @@ def main():
             rows.append(r)
             all_trades += [dict(t, version=vname, group=gname) for t in taken]
             print(f"{vname} | {gname}: done", flush=True)
-    pd.DataFrame(rows).to_csv(f"{o.OUT_DIR}/frozen_5min_versions.csv", index=False)
+    pd.DataFrame(rows).to_csv(f"{o.OUT_DIR}/frozen_5min_versions{OUT_SUFFIX}.csv", index=False)
     keep_cols = ["version", "group", "day", "ticker", "side", "entry_m", "entry", "shares", "value", "exit_m", "pnl_ps", "pnl"]
-    pd.DataFrame(all_trades)[keep_cols].to_csv(f"{o.OUT_DIR}/frozen_5min_trades.csv", index=False)
+    pd.DataFrame(all_trades)[keep_cols].to_csv(f"{o.OUT_DIR}/frozen_5min_trades{OUT_SUFFIX}.csv", index=False)
     print("ALL DONE")
 
 
