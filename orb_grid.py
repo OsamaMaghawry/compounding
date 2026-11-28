@@ -49,6 +49,7 @@ def main():
                             r.update({k: st.get(k) for k in ("trades", "win_pct", "pf", "without_best5", "max_dd", "worst_day")})
                         else:
                             r["pf_after"], r["max_dd_after"] = st.get("pf"), st.get("max_dd")
+                            r["long_after"], r["short_after"] = st.get("long_pnl"), st.get("short_pnl")
                     rows.append(r)
         print(f"done: {ename}", flush=True)
     pd.DataFrame(rows).to_csv(f"{o.OUT_DIR}/grid_1stock_{o.TEST_START}_{o.TEST_END}.csv", index=False)
