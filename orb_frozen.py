@@ -65,7 +65,10 @@ def run(cands, sim, filt, long_only, adr, datr, rvol_price_filters=True, spy=Non
 
 def main():
     adr, datr = ox.adr_table(), ox.atr_table()
+    o.TEST_START, o.TEST_END = MONTHS[0][0], MONTHS[-1][1]   # load SPY bars for the whole period (all saved windows)
     spy = tu.spy_state()
+    missing = [d for d in DAYS if d not in spy]
+    print(f"SPY days missing: {missing}", flush=True)
     scan = scan_candidates()
     tick = ticker_candidates()
     groups = {"Full scan (1 stock/day)": (scan, True), "TQQQ": (tick["TQQQ"], False), "NVDA": (tick["NVDA"], False),
