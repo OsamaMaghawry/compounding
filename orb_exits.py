@@ -245,7 +245,8 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             if vwap_filter and (bars[nxt - 1, 4] - ser["vwap"][nxt - 1]) * s < 0:
                 continue
             R = orh - orl
-            stop = own_stop if own_stop is not None else (orl if s == 1 else orh)
+            sf = x.get("stop_frac", 0.0)             # 0 = other side of the range, 0.5 = middle
+            stop = own_stop if own_stop is not None else ((orl + R * sf) if s == 1 else (orh - R * sf))
             risk = (entry - stop) * s
             if risk <= 0:
                 continue
@@ -256,7 +257,7 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             out.append({"ticker": cand["ticker"], "day": cand["day"], "side": side, "entry_m": int(m),
                         "entry": entry, "risk": risk, "pnl_ps": pnl, "r": pnl / risk, "exit_m": int(exit_m),
                         "rvol": cand["rvol5"] if ENTRY["or"] == 5 else cand["rvol"], "gap": cand["gap"],
-                        "fills": fills})
+                        "fills": fills, "R": R, "adr": a_})
     return out
 
 

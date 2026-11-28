@@ -326,6 +326,8 @@ def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=
                 continue
             if sizing == "RISK":
                 shares = min(CAPITAL * risk_pct / 100 / t["risk"], 2 * slot_value / t["entry"])
+            elif sizing == "RISK_CAP":           # risk a fixed % of capital, position never above the slot value
+                shares = min(CAPITAL * risk_pct / 100 / t["risk"], slot_value / t["entry"])
             else:
                 shares = slot_value / t["entry"]
             if t["side"] == "short":
