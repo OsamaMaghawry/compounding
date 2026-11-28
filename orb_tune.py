@@ -160,6 +160,8 @@ def main():
         part = Path(f"{o.OUT_DIR}/tune_step2_{rng}_{strat.replace('+', '_').replace(' ', '_')}.csv")
         if part.exists():                       # saved part: not run again
             continue
+        if os.environ.get("ORB_GROUP") and os.environ["ORB_GROUP"] != f"{rng} {strat}":
+            continue                            # another process runs this group
         rows2 = []
         base = g[g.changed == "base"].iloc[0]
         score = lambda r: r["total"] / max(1.0, -r["max_dd"])
