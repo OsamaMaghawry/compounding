@@ -19,7 +19,11 @@ ENTRIES = [  # (name, entry rule for orb_variants.find_entries, or a pullback mo
     ("5-min range, retest of the range edge (limit)", {"or": 5, "bar": 1, "vol": 1.0, "retest": 30}, None),
     ("5-min range, only in the gap direction", {"or": 5, "bar": 1, "vol": 1.0, "gap": True}, None),
     ("Pullback PB1: after the break, a pullback, then a break of the latest 5-min high", {"or": 5}, "pb1"),
+    ("15-min range, stop order at the range edge", {"or": 15, "type": "stop_order"}, None),
 ]
+if os.environ.get("ORB_ENTRIES"):          # e.g. "5-min range, stop order|15-min range, stop order"
+    ENTRIES = [x for x in ENTRIES if any(x[0].startswith(p) for p in os.environ["ORB_ENTRIES"].split("|"))]
+KS = [int(k) for k in os.environ.get("ORB_K", "1").split(",")]
 
 
 def main():
@@ -38,11 +42,12 @@ def main():
                 ts = [t for t in ts if (t["gap"] > 0) == (t["side"] == "long") and t["gap"] != 0]
             for t in ts:
                 t["news"] = news.get((t["ticker"], t["day"]))
-            for need_news in (True, False):
+            for need_news in ((True, False) if o.NEWS_CALL_CAP or not os.environ.get("ORB_NO_NEWS") else (False,)):
+              for k in KS:
                 for long_only, label in ((False, "Long+short"), (True, "Long only")):
-                    r = {"entry": ename, "exit": xname, "news": "news" if need_news else "no news", "strategy": label}
+                    r = {"entry": ename, "exit": xname, "stocks_per_day": k, "news": "news" if need_news else "no news", "strategy": label}
                     for comm, tag in ((0.0, "before"), (ox.COMMISSION_PCT, "after")):
-                        taken = o.portfolio(ts, 1, long_only, news_required=need_news, commission_pct=comm, max_per_day=1)
+                        taken = o.portfolio(ts, k, long_only, news_required=need_news, commission_pct=comm, max_per_day=k)
                         st = o.stats(taken, v.DAYS)
                         r[f"total_{tag}"] = st.get("total", 0)
                         if tag == "before":
@@ -52,7 +57,8 @@ def main():
                             r["long_after"], r["short_after"] = st.get("long_pnl"), st.get("short_pnl")
                     rows.append(r)
         print(f"done: {ename}", flush=True)
-    pd.DataFrame(rows).to_csv(f"{o.OUT_DIR}/grid_1stock_{o.TEST_START}_{o.TEST_END}.csv", index=False)
+    name = os.environ.get("ORB_OUT", "grid_1stock")
+    pd.DataFrame(rows).to_csv(f"{o.OUT_DIR}/{name}_{o.TEST_START}_{o.TEST_END}.csv", index=False)
 
 
 if __name__ == "__main__":

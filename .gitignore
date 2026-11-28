@@ -3,3 +3,4 @@ results/orb/run.log
 results/orb/all_breakouts.csv.gz
 results/orb/summary.md
 results/orb/run_m3.log
+results/orb/run_k.log
