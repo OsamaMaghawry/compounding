@@ -24,7 +24,7 @@ ENTRIES = [  # (name, entry rule for orb_variants.find_entries, or a pullback mo
 
 def main():
     cands = v.load_candidates()
-    o.NEWS_CALL_CAP = 0
+    o.NEWS_CALL_CAP = int(os.environ.get("ORB_NEWS_CAP", "0"))
     flagged = o.add_news_flags([{"ticker": c["ticker"], "day": c["day"]} for c in cands], o.trading_days())
     news = {(t["ticker"], t["day"]): t["news"] for t in flagged}
     adr, datr = ox.adr_table(), ox.atr_table()
