@@ -148,6 +148,8 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
         a_ = adr.get((cand["ticker"], cand["day"]))
         if not a_:
             continue
+        if ENTRY["or"] == 5 and (cand["rvol5"] < o.MIN_RVOL or cand["price5"] < o.MIN_PRICE):
+            continue                             # stocks in play judged on what is known at 09:35
         ents = v.find_entries(cand, ENTRY)
         if not ents:
             continue
@@ -170,7 +172,7 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             pnl, exit_m = manage(s, entry, R, a_, bars, nxt, ser, dict(x, stop=stop), d_atr)
             out.append({"ticker": cand["ticker"], "day": cand["day"], "side": side, "entry_m": int(m),
                         "entry": entry, "risk": risk, "pnl_ps": pnl, "r": pnl / risk, "exit_m": int(exit_m),
-                        "rvol": cand["rvol"], "gap": cand["gap"]})
+                        "rvol": cand["rvol5"] if ENTRY["or"] == 5 else cand["rvol"], "gap": cand["gap"]})
     return out
 
 
@@ -214,6 +216,31 @@ EXITS = [
 ]
 
 
+SETUPS = [  # (name, positions per day, how they are chosen)
+    ("5 slots", 5, "first"),
+    ("1 stock/day: first breakout", 1, "first"),
+    ("2 stocks/day: first breakouts", 2, "first"),
+]
+
+
+def select(ts, k, pick, need_news):
+    """Keeps only trades in the top-k stocks of each day, ranked at 09:35 (RVOL of the first 5 minutes or gap).
+    The ranking uses every stock in play that day, whether or not it breaks out later."""
+    ranked = {}
+    for t in CANDS:
+        if need_news and not NEWS.get((t["ticker"], t["day"])):
+            continue
+        if t["rvol5"] < o.MIN_RVOL or t["price5"] < o.MIN_PRICE:
+            continue
+        ranked.setdefault(t["day"], []).append(t)
+    top = set()
+    for day, lst in ranked.items():
+        key = (lambda c: c["rvol5"]) if pick == "rvol" else (lambda c: abs(c["gap"]))
+        top |= {(c["ticker"], day) for c in sorted(lst, key=key, reverse=True)[:k]}
+    return [t for t in ts if (t["ticker"], t["day"]) in top]
+
+
+CANDS, NEWS = [], {}
 COMMISSION_PCT = 0.5   # $5 per $1,000 traded, on the entry and on the exit
 
 
@@ -262,6 +289,8 @@ def main():
     o.NEWS_CALL_CAP = int(os.environ.get("ORB_NEWS_CAP", "0"))   # 0 = saved news only, no EODHD calls
     flagged = o.add_news_flags([{"ticker": c["ticker"], "day": c["day"]} for c in cands], o.trading_days())
     news = {(t["ticker"], t["day"]): t["news"] for t in flagged}
+    CANDS[:] = cands
+    NEWS.update(news)
     adr = adr_table()
     datr = atr_table()
     rows, build = [], []
@@ -270,19 +299,22 @@ def main():
         for t in ts:
             t["news"] = news.get((t["ticker"], t["day"]))
         for need_news in (True, False):
+          for setup, k, pick in SETUPS:
             for long_only, label in ((False, "Long+short"), (True, "Long only")):
                 for comm in (0.0, COMMISSION_PCT):
-                    taken = o.portfolio(ts, 5, long_only, news_required=need_news, commission_pct=comm)
+                    pool = select(ts, k, pick, need_news) if pick != "first" else ts
+                    taken = o.portfolio(pool, k, long_only, news_required=need_news, commission_pct=comm,
+                                        max_per_day=k if setup != "5 slots" else 0)
                     st = o.stats(taken, v.DAYS)
-                    rows.append({"exit": name, "news": "news" if need_news else "no news", "strategy": label,
+                    rows.append({"exit": name, "setup": setup, "news": "news" if need_news else "no news", "strategy": label,
                                  "commission": "$5 per $1,000" if comm else "none", **st})
                     if not comm:
-                        build.append({"exit": name, "news": "news" if need_news else "no news", "strategy": label,
+                        build.append({"exit": name, "setup": setup, "news": "news" if need_news else "no news", "strategy": label,
                                       **construction(ts, taken, need_news, long_only)})
     df = pd.DataFrame(rows)
     df.to_csv(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.csv", index=False)
     pd.DataFrame(build).to_csv(f"{o.OUT_DIR}/construction_{o.TEST_START}_{o.TEST_END}.csv", index=False)
-    cols = ["exit", "news", "commission", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
+    cols = ["exit", "setup", "news", "commission", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
             "worst_day", "max_dd"]
     with open(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.md", "w") as f:
         f.write(f"# ORB exit variants - {o.TEST_START} to {o.TEST_END}\n\nEntry fixed: {ENTRY['name']}; stop at the other "

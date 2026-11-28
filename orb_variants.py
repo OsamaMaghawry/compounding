@@ -16,7 +16,7 @@ import pandas as pd
 import orb_backtest as o
 
 OR_LENGTHS = (5, 15, 30)
-CACHE = Path(f"/tmp/claude-0/orb_days_{o.TEST_START}_{o.TEST_END}.pkl")   # derived from saved data, rebuilt for free
+CACHE = Path(f"/tmp/claude-0/orb_days2_{o.TEST_START}_{o.TEST_END}.pkl")   # derived from saved data, rebuilt for free
 SLIP = o.SLIPPAGE_PCT / 100
 EXIT_AT = o.hm(o.EXIT_TIME)
 LAST_ENTRY = o.hm(o.LAST_ENTRY)
@@ -36,17 +36,20 @@ def candidate_days(ticker):
         first = a[a[:, 0] < 15]
         if len(first) < 9 or first[0, 0] > 2:
             continue
-        v15 = first[:, 5].sum()
+        v15, v5 = first[:, 5].sum(), a[a[:, 0] < 5][:, 5].sum()
         i = days.index(day)
         prior = [hist[d] for d in days[max(0, i - o.RVOL_LOOKBACK_DAYS):i] if d in hist]
-        hist[day] = v15
+        hist[day] = (v5, v15)
         if not (o.TEST_START <= day <= o.TEST_END) or day not in info or len(prior) < o.MIN_RVOL_HISTORY_DAYS:
             continue
-        rvol = v15 / np.mean(prior) if np.mean(prior) > 0 else 0
+        m5, m15 = np.mean([p[0] for p in prior]), np.mean([p[1] for p in prior])
+        rvol = v15 / m15 if m15 > 0 else 0          # first 15 minutes (known at 09:45)
+        rvol5 = v5 / m5 if m5 > 0 else 0            # first 5 minutes (known at 09:35)
         prev_close, adv = info[day]
-        if rvol < o.MIN_RVOL or first[-1, 4] < o.MIN_PRICE or adv < o.MIN_AVG_DAILY_VOLUME:
+        price5 = a[a[:, 0] < 5][-1, 4] if (a[:, 0] < 5).any() else first[-1, 4]
+        if max(rvol, rvol5) < o.MIN_RVOL or min(first[-1, 4], price5) < o.MIN_PRICE or adv < o.MIN_AVG_DAILY_VOLUME:
             continue
-        out.append({"ticker": ticker, "day": day, "rvol": round(rvol, 2),
+        out.append({"ticker": ticker, "day": day, "rvol": round(rvol, 2), "rvol5": round(rvol5, 2), "price5": price5,
                     "gap": round((a[0, 1] / prev_close - 1) * 100, 2), "bars": a})
     return out
 

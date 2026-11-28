@@ -294,7 +294,7 @@ def add_news_flags(trades, days):
 
 # ---------------------------------------------------------------------------- portfolio
 def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=0.5, daily_limit_pct=0.0,
-              keep=None, commission_pct=0.0):
+              keep=None, commission_pct=0.0, max_per_day=0):
     """Applies an optional filter (keep), slots (max open positions), sizing and an optional daily loss limit.
     Long+short takes, per stock and day, the first break that passes the filters; long only takes the long break."""
     pool = [t for t in trades if (not news_required or t["news"]) and (keep is None or keep(t))]
@@ -318,6 +318,8 @@ def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=
             open_exits = [e for e in open_exits if e > t["entry_m"]]
             if len(open_exits) >= slots:
                 continue
+            if max_per_day and len(closed) >= max_per_day:
+                break
             # daily loss limit: only trades already CLOSED before this entry count (no look-ahead)
             realized = sum(p for e, p in closed if e <= t["entry_m"])
             if daily_limit_pct and realized <= -CAPITAL * daily_limit_pct / 100:
