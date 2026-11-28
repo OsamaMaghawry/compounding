@@ -20,6 +20,8 @@ ENTRIES = [  # (name, entry rule for orb_variants.find_entries, or a pullback mo
     ("5-min range, only in the gap direction", {"or": 5, "bar": 1, "vol": 1.0, "gap": True}, None),
     ("Pullback PB1: after the break, a pullback, then a break of the latest 5-min high", {"or": 5}, "pb1"),
     ("15-min range, stop order at the range edge", {"or": 15, "type": "stop_order"}, None),
+    ("2nd 5-min candle closes beyond the 1st (no volume check)", {"or": 5, "bar": 5, "vol": 0, "only_first": True}, None),
+    ("2nd 5-min candle closes beyond the 1st, volume >= 1st candle", {"or": 5, "bar": 5, "vol": 1.0, "only_first": True}, None),
 ]
 if os.environ.get("ORB_ENTRIES"):          # e.g. "5-min range, stop order|15-min range, stop order"
     ENTRIES = [x for x in ENTRIES if any(x[0].startswith(p) for p in os.environ["ORB_ENTRIES"].split("|"))]
@@ -42,6 +44,8 @@ def main():
                 ts = [t for t in ts if (t["gap"] > 0) == (t["side"] == "long") and t["gap"] != 0]
             for t in ts:
                 t["news"] = news.get((t["ticker"], t["day"]))
+                if os.environ.get("ORB_RANK") == "gap":
+                    t["rvol"] = abs(t["gap"])          # ties at the same minute: biggest gap first
             for need_news in ((True, False) if o.NEWS_CALL_CAP or not os.environ.get("ORB_NO_NEWS") else (False,)):
               for k in KS:
                 for long_only, label in ((False, "Long+short"), (True, "Long only")):

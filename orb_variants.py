@@ -148,6 +148,8 @@ def find_entries(cand, e):
             m, c, v = a[last, 0], a[last, 4], a[j:last + 1, 5].sum()
         if m > LAST_ENTRY or len(out) == 2:
             break
+        if e.get("only_first") and j > start:
+            break                                      # only the first candle after the range counts
         vol_ok = not e.get("vol") or v >= e["vol"] * avg_vol * k
         for side, broke in (("long", c > orh), ("short", c < orl)):
             if side in out or not broke or not vol_ok:
