@@ -333,7 +333,10 @@ def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=
             if shares <= 0:
                 continue
             pnl = shares * t["pnl_ps"]
-            if commission_pct:   # % of the traded value, on the entry and on the exit
+            if commission_pct == "TTP":   # $0.005 per share, $0.75 minimum, per filled order
+                fee = lambda n: max(0.75, 0.005 * n)
+                pnl -= fee(shares) + sum(fee(shares * f) for f in t.get("fills") or [1.0])
+            elif commission_pct:   # % of the traded value, on the entry and on the exit
                 entry_value = shares * t["entry"]
                 exit_value = entry_value + (pnl if t["side"] == "long" else -pnl)
                 pnl -= commission_pct / 100 * (entry_value + exit_value)

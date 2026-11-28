@@ -76,11 +76,14 @@ def manage(s, entry, R, adr, bars, j0, ser, x, datr=None):
     stop = x["stop"]
     tgts = [(entry + s * k * unit[u], frac) for k, frac, u in x.get("targets", [])]
     remaining, pnl, hit, be, best, exit_m = 1.0, 0.0, 0, False, entry, None
+    fills = []                                    # fraction of the position sold in each exit order
     day_hi, day_lo = bars[:j0, 2].max(), bars[:j0, 3].min()
 
     def close_all(price, m):
         nonlocal pnl, remaining, exit_m
         pnl += remaining * (price * (1 - s * SLIP) - entry) * s
+        if remaining > 1e-9:
+            fills.append(remaining)
         remaining, exit_m = 0.0, m
 
     def active(rule):
@@ -111,6 +114,7 @@ def manage(s, entry, R, adr, bars, j0, ser, x, datr=None):
             fill = op if (op - price) * s >= 0 else price
             pnl += frac * (fill * (1 - s * SLIP) - entry) * s
             remaining -= frac
+            fills.append(frac)
             hit = i + 1
             if x.get("step"):                    # stop to the previous target (entry after the first)
                 lvl = entry if i == 0 else tgts[i - 1][0]
@@ -139,7 +143,7 @@ def manage(s, entry, R, adr, bars, j0, ser, x, datr=None):
             close_all(c, m); break
     if remaining > 1e-9:
         close_all(bars[-1, 4], bars[-1, 0])
-    return pnl, exit_m
+    return pnl, exit_m, fills
 
 
 ENTRY_MODE = os.environ.get("ORB_ENTRY", "breakout")   # breakout | pb1 | pb2
@@ -248,10 +252,11 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             d_atr = (datr_tab or {}).get((cand["ticker"], cand["day"]))
             if x.get("be_atr") and not d_atr:
                 continue
-            pnl, exit_m = manage(s, entry, R, a_, bars, nxt, ser, dict(x, stop=stop), d_atr)
+            pnl, exit_m, fills = manage(s, entry, R, a_, bars, nxt, ser, dict(x, stop=stop), d_atr)
             out.append({"ticker": cand["ticker"], "day": cand["day"], "side": side, "entry_m": int(m),
                         "entry": entry, "risk": risk, "pnl_ps": pnl, "r": pnl / risk, "exit_m": int(exit_m),
-                        "rvol": cand["rvol5"] if ENTRY["or"] == 5 else cand["rvol"], "gap": cand["gap"]})
+                        "rvol": cand["rvol5"] if ENTRY["or"] == 5 else cand["rvol"], "gap": cand["gap"],
+                        "fills": fills})
     return out
 
 
@@ -320,7 +325,7 @@ def select(ts, k, pick, need_news):
 
 
 CANDS, NEWS = [], {}
-COMMISSION_PCT = 0.5   # $5 per $1,000 traded, on the entry and on the exit
+COMMISSION_PCT = "TTP"   # Trade The Pool: $0.005 per share, $0.75 minimum per filled order (buy and each sell)
 
 
 def construction(all_trades, taken, need_news, long_only):
