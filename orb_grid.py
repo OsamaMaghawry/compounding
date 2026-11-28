@@ -46,6 +46,8 @@ def main():
                 t["news"] = news.get((t["ticker"], t["day"]))
                 if os.environ.get("ORB_RANK") == "gap":
                     t["rvol"] = abs(t["gap"])          # ties at the same minute: biggest gap first
+            if os.environ.get("ORB_MIN_ENTRY"):        # skip breakouts before this minute after 09:30 (e.g. 10 = 09:40)
+                ts = [t for t in ts if t["entry_m"] >= int(os.environ["ORB_MIN_ENTRY"])]
             for need_news in ((True, False) if o.NEWS_CALL_CAP or not os.environ.get("ORB_NO_NEWS") else (False,)):
               for k in KS:
                 for long_only, label in ((False, "Long+short"), (True, "Long only")):
