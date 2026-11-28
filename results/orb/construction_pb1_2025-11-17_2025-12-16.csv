@@ -1,0 +1,73 @@
+exit,setup,news,strategy,signals,trades_taken,signals_skipped_slots_full,days_traded,trades_per_day_avg,trades_per_day_max,max_open_at_once_avg,days_all_5_slots_full,peak_capital_in_use_avg,avg_hold_min,avg_position,longs,shorts
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",5 slots,news,Long+short,551,129,422.0,21,6.1,9,5.0,21,9932.0,263.0,1982.0,83,46
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",5 slots,news,Long only,336,123,,21,5.9,9,5.0,21,10000.0,268.0,2000.0,123,0
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1 stock/day: first breakout,news,Long+short,551,21,530.0,21,1.0,1,1.0,0,9990.0,280.0,9990.0,14,7
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1 stock/day: first breakout,news,Long only,336,21,,21,1.0,1,1.0,0,10000.0,285.0,10000.0,21,0
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2 stocks/day: first breakouts,news,Long+short,551,42,509.0,21,2.0,2,2.0,0,9978.0,257.0,4989.0,31,11
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2 stocks/day: first breakouts,news,Long only,336,42,,21,2.0,2,2.0,0,10000.0,275.0,5000.0,42,0
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",5 slots,no news,Long+short,886,134,752.0,21,6.4,10,5.0,21,9940.0,247.0,1983.0,88,46
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",5 slots,no news,Long only,546,127,,21,6.0,9,5.0,21,10000.0,263.0,2000.0,127,0
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1 stock/day: first breakout,no news,Long+short,886,21,865.0,21,1.0,1,1.0,0,9992.0,258.0,9992.0,17,4
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1 stock/day: first breakout,no news,Long only,546,21,,21,1.0,1,1.0,0,10000.0,239.0,10000.0,21,0
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2 stocks/day: first breakouts,no news,Long+short,886,42,844.0,21,2.0,2,2.0,0,9979.0,256.0,4989.0,33,9
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2 stocks/day: first breakouts,no news,Long only,546,42,,21,2.0,2,2.0,0,10000.0,250.0,5000.0,42,0
+BE at 0.25 x daily ATR,5 slots,news,Long+short,551,150,401.0,21,7.1,10,5.0,21,9940.0,198.0,1976.0,92,58
+BE at 0.25 x daily ATR,5 slots,news,Long only,336,142,,21,6.8,9,5.0,21,10000.0,196.0,2000.0,142,0
+BE at 0.25 x daily ATR,1 stock/day: first breakout,news,Long+short,551,21,530.0,21,1.0,1,1.0,0,9990.0,204.0,9990.0,14,7
+BE at 0.25 x daily ATR,1 stock/day: first breakout,news,Long only,336,21,,21,1.0,1,1.0,0,10000.0,244.0,10000.0,21,0
+BE at 0.25 x daily ATR,2 stocks/day: first breakouts,news,Long+short,551,42,509.0,21,2.0,2,2.0,0,9740.0,182.0,4989.0,31,11
+BE at 0.25 x daily ATR,2 stocks/day: first breakouts,news,Long only,336,42,,21,2.0,2,2.0,0,9762.0,180.0,5000.0,42,0
+BE at 0.25 x daily ATR,5 slots,no news,Long+short,886,156,730.0,21,7.4,10,5.0,21,9950.0,192.0,1980.0,101,55
+BE at 0.25 x daily ATR,5 slots,no news,Long only,546,148,,21,7.0,11,5.0,21,10000.0,191.0,2000.0,148,0
+BE at 0.25 x daily ATR,1 stock/day: first breakout,no news,Long+short,886,21,865.0,21,1.0,1,1.0,0,9992.0,183.0,9992.0,17,4
+BE at 0.25 x daily ATR,1 stock/day: first breakout,no news,Long only,546,21,,21,1.0,1,1.0,0,10000.0,199.0,10000.0,21,0
+BE at 0.25 x daily ATR,2 stocks/day: first breakouts,no news,Long+short,886,42,844.0,21,2.0,2,2.0,0,9742.0,166.0,4989.0,33,9
+BE at 0.25 x daily ATR,2 stocks/day: first breakouts,no news,Long only,546,42,,21,2.0,2,2.0,0,10000.0,179.0,5000.0,42,0
+BE at 0.5R,5 slots,news,Long+short,551,141,410.0,21,6.7,9,5.0,21,9930.0,220.0,1982.0,89,52
+BE at 0.5R,5 slots,news,Long only,336,134,,21,6.4,8,5.0,21,10000.0,214.0,2000.0,134,0
+BE at 0.5R,1 stock/day: first breakout,news,Long+short,551,21,530.0,21,1.0,1,1.0,0,9990.0,256.0,9990.0,14,7
+BE at 0.5R,1 stock/day: first breakout,news,Long only,336,21,,21,1.0,1,1.0,0,10000.0,260.0,10000.0,21,0
+BE at 0.5R,2 stocks/day: first breakouts,news,Long+short,551,42,509.0,21,2.0,2,2.0,0,9978.0,224.0,4989.0,31,11
+BE at 0.5R,2 stocks/day: first breakouts,news,Long only,336,42,,21,2.0,2,2.0,0,10000.0,232.0,5000.0,42,0
+BE at 0.5R,5 slots,no news,Long+short,886,151,735.0,21,7.2,10,5.0,21,9940.0,212.0,1982.0,96,55
+BE at 0.5R,5 slots,no news,Long only,546,145,,21,6.9,10,5.0,21,10000.0,204.0,2000.0,145,0
+BE at 0.5R,1 stock/day: first breakout,no news,Long+short,886,21,865.0,21,1.0,1,1.0,0,9992.0,235.0,9992.0,17,4
+BE at 0.5R,1 stock/day: first breakout,no news,Long only,546,21,,21,1.0,1,1.0,0,10000.0,214.0,10000.0,21,0
+BE at 0.5R,2 stocks/day: first breakouts,no news,Long+short,886,42,844.0,21,2.0,2,2.0,0,9979.0,231.0,4989.0,33,9
+BE at 0.5R,2 stocks/day: first breakouts,no news,Long only,546,42,,21,2.0,2,2.0,0,10000.0,224.0,5000.0,42,0
+ADR trail only: trail 25% ADR once at BE,5 slots,news,Long+short,551,144,407.0,21,6.9,10,5.0,21,9935.0,218.0,1980.0,93,51
+ADR trail only: trail 25% ADR once at BE,5 slots,news,Long only,336,135,,21,6.4,9,5.0,21,10000.0,222.0,2000.0,135,0
+ADR trail only: trail 25% ADR once at BE,1 stock/day: first breakout,news,Long+short,551,21,530.0,21,1.0,1,1.0,0,9990.0,222.0,9990.0,14,7
+ADR trail only: trail 25% ADR once at BE,1 stock/day: first breakout,news,Long only,336,21,,21,1.0,1,1.0,0,10000.0,222.0,10000.0,21,0
+ADR trail only: trail 25% ADR once at BE,2 stocks/day: first breakouts,news,Long+short,551,42,509.0,21,2.0,2,2.0,0,9978.0,212.0,4989.0,31,11
+ADR trail only: trail 25% ADR once at BE,2 stocks/day: first breakouts,news,Long only,336,42,,21,2.0,2,2.0,0,10000.0,220.0,5000.0,42,0
+ADR trail only: trail 25% ADR once at BE,5 slots,no news,Long+short,886,155,731.0,21,7.4,10,5.0,21,9942.0,201.0,1983.0,100,55
+ADR trail only: trail 25% ADR once at BE,5 slots,no news,Long only,546,144,,21,6.9,9,5.0,21,10000.0,214.0,2000.0,144,0
+ADR trail only: trail 25% ADR once at BE,1 stock/day: first breakout,no news,Long+short,886,21,865.0,21,1.0,1,1.0,0,9992.0,188.0,9992.0,17,4
+ADR trail only: trail 25% ADR once at BE,1 stock/day: first breakout,no news,Long only,546,21,,21,1.0,1,1.0,0,10000.0,176.0,10000.0,21,0
+ADR trail only: trail 25% ADR once at BE,2 stocks/day: first breakouts,no news,Long+short,886,42,844.0,21,2.0,2,2.0,0,9979.0,205.0,4989.0,33,9
+ADR trail only: trail 25% ADR once at BE,2 stocks/day: first breakouts,no news,Long only,546,42,,21,2.0,2,2.0,0,10000.0,206.0,5000.0,42,0
+No targets: all trails 9 EMA 5-min once at BE,5 slots,news,Long+short,551,139,412.0,21,6.6,9,5.0,21,9943.0,219.0,1981.0,90,49
+No targets: all trails 9 EMA 5-min once at BE,5 slots,news,Long only,336,127,,21,6.0,9,5.0,21,10000.0,219.0,2000.0,127,0
+No targets: all trails 9 EMA 5-min once at BE,1 stock/day: first breakout,news,Long+short,551,21,530.0,21,1.0,1,1.0,0,9990.0,225.0,9990.0,14,7
+No targets: all trails 9 EMA 5-min once at BE,1 stock/day: first breakout,news,Long only,336,21,,21,1.0,1,1.0,0,10000.0,220.0,10000.0,21,0
+No targets: all trails 9 EMA 5-min once at BE,2 stocks/day: first breakouts,news,Long+short,551,42,509.0,21,2.0,2,2.0,0,9978.0,204.0,4989.0,31,11
+No targets: all trails 9 EMA 5-min once at BE,2 stocks/day: first breakouts,news,Long only,336,42,,21,2.0,2,2.0,0,10000.0,221.0,5000.0,42,0
+No targets: all trails 9 EMA 5-min once at BE,5 slots,no news,Long+short,886,150,736.0,21,7.1,10,5.0,21,9953.0,203.0,1982.0,96,54
+No targets: all trails 9 EMA 5-min once at BE,5 slots,no news,Long only,546,135,,21,6.4,9,5.0,21,10000.0,213.0,2000.0,135,0
+No targets: all trails 9 EMA 5-min once at BE,1 stock/day: first breakout,no news,Long+short,886,21,865.0,21,1.0,1,1.0,0,9992.0,199.0,9992.0,17,4
+No targets: all trails 9 EMA 5-min once at BE,1 stock/day: first breakout,no news,Long only,546,21,,21,1.0,1,1.0,0,10000.0,177.0,10000.0,21,0
+No targets: all trails 9 EMA 5-min once at BE,2 stocks/day: first breakouts,no news,Long+short,886,42,844.0,21,2.0,2,2.0,0,9979.0,207.0,4989.0,33,9
+No targets: all trails 9 EMA 5-min once at BE,2 stocks/day: first breakouts,no news,Long only,546,42,,21,2.0,2,2.0,0,10000.0,208.0,5000.0,42,0
+"Thirds at 1R, 2R, 3R, stop steps up",5 slots,news,Long+short,551,129,422.0,21,6.1,9,5.0,21,9932.0,262.0,1982.0,84,45
+"Thirds at 1R, 2R, 3R, stop steps up",5 slots,news,Long only,336,123,,21,5.9,9,5.0,21,10000.0,269.0,2000.0,123,0
+"Thirds at 1R, 2R, 3R, stop steps up",1 stock/day: first breakout,news,Long+short,551,21,530.0,21,1.0,1,1.0,0,9990.0,278.0,9990.0,14,7
+"Thirds at 1R, 2R, 3R, stop steps up",1 stock/day: first breakout,news,Long only,336,21,,21,1.0,1,1.0,0,10000.0,283.0,10000.0,21,0
+"Thirds at 1R, 2R, 3R, stop steps up",2 stocks/day: first breakouts,news,Long+short,551,42,509.0,21,2.0,2,2.0,0,9978.0,261.0,4989.0,31,11
+"Thirds at 1R, 2R, 3R, stop steps up",2 stocks/day: first breakouts,news,Long only,336,42,,21,2.0,2,2.0,0,10000.0,275.0,5000.0,42,0
+"Thirds at 1R, 2R, 3R, stop steps up",5 slots,no news,Long+short,886,134,752.0,21,6.4,10,5.0,21,9940.0,250.0,1983.0,88,46
+"Thirds at 1R, 2R, 3R, stop steps up",5 slots,no news,Long only,546,127,,21,6.0,9,5.0,21,10000.0,266.0,2000.0,127,0
+"Thirds at 1R, 2R, 3R, stop steps up",1 stock/day: first breakout,no news,Long+short,886,21,865.0,21,1.0,1,1.0,0,9992.0,256.0,9992.0,17,4
+"Thirds at 1R, 2R, 3R, stop steps up",1 stock/day: first breakout,no news,Long only,546,21,,21,1.0,1,1.0,0,10000.0,236.0,10000.0,21,0
+"Thirds at 1R, 2R, 3R, stop steps up",2 stocks/day: first breakouts,no news,Long+short,886,42,844.0,21,2.0,2,2.0,0,9979.0,255.0,4989.0,33,9
+"Thirds at 1R, 2R, 3R, stop steps up",2 stocks/day: first breakouts,no news,Long only,546,42,,21,2.0,2,2.0,0,10000.0,253.0,5000.0,42,0

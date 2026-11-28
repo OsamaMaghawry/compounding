@@ -142,6 +142,80 @@ def manage(s, entry, R, adr, bars, j0, ser, x, datr=None):
     return pnl, exit_m
 
 
+ENTRY_MODE = os.environ.get("ORB_ENTRY", "breakout")   # breakout | pb1 | pb2
+
+
+def pullback_entries(cand, mode):
+    """Breakout of the 5-min range (1-min close beyond it, volume >= range average), then WAIT for a pullback, then
+    enter on a break of the most recent 5-min high (low for shorts).
+    pb1: pullback = a 5-min candle that closes against the move (red for longs) or makes a lower high; the entry level is
+         the high of the latest 5-min candle (it moves down while the pullback goes on); stop at the other side of the range;
+         cancelled if price closes back inside the range's other side.
+    pb2: like pb1, but the pullback must come back to within 0.25 x range of the breakout level (a retest), and the
+         stop goes just below the pullback's low."""
+    a = cand["bars"]
+    rng = a[a[:, 0] < 5]
+    if len(rng) < 3 or rng[0, 0] > 2:
+        return {}
+    orh, orl = rng[:, 2].max(), rng[:, 3].min()
+    R = orh - orl
+    if R <= 0:
+        return {}
+    avg_vol = rng[:, 5].mean()
+    last_entry = o.hm(o.LAST_ENTRY)
+    out = {}
+    for side in ("long", "short"):
+        s = 1 if side == "long" else -1
+        level = orh if s == 1 else orl
+        far = orl if s == 1 else orh
+        broke_at = None
+        for j in range(len(a)):
+            m, op, h, l, c, vol = a[j]
+            if m < 5:
+                continue
+            if m > last_entry:
+                break
+            if (c - level) * s > 0 and vol >= avg_vol:
+                broke_at = j
+                break
+        if broke_at is None:
+            continue
+        cur, prev5, pulled, trigger, pb_ext = None, None, False, None, None
+        for j in range(broke_at + 1, len(a)):
+            m, op, h, l, c, vol = a[j]
+            if m > last_entry:
+                break
+            if (c - far) * s < 0:                       # back through the other side of the range: setup failed
+                break
+            if trigger is not None and (h - trigger if s == 1 else trigger - l) > 0:
+                ok = True
+                if mode == "pb2":
+                    ok = (pb_ext - (level + s * 0.25 * R)) * s <= 0
+                if ok:
+                    fill = (max(op, trigger) if s == 1 else min(op, trigger)) * (1 + s * SLIP)
+                    stop = far if mode == "pb1" else pb_ext - s * 0.0005 * pb_ext
+                    out[side] = (m, fill, orh, orl, j + 1, stop)
+                    break
+            b = int(m // 5)                             # 5-minute candles from 1-minute bars
+            if cur is None or cur[0] != b:
+                cur = [b, op, h, l, c]
+            else:
+                cur[2], cur[3], cur[4] = max(cur[2], h), min(cur[3], l), c
+            last_of_bucket = j + 1 >= len(a) or int(a[j + 1, 0] // 5) != b
+            if last_of_bucket:
+                _, co, ch, cl, cc = cur
+                against = (cc < co) if s == 1 else (cc > co)
+                lower_high = prev5 is not None and ((ch < prev5[2]) if s == 1 else (cl > prev5[3]))
+                if against or lower_high:
+                    pulled = True
+                if pulled:
+                    trigger = ch if s == 1 else cl         # the most recent 5-min high (low for shorts)
+                    ext = cl if s == 1 else ch
+                    pb_ext = ext if pb_ext is None else (min(pb_ext, ext) if s == 1 else max(pb_ext, ext))
+                prev5 = cur[:]
+    return out
+
+
 def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
     out = []
     for cand in cands:
@@ -150,19 +224,22 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             continue
         if ENTRY["or"] == 5 and (cand["rvol5"] < o.MIN_RVOL or cand["price5"] < o.MIN_PRICE):
             continue                             # stocks in play judged on what is known at 09:35
-        ents = v.find_entries(cand, ENTRY)
+        if ENTRY_MODE == "breakout":
+            ents = {k_: tuple(v_) + (None,) for k_, v_ in v.find_entries(cand, ENTRY).items()}
+        else:
+            ents = pullback_entries(cand, ENTRY_MODE)
         if not ents:
             continue
         bars = cand["bars"]
         ser = series(bars)
-        for side, (m, entry, orh, orl, nxt) in ents.items():
+        for side, (m, entry, orh, orl, nxt, own_stop) in ents.items():
             s = 1 if side == "long" else -1
             if nxt >= len(bars):
                 continue
             if vwap_filter and (bars[nxt - 1, 4] - ser["vwap"][nxt - 1]) * s < 0:
                 continue
             R = orh - orl
-            stop = orl if s == 1 else orh
+            stop = own_stop if own_stop is not None else (orl if s == 1 else orh)
             risk = (entry - stop) * s
             if risk <= 0:
                 continue
@@ -312,11 +389,11 @@ def main():
                         build.append({"exit": name, "setup": setup, "news": "news" if need_news else "no news", "strategy": label,
                                       **construction(ts, taken, need_news, long_only)})
     df = pd.DataFrame(rows)
-    df.to_csv(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.csv", index=False)
-    pd.DataFrame(build).to_csv(f"{o.OUT_DIR}/construction_{o.TEST_START}_{o.TEST_END}.csv", index=False)
+    df.to_csv(f"{o.OUT_DIR}/exits_{ENTRY_MODE}_{o.TEST_START}_{o.TEST_END}.csv", index=False)
+    pd.DataFrame(build).to_csv(f"{o.OUT_DIR}/construction_{ENTRY_MODE}_{o.TEST_START}_{o.TEST_END}.csv", index=False)
     cols = ["exit", "setup", "news", "commission", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
             "worst_day", "max_dd"]
-    with open(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.md", "w") as f:
+    with open(f"{o.OUT_DIR}/exits_{ENTRY_MODE}_{o.TEST_START}_{o.TEST_END}.md", "w") as f:
         f.write(f"# ORB exit variants - {o.TEST_START} to {o.TEST_END}\n\nEntry fixed: {ENTRY['name']}; stop at the other "
                 f"side of the range. Stocks above ${o.MIN_PRICE:.0f}, RVOL >= {o.MIN_RVOL}, news, 5 slots, ${o.CAPITAL:,}.\n\n")
         f.write(df[cols].to_markdown(index=False))
