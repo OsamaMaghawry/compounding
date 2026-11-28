@@ -1,0 +1,105 @@
+exit,news,strategy,signals,trades_taken,signals_skipped_slots_full,days_traded,trades_per_day_avg,trades_per_day_max,max_open_at_once_avg,days_all_5_slots_full,peak_capital_in_use_avg,avg_hold_min,avg_position,longs,shorts
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",news,Long+short,668,137,531.0,21,6.5,8,5.0,21,9929.0,253.0,1981.0,93,44
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",news,Long only,393,138,,21,6.6,9,5.0,21,10000.0,232.0,2000.0,138,0
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",no news,Long+short,1061,145,916.0,21,6.9,9,5.0,21,9956.0,240.0,1986.0,98,47
+"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",no news,Long only,627,150,,21,7.1,10,5.0,21,10000.0,225.0,2000.0,150,0
+BE at 0.25 x daily ATR,news,Long+short,668,189,479.0,21,9.0,13,5.0,21,9949.0,159.0,1985.0,130,59
+BE at 0.25 x daily ATR,news,Long only,393,179,,21,8.5,13,5.0,21,10000.0,152.0,2000.0,179,0
+BE at 0.25 x daily ATR,no news,Long+short,1061,192,869.0,21,9.1,13,5.0,21,9964.0,162.0,1986.0,126,66
+BE at 0.25 x daily ATR,no news,Long only,627,188,,21,9.0,13,5.0,21,10000.0,150.0,2000.0,188,0
+BE at 0.5R,news,Long+short,668,172,496.0,21,8.2,11,5.0,21,9955.0,183.0,1984.0,114,58
+BE at 0.5R,news,Long only,393,164,,21,7.8,11,5.0,21,10000.0,172.0,2000.0,164,0
+BE at 0.5R,no news,Long+short,1061,183,878.0,21,8.7,12,5.0,21,9972.0,175.0,1987.0,122,61
+BE at 0.5R,no news,Long only,627,178,,21,8.5,12,5.0,21,10000.0,164.0,2000.0,178,0
+BE at 0.75R,news,Long+short,668,144,524.0,21,6.9,9,5.0,21,9935.0,232.0,1981.0,97,47
+BE at 0.75R,news,Long only,393,145,,21,6.9,9,5.0,21,10000.0,215.0,2000.0,145,0
+BE at 0.75R,no news,Long+short,1061,156,905.0,21,7.4,10,5.0,21,9957.0,216.0,1984.0,101,55
+BE at 0.75R,no news,Long only,627,157,,21,7.5,11,5.0,21,10000.0,204.0,2000.0,157,0
+BE at 1.5R,news,Long+short,668,129,539.0,21,6.1,8,5.0,21,9932.0,276.0,1982.0,91,38
+BE at 1.5R,news,Long only,393,129,,21,6.1,8,5.0,21,10000.0,263.0,2000.0,129,0
+BE at 1.5R,no news,Long+short,1061,134,927.0,21,6.4,8,5.0,21,9956.0,266.0,1989.0,94,40
+BE at 1.5R,no news,Long only,627,139,,21,6.6,9,5.0,21,10000.0,253.0,2000.0,139,0
+No breakeven,news,Long+short,668,127,541.0,21,6.0,8,5.0,21,9929.0,283.0,1982.0,89,38
+No breakeven,news,Long only,393,128,,21,6.1,8,5.0,21,10000.0,268.0,2000.0,128,0
+No breakeven,no news,Long+short,1061,129,932.0,21,6.1,8,5.0,21,9956.0,276.0,1988.0,90,39
+No breakeven,no news,Long only,627,135,,21,6.4,9,5.0,21,10000.0,261.0,2000.0,135,0
+"BE at 1R, lock +0.25R",news,Long+short,668,143,525.0,21,6.8,9,5.0,21,9941.0,243.0,1981.0,96,47
+"BE at 1R, lock +0.25R",news,Long only,393,140,,21,6.7,9,5.0,21,10000.0,224.0,2000.0,140,0
+"BE at 1R, lock +0.25R",no news,Long+short,1061,148,913.0,21,7.0,10,5.0,21,9957.0,232.0,1987.0,100,48
+"BE at 1R, lock +0.25R",no news,Long only,627,150,,21,7.1,9,5.0,21,10000.0,217.0,2000.0,150,0
+"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",news,Long+short,668,194,474.0,21,9.2,13,5.0,21,9951.0,150.0,1979.0,128,66
+"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",news,Long only,393,176,,21,8.4,12,5.0,20,9905.0,149.0,2000.0,176,0
+"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",no news,Long+short,1061,197,864.0,21,9.4,13,5.0,21,9968.0,154.0,1986.0,131,66
+"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",no news,Long only,627,191,,21,9.1,14,5.0,21,10000.0,144.0,2000.0,191,0
+ADR trail only: trail 25% ADR once at BE,news,Long+short,668,169,499.0,21,8.0,10,5.0,21,9948.0,190.0,1982.0,109,60
+ADR trail only: trail 25% ADR once at BE,news,Long only,393,158,,21,7.5,10,5.0,20,9905.0,186.0,2000.0,158,0
+ADR trail only: trail 25% ADR once at BE,no news,Long+short,1061,175,886.0,21,8.3,11,5.0,21,9961.0,185.0,1987.0,120,55
+ADR trail only: trail 25% ADR once at BE,no news,Long only,627,177,,21,8.4,11,5.0,21,10000.0,173.0,2000.0,177,0
+Base + out when the day's range reaches 100% ADR,news,Long+short,668,292,376.0,21,13.9,24,5.0,20,9843.0,83.0,1978.0,175,117
+Base + out when the day's range reaches 100% ADR,news,Long only,393,260,,21,12.4,20,4.9,19,9714.0,89.0,2000.0,260,0
+Base + out when the day's range reaches 100% ADR,no news,Long+short,1061,310,751.0,21,14.8,22,5.0,21,9958.0,87.0,1984.0,192,118
+Base + out when the day's range reaches 100% ADR,no news,Long only,627,286,,21,13.6,22,5.0,21,10000.0,84.0,2000.0,286,0
+Base + out when the day's range reaches 130% ADR,news,Long+short,668,230,438.0,21,11.0,17,5.0,21,9937.0,131.0,1981.0,147,83
+Base + out when the day's range reaches 130% ADR,news,Long only,393,201,,21,9.6,16,5.0,21,10000.0,130.0,2000.0,201,0
+Base + out when the day's range reaches 130% ADR,no news,Long+short,1061,227,834.0,21,10.8,19,5.0,21,9962.0,132.0,1986.0,145,82
+Base + out when the day's range reaches 130% ADR,no news,Long only,627,222,,21,10.6,16,5.0,21,10000.0,128.0,2000.0,222,0
+"Base, runner trails 9 EMA (1-min close)",news,Long+short,668,140,528.0,21,6.7,8,5.0,21,9934.0,241.0,1980.0,95,45
+"Base, runner trails 9 EMA (1-min close)",news,Long only,393,140,,21,6.7,9,5.0,21,10000.0,221.0,2000.0,140,0
+"Base, runner trails 9 EMA (1-min close)",no news,Long+short,1061,149,912.0,21,7.1,9,5.0,21,9956.0,232.0,1985.0,100,49
+"Base, runner trails 9 EMA (1-min close)",no news,Long only,627,152,,21,7.2,10,5.0,21,10000.0,213.0,2000.0,152,0
+"Base, runner trails 20 EMA (1-min close)",news,Long+short,668,140,528.0,21,6.7,8,5.0,21,9935.0,242.0,1981.0,96,44
+"Base, runner trails 20 EMA (1-min close)",news,Long only,393,140,,21,6.7,9,5.0,21,10000.0,221.0,2000.0,140,0
+"Base, runner trails 20 EMA (1-min close)",no news,Long+short,1061,149,912.0,21,7.1,9,5.0,21,9958.0,234.0,1986.0,101,48
+"Base, runner trails 20 EMA (1-min close)",no news,Long only,627,151,,21,7.2,10,5.0,21,10000.0,213.0,2000.0,151,0
+"Base, runner trails 9 EMA on 5-min bars",news,Long+short,668,136,532.0,21,6.5,8,5.0,21,9931.0,245.0,1980.0,92,44
+"Base, runner trails 9 EMA on 5-min bars",news,Long only,393,137,,21,6.5,9,5.0,21,10000.0,224.0,2000.0,137,0
+"Base, runner trails 9 EMA on 5-min bars",no news,Long+short,1061,143,918.0,21,6.8,9,5.0,21,9960.0,233.0,1986.0,97,46
+"Base, runner trails 9 EMA on 5-min bars",no news,Long only,627,148,,21,7.0,10,5.0,21,10000.0,217.0,2000.0,148,0
+"50% at 1.5R, rest trails 9 EMA 5-min",news,Long+short,668,142,526.0,21,6.8,8,5.0,21,9929.0,223.0,1978.0,95,47
+"50% at 1.5R, rest trails 9 EMA 5-min",news,Long only,393,139,,21,6.6,9,5.0,21,10000.0,205.0,2000.0,139,0
+"50% at 1.5R, rest trails 9 EMA 5-min",no news,Long+short,1061,150,911.0,21,7.1,9,5.0,21,9960.0,216.0,1981.0,98,52
+"50% at 1.5R, rest trails 9 EMA 5-min",no news,Long only,627,152,,21,7.2,10,5.0,21,10000.0,196.0,2000.0,152,0
+No targets: all trails 9 EMA 5-min once at BE,news,Long+short,668,149,519.0,21,7.1,9,5.0,21,9942.0,198.0,1978.0,99,50
+No targets: all trails 9 EMA 5-min once at BE,news,Long only,393,143,,21,6.8,10,5.0,21,10000.0,181.0,2000.0,143,0
+No targets: all trails 9 EMA 5-min once at BE,no news,Long+short,1061,156,905.0,21,7.4,10,5.0,21,9957.0,192.0,1980.0,101,55
+No targets: all trails 9 EMA 5-min once at BE,no news,Long only,627,155,,21,7.4,11,5.0,21,10000.0,168.0,2000.0,155,0
+No targets: all trails 20 EMA 1-min once at BE,news,Long+short,668,163,505.0,21,7.8,9,5.0,21,9947.0,187.0,1979.0,108,55
+No targets: all trails 20 EMA 1-min once at BE,news,Long only,393,157,,21,7.5,11,5.0,21,10000.0,173.0,2000.0,157,0
+No targets: all trails 20 EMA 1-min once at BE,no news,Long+short,1061,172,889.0,21,8.2,11,5.0,21,9957.0,183.0,1983.0,114,58
+No targets: all trails 20 EMA 1-min once at BE,no news,Long only,627,173,,21,8.2,11,5.0,21,10000.0,163.0,2000.0,173,0
+"Thirds at 1R, 2R, 3R, stop steps up",news,Long+short,668,137,531.0,21,6.5,8,5.0,21,9929.0,252.0,1981.0,94,43
+"Thirds at 1R, 2R, 3R, stop steps up",news,Long only,393,138,,21,6.6,9,5.0,21,10000.0,232.0,2000.0,138,0
+"Thirds at 1R, 2R, 3R, stop steps up",no news,Long+short,1061,144,917.0,21,6.9,9,5.0,21,9959.0,243.0,1986.0,99,45
+"Thirds at 1R, 2R, 3R, stop steps up",no news,Long only,627,146,,21,7.0,9,5.0,21,10000.0,230.0,2000.0,146,0
+"Quarters at 1R, 2R, 3R, 4R, stop steps up",news,Long+short,668,136,532.0,21,6.5,8,5.0,21,9929.0,257.0,1981.0,93,43
+"Quarters at 1R, 2R, 3R, 4R, stop steps up",news,Long only,393,136,,21,6.5,9,5.0,21,10000.0,234.0,2000.0,136,0
+"Quarters at 1R, 2R, 3R, 4R, stop steps up",no news,Long+short,1061,141,920.0,21,6.7,9,5.0,21,9957.0,247.0,1987.0,96,45
+"Quarters at 1R, 2R, 3R, 4R, stop steps up",no news,Long only,627,146,,21,7.0,9,5.0,21,10000.0,232.0,2000.0,146,0
+"50% 1.5R, 25% 3R, runner trail 1.5R",news,Long+short,668,134,534.0,21,6.4,8,5.0,21,9926.0,264.0,1980.0,92,42
+"50% 1.5R, 25% 3R, runner trail 1.5R",news,Long only,393,136,,21,6.5,9,5.0,21,10000.0,238.0,2000.0,136,0
+"50% 1.5R, 25% 3R, runner trail 1.5R",no news,Long+short,1061,139,922.0,21,6.6,9,5.0,21,9954.0,255.0,1987.0,96,43
+"50% 1.5R, 25% 3R, runner trail 1.5R",no news,Long only,627,145,,21,6.9,9,5.0,21,10000.0,236.0,2000.0,145,0
+"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",news,Long+short,668,137,531.0,21,6.5,8,5.0,21,9931.0,243.0,1980.0,93,44
+"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",news,Long only,393,138,,21,6.6,9,5.0,21,10000.0,224.0,2000.0,138,0
+"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",no news,Long+short,1061,143,918.0,21,6.8,9,5.0,21,9960.0,234.0,1986.0,97,46
+"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",no news,Long only,627,148,,21,7.0,10,5.0,21,10000.0,217.0,2000.0,148,0
+Base + out on a close back through VWAP,news,Long+short,668,260,408.0,21,12.4,17,5.0,21,9947.0,84.0,1980.0,167,93
+Base + out on a close back through VWAP,news,Long only,393,226,,21,10.8,15,4.8,19,9619.0,79.0,2000.0,226,0
+Base + out on a close back through VWAP,no news,Long+short,1061,284,777.0,21,13.5,17,5.0,21,9971.0,89.0,1980.0,182,102
+Base + out on a close back through VWAP,no news,Long only,627,254,,21,12.1,17,5.0,21,10000.0,79.0,2000.0,254,0
+"Base, runner trails VWAP",news,Long+short,668,133,535.0,21,6.3,8,5.0,21,9926.0,268.0,1980.0,91,42
+"Base, runner trails VWAP",news,Long only,393,135,,21,6.4,9,5.0,21,10000.0,241.0,2000.0,135,0
+"Base, runner trails VWAP",no news,Long+short,1061,140,921.0,21,6.7,8,5.0,21,9954.0,252.0,1985.0,96,44
+"Base, runner trails VWAP",no news,Long only,627,145,,21,6.9,9,5.0,21,10000.0,232.0,2000.0,145,0
+Base + entry only on the right side of VWAP,news,Long+short,665,136,529.0,21,6.5,8,5.0,21,9929.0,253.0,1982.0,93,43
+Base + entry only on the right side of VWAP,news,Long only,392,138,,21,6.6,9,5.0,21,10000.0,232.0,2000.0,138,0
+Base + entry only on the right side of VWAP,no news,Long+short,1055,145,910.0,21,6.9,9,5.0,21,9956.0,240.0,1986.0,98,47
+Base + entry only on the right side of VWAP,no news,Long only,626,149,,21,7.1,10,5.0,21,10000.0,225.0,2000.0,149,0
+"Base, runner chandelier 3x 1-min ATR",news,Long+short,668,140,528.0,21,6.7,8,5.0,21,9933.0,239.0,1981.0,95,45
+"Base, runner chandelier 3x 1-min ATR",news,Long only,393,140,,21,6.7,9,5.0,21,10000.0,220.0,2000.0,140,0
+"Base, runner chandelier 3x 1-min ATR",no news,Long+short,1061,149,912.0,21,7.1,9,5.0,21,9958.0,231.0,1986.0,101,48
+"Base, runner chandelier 3x 1-min ATR",no news,Long only,627,151,,21,7.2,10,5.0,21,10000.0,211.0,2000.0,151,0
+No targets: chandelier 3x 1-min ATR once at BE,news,Long+short,668,164,504.0,21,7.8,10,5.0,21,9945.0,185.0,1979.0,108,56
+No targets: chandelier 3x 1-min ATR once at BE,news,Long only,393,154,,21,7.3,10,5.0,21,10000.0,175.0,2000.0,154,0
+No targets: chandelier 3x 1-min ATR once at BE,no news,Long+short,1061,174,887.0,21,8.3,11,5.0,21,9957.0,180.0,1982.0,114,60
+No targets: chandelier 3x 1-min ATR once at BE,no news,Long only,627,171,,21,8.1,11,5.0,21,10000.0,163.0,2000.0,171,0

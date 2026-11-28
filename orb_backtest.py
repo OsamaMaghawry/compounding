@@ -19,12 +19,14 @@ stops at the stop price (or the open if it gaps through). If a bar touches both 
 is assumed first. SLIPPAGE_PCT on every fill.
 """
 
+import os
+
 # ============================================================================
 # SETTINGS
 # ============================================================================
 DATA_DIR = "/home/user/market-data/eodhd_cache"   # saved EODHD data (repo market-data)
-TEST_START = "2025-11-17"           # first test day (needs ~10 days of history before it)
-TEST_END = "2025-12-16"
+TEST_START = os.environ.get("ORB_START", "2025-11-17")   # first test day (needs ~10 days of history before it)
+TEST_END = os.environ.get("ORB_END", "2025-12-16")
 
 OR_MINUTES = 15                     # opening range length
 MIN_RVOL = 2.0                      # relative volume of the opening range
@@ -292,7 +294,7 @@ def add_news_flags(trades, days):
 
 # ---------------------------------------------------------------------------- portfolio
 def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=0.5, daily_limit_pct=0.0,
-              keep=None):
+              keep=None, commission_pct=0.0):
     """Applies an optional filter (keep), slots (max open positions), sizing and an optional daily loss limit.
     Long+short takes, per stock and day, the first break that passes the filters; long only takes the long break."""
     pool = [t for t in trades if (not news_required or t["news"]) and (keep is None or keep(t))]
@@ -329,7 +331,11 @@ def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=
             if shares <= 0:
                 continue
             pnl = shares * t["pnl_ps"]
-            taken.append(dict(t, shares=shares, pnl=pnl))
+            if commission_pct:   # % of the traded value, on the entry and on the exit
+                entry_value = shares * t["entry"]
+                exit_value = entry_value + (pnl if t["side"] == "long" else -pnl)
+                pnl -= commission_pct / 100 * (entry_value + exit_value)
+            taken.append(dict(t, shares=shares, pnl=pnl, value=shares * t["entry"]))
             open_exits.append(t["exit_m"])
             closed.append((t["exit_m"], pnl))
     return taken

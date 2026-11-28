@@ -6,6 +6,7 @@ Writes results/orb/exits_<start>_<end>.md and .csv.
 """
 import gzip
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +41,19 @@ def adr_table():
     return out
 
 
+def atr_table():
+    """Daily ATR (14-day average true range, $) known before each day, per ticker."""
+    out = {}
+    for f in Path(o.DATA_DIR, "json").glob("eod_*_*.json.gz"):
+        t = f.name[4:].rsplit("_", 2)[0]
+        rows = [r for r in sorted(json.load(gzip.open(f)), key=lambda r: r["date"]) if r.get("high") and r.get("close")]
+        trs = [max(r["high"] - r["low"], abs(r["high"] - p["close"]), abs(r["low"] - p["close"]))
+               for p, r in zip(rows[:-1], rows[1:])]
+        for i in range(ADR_DAYS, len(trs)):
+            out[(t, rows[i + 1]["date"])] = float(np.mean(trs[i - ADR_DAYS:i]))
+    return out
+
+
 def series(bars):
     c, h, l, vol = bars[:, 4], bars[:, 2], bars[:, 3], bars[:, 5]
     tp = (h + l + c) / 3
@@ -56,7 +70,7 @@ def series(bars):
     return {"ema9": ema(c, 9), "ema20": ema(c, 20), "vwap": vwap, "ema9_5": ema9_5, "atr": atr}
 
 
-def manage(s, entry, R, adr, bars, j0, ser, x):
+def manage(s, entry, R, adr, bars, j0, ser, x, datr=None):
     """Runs exit rules x from bar j0. Units: 'R' = range size, 'ADR' = average daily range."""
     unit = {"R": R, "ADR": adr}
     stop = x["stop"]
@@ -103,7 +117,8 @@ def manage(s, entry, R, adr, bars, j0, ser, x):
                 stop = max(stop, lvl) if s == 1 else min(stop, lvl)
         if remaining <= 1e-9:
             exit_m = m; break
-        if x.get("be") is not None and not be and (fav - (entry + s * x["be"] * R)) * s >= 0:
+        be_move = x["be_atr"] * datr if x.get("be_atr") else (x["be"] * R if x.get("be") is not None else None)
+        if be_move is not None and not be and (fav - (entry + s * be_move)) * s >= 0:
             lvl = entry + s * x.get("be_lock", 0) * R
             stop = max(stop, lvl) if s == 1 else min(stop, lvl); be = True
         for rule in x.get("trail", []):
@@ -127,7 +142,7 @@ def manage(s, entry, R, adr, bars, j0, ser, x):
     return pnl, exit_m
 
 
-def trades(cands, x, adr, vwap_filter=False):
+def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
     out = []
     for cand in cands:
         a_ = adr.get((cand["ticker"], cand["day"]))
@@ -149,7 +164,10 @@ def trades(cands, x, adr, vwap_filter=False):
             risk = (entry - stop) * s
             if risk <= 0:
                 continue
-            pnl, exit_m = manage(s, entry, R, a_, bars, nxt, ser, dict(x, stop=stop))
+            d_atr = (datr_tab or {}).get((cand["ticker"], cand["day"]))
+            if x.get("be_atr") and not d_atr:
+                continue
+            pnl, exit_m = manage(s, entry, R, a_, bars, nxt, ser, dict(x, stop=stop), d_atr)
             out.append({"ticker": cand["ticker"], "day": cand["day"], "side": side, "entry_m": int(m),
                         "entry": entry, "risk": risk, "pnl_ps": pnl, "r": pnl / risk, "exit_m": int(exit_m),
                         "rvol": cand["rvol"], "gap": cand["gap"]})
@@ -160,6 +178,7 @@ T = lambda k, f, u="R": (k, f, u)
 BASE = {"be": 1.0, "targets": [T(1.5, .5), T(2.0, .25)], "trail": [{"type": "R", "k": 1.0, "start": "t2"}]}
 EXITS = [
     ("Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R", BASE, {}),
+    ("BE at 0.25 x daily ATR", dict(BASE, be=None, be_atr=0.25), {}),
     # breakeven timing
     ("BE at 0.5R", dict(BASE, be=0.5), {}),
     ("BE at 0.75R", dict(BASE, be=0.75), {}),
@@ -195,24 +214,75 @@ EXITS = [
 ]
 
 
+COMMISSION_PCT = 0.5   # $5 per $1,000 traded, on the entry and on the exit
+
+
+def construction(all_trades, taken, need_news, long_only):
+    """How the portfolio was invested: signals, positions per day, slots full, capital in use."""
+    pool = [t for t in all_trades if (not need_news or t["news"]) and (t["side"] == "long" or not long_only)]
+    sig = pd.DataFrame(pool)
+    df = pd.DataFrame(taken)
+    if df.empty:
+        return {}
+    per_day = df.groupby("day").size().reindex(v.DAYS, fill_value=0)
+    # most positions open at the same time, per day, and capital in use at that moment
+    peak, peak_val = [], []
+    for day, g in df.groupby("day"):
+        ev = sorted([(r.entry_m, 1, r.value) for r in g.itertuples()] + [(r.exit_m, -1, -r.value) for r in g.itertuples()],
+                    key=lambda e_: (e_[0], e_[1]))
+        n = val = mx = mxv = 0
+        for _, d, val_ in ev:
+            n += d; val += val_; mx = max(mx, n); mxv = max(mxv, val)
+        peak.append(mx); peak_val.append(mxv)
+    sig_days = sig.groupby("day").size() if len(sig) else pd.Series(dtype=int)
+    return {
+        "signals": len(sig), "trades_taken": len(df), "signals_skipped_slots_full": len(sig) - len(df) if not long_only else None,
+        "days_traded": int((per_day > 0).sum()), "trades_per_day_avg": round(per_day.mean(), 1),
+        "trades_per_day_max": int(per_day.max()), "max_open_at_once_avg": round(np.mean(peak), 1),
+        "days_all_5_slots_full": int(sum(1 for p in peak if p >= 5)),
+        "peak_capital_in_use_avg": round(np.mean(peak_val), 0),
+        "avg_hold_min": round((df.exit_m - df.entry_m).mean(), 0),
+        "avg_position": round(df.value.mean(), 0), "longs": int((df.side == "long").sum()), "shorts": int((df.side == "short").sum()),
+    }
+
+
+FROZEN = ["Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",
+          "No targets: all trails 9 EMA 5-min once at BE",
+          "ADR trail only: trail 25% ADR once at BE",
+          "Thirds at 1R, 2R, 3R, stop steps up",
+          "BE at 0.5R",
+          "BE at 0.25 x daily ATR"]
+
+
 def main():
+    global EXITS
+    if os.environ.get("ORB_SET") == "frozen":
+        EXITS = [x for x in EXITS if x[0] in FROZEN]
     cands = v.load_candidates()
-    o.NEWS_CALL_CAP = 0                        # saved news only - no EODHD calls
+    o.NEWS_CALL_CAP = int(os.environ.get("ORB_NEWS_CAP", "0"))   # 0 = saved news only, no EODHD calls
     flagged = o.add_news_flags([{"ticker": c["ticker"], "day": c["day"]} for c in cands], o.trading_days())
     news = {(t["ticker"], t["day"]): t["news"] for t in flagged}
     adr = adr_table()
-    rows = []
+    datr = atr_table()
+    rows, build = [], []
     for name, x, kw in EXITS:
-        ts = trades(cands, x, adr, **kw)
+        ts = trades(cands, x, adr, datr_tab=datr, **kw)
         for t in ts:
             t["news"] = news.get((t["ticker"], t["day"]))
         for need_news in (True, False):
             for long_only, label in ((False, "Long+short"), (True, "Long only")):
-                st = o.stats(o.portfolio(ts, 5, long_only, news_required=need_news), v.DAYS)
-                rows.append({"exit": name, "news": "news" if need_news else "no news", "strategy": label, **st})
+                for comm in (0.0, COMMISSION_PCT):
+                    taken = o.portfolio(ts, 5, long_only, news_required=need_news, commission_pct=comm)
+                    st = o.stats(taken, v.DAYS)
+                    rows.append({"exit": name, "news": "news" if need_news else "no news", "strategy": label,
+                                 "commission": "$5 per $1,000" if comm else "none", **st})
+                    if not comm:
+                        build.append({"exit": name, "news": "news" if need_news else "no news", "strategy": label,
+                                      **construction(ts, taken, need_news, long_only)})
     df = pd.DataFrame(rows)
     df.to_csv(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.csv", index=False)
-    cols = ["exit", "news", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
+    pd.DataFrame(build).to_csv(f"{o.OUT_DIR}/construction_{o.TEST_START}_{o.TEST_END}.csv", index=False)
+    cols = ["exit", "news", "commission", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
             "worst_day", "max_dd"]
     with open(f"{o.OUT_DIR}/exits_{o.TEST_START}_{o.TEST_END}.md", "w") as f:
         f.write(f"# ORB exit variants - {o.TEST_START} to {o.TEST_END}\n\nEntry fixed: {ENTRY['name']}; stop at the other "
