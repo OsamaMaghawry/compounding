@@ -5,8 +5,7 @@ import pandas as pd
 
 import orb_backtest as o
 
-PERIODS = [("2025-11-17", "2026-02-25"), ("2026-02-26", "2026-06-20"),
-           ("2026-06-21", "2026-10-13"), ("2026-10-14", "2026-11-27")]
+PERIODS = [(o.TEST_START, o.TEST_END)]
 
 trades = pd.read_csv(f"{o.OUT_DIR}/all_breakouts.csv.gz").to_dict("records")
 days = [d for d in o.trading_days() if o.TEST_START <= d <= o.TEST_END]
@@ -27,7 +26,7 @@ VERSIONS = [  # (name, slots, kwargs)
 rows = []
 for name, slots, kw in VERSIONS:
     for long_only in (False, True):
-        args = dict(news_required=True, **kw)
+        args = {"news_required": True, **kw}
         taken = o.portfolio(trades, slots, long_only, **args)
         st = o.stats(taken, days)
         df = pd.DataFrame(taken)
@@ -41,11 +40,10 @@ for name, slots, kw in VERSIONS:
 res = pd.DataFrame(rows)
 res.to_csv(f"{o.OUT_DIR}/summary.csv", index=False)
 cols = ["version", "strategy", "trades", "win_pct", "pf", "total", "without_best5", "avg_r", "long_pnl", "short_pnl",
-        "worst_day", "max_dd", "P1", "P2", "P3", "P4"]
+        "worst_day", "max_dd", "days_up", "days_down"]
 months = sorted(c for c in res.columns if c[:2] == "20" and len(c) == 7)
 with open(f"{o.OUT_DIR}/summary.md", "w") as f:
     f.write(f"# ORB backtest - {days[0]} to {days[-1]} ({len(days)} days), ${o.CAPITAL:,} capital\n\n")
-    f.write(f"P1 {PERIODS[0]}, P2 {PERIODS[1]}, P3 {PERIODS[2]}, P4 {PERIODS[3]}\n\n")
     f.write(res[cols].to_markdown(index=False) + "\n\n## Monthly P&L\n\n")
     f.write(res[["version", "strategy"] + months].to_markdown(index=False) + "\n")
 print(res[cols].to_string(index=False))

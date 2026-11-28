@@ -24,13 +24,13 @@ is assumed first. SLIPPAGE_PCT on every fill.
 # ============================================================================
 DATA_DIR = "/home/user/market-data/eodhd_cache"   # saved EODHD data (repo market-data)
 TEST_START = "2025-11-17"           # first test day (needs ~10 days of history before it)
-TEST_END = "2026-11-27"
+TEST_END = "2025-12-16"
 
 OR_MINUTES = 15                     # opening range length
 MIN_RVOL = 2.0                      # relative volume of the opening range
 RVOL_LOOKBACK_DAYS = 20
 MIN_RVOL_HISTORY_DAYS = 10
-MIN_PRICE = 5.0
+MIN_PRICE = 20.0
 MIN_AVG_DAILY_VOLUME = 500_000
 AVG_VOLUME_DAYS = 20
 MIN_RANGE_PCT = 0.0                 # e.g. 0.5 = skip ranges narrower than 0.5% of the price
@@ -50,8 +50,8 @@ EXIT_TIME = "15:55"
 
 NEWS_REQUIRED = True
 NEWS_UNTIL = "09:45"                # news must be published before this time on the trade day
-NEWS_CALL_CAP = 20_000              # EODHD calls allowed for news in one run
-FETCH_NEWS = False                  # False = no EODHD calls at all: the news check is left out
+NEWS_CALL_CAP = 5_000              # EODHD calls allowed for news in one run
+FETCH_NEWS = True                  # False = no EODHD calls at all: the news check is left out
 
 CAPITAL = 10_000                    # allocated capital ($)
 SLIPPAGE_PCT = 0.02                 # % per fill
@@ -102,7 +102,9 @@ def daily_info(ticker, days):
 
 
 def load_minutes(ticker):
-    frames = [pd.read_csv(p) for p in sorted(Path(DATA_DIR, "minutes").glob(f"*/{ticker}.csv.gz"))]
+    lookback = (pd.Timestamp(TEST_START) - pd.Timedelta(days=45)).strftime("%Y-%m-%d")
+    frames = [pd.read_csv(p) for p in sorted(Path(DATA_DIR, "minutes").glob(f"*/{ticker}.csv.gz"))
+              if p.parent.name.split("_")[0] <= TEST_END and p.parent.name.split("_")[1] >= lookback]
     frames = [f for f in frames if not f.empty]
     if not frames:
         return None
@@ -231,12 +233,13 @@ def scan_ticker(ticker):
 
 # ---------------------------------------------------------------------------- news
 _news_calls = 0
+NEWS_FROM = (pd.Timestamp(TEST_START) - pd.Timedelta(days=5)).strftime("%Y-%m-%d")
 
 
 def news_times(ticker, key):
     """Publication times (UTC ISO) of all EODHD news for a ticker over the test range, saved in market-data."""
     global _news_calls
-    f = Path(DATA_DIR, "news", f"{ticker}.json.gz")
+    f = Path(DATA_DIR, "news", f"{TEST_START}_{TEST_END}", f"{ticker}.json.gz")
     if f.exists():
         return json.load(gzip.open(f))
     times, offset = [], 0
@@ -247,7 +250,7 @@ def news_times(ticker, key):
         for attempt in range(5):
             try:
                 r = requests.get("https://eodhd.com/api/news", timeout=60, params={
-                    "s": f"{ticker}.US", "from": "2025-10-01", "to": TEST_END, "limit": 1000, "offset": offset,
+                    "s": f"{ticker}.US", "from": NEWS_FROM, "to": TEST_END, "limit": 1000, "offset": offset,
                     "api_token": key, "fmt": "json"})
                 if r.status_code == 429:
                     time.sleep(5 * (attempt + 1)); continue
@@ -353,7 +356,8 @@ def stats(taken, days_in_test):
 def main():
     days = trading_days()
     test_days = [d for d in days if TEST_START <= d <= TEST_END]
-    tickers = sorted({p.name[:-7] for p in Path(DATA_DIR, "minutes").glob("*/*.csv.gz")} - {"SPY"})
+    tickers = sorted({p.name[:-7] for p in Path(DATA_DIR, "minutes").glob("*/*.csv.gz")
+                      if p.parent.name.split("_")[0] <= TEST_END and p.parent.name.split("_")[1] >= TEST_START} - {"SPY"})
     print(f"ORB {OR_MINUTES}m | {len(test_days)} test days {test_days[0]} -> {test_days[-1]} | {len(tickers):,} stocks", flush=True)
     t0 = time.time()
     trades = []
