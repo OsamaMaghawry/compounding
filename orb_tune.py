@@ -135,8 +135,9 @@ def main():
     for mth in MONTHS:
         print(f"candidates {mth}: {len(candidates(mth))}", flush=True)
     rows = []
-    # step 1: one change at a time from the base
-    for or_len in (5, 15):
+    step1_file = Path(f"{o.OUT_DIR}/tune_step1_one_change.csv")
+    # step 1: one change at a time from the base (skipped if already saved)
+    for or_len in (() if step1_file.exists() else (5, 15)):
         rows += evaluate(or_len, BASE_SIM, BASE_FILT, adr, datr, spy, "base")
         for k, opts in SIM_OPTIONS.items():
             for opt in opts:
@@ -149,13 +150,17 @@ def main():
                     continue
                 rows += evaluate(or_len, BASE_SIM, dict(BASE_FILT, **{k: opt}), adr, datr, spy, f"{k}: {opt}")
         print(f"step 1 done: {or_len}-min", flush=True)
-    step1 = pd.DataFrame(rows)
-    step1.to_csv(f"{o.OUT_DIR}/tune_step1_one_change.csv", index=False)
+    if rows:
+        pd.DataFrame(rows).to_csv(step1_file, index=False)
+    step1 = pd.read_csv(step1_file)
 
     # step 2: combine the 2 best options of each setting (by 3-month total / drawdown), per range and strategy
-    rows2 = []
     for (rng, strat), g in step1.groupby(["range", "strategy"]):
         or_len = int(rng.split("-")[0])
+        part = Path(f"{o.OUT_DIR}/tune_step2_{rng}_{strat.replace('+', '_').replace(' ', '_')}.csv")
+        if part.exists():                       # saved part: not run again
+            continue
+        rows2 = []
         base = g[g.changed == "base"].iloc[0]
         score = lambda r: r["total"] / max(1.0, -r["max_dd"])
         best = {}
@@ -174,8 +179,11 @@ def main():
             for r in evaluate(or_len, sim, filt, adr, datr, spy, "combination"):
                 if (r["strategy"] == "Long only") == lo:
                     rows2.append(r)
-        print(f"step 2 done: {rng} {strat} ({len(rows2)} rows)", flush=True)
-    pd.DataFrame(rows2).to_csv(f"{o.OUT_DIR}/tune_step2_combinations.csv", index=False)
+        pd.DataFrame(rows2).to_csv(part, index=False)
+        os.system(f'git add "{part}" && git commit -qm "ORB tuning step 2: {rng} {strat}" '
+                  f'-m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" '
+                  f'-m "Claude-Session: https://claude.ai/code/session_01UMT8os9rEpqA4E8Br1QE99" && git push -q')
+        print(f"step 2 done and saved: {rng} {strat} ({len(rows2)} rows)", flush=True)
     print("ALL DONE")
 
 
