@@ -1,0 +1,313 @@
+entry,exit,stocks_per_day,news,strategy,total_before,trades,win_pct,pf,without_best5,max_dd,worst_day,total_after,pf_after,max_dd_after,long_after,short_after
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,275.0,21,38.1,1.1,-2561.0,-2234.0,-528.0,-1804.0,0.57,-3551.0,-2967.0,1163.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,-537.0,42,35.7,0.84,-2423.0,-1939.0,-584.0,-2616.0,0.45,-3443.0,-3189.0,573.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,-1940.0,42,31.0,0.46,-3009.0,-2283.0,-584.0,-4030.0,0.21,-4030.0,-4030.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,-356.0,63,38.1,0.87,-1613.0,-1335.0,-417.0,-2432.0,0.41,-2912.0,-2688.0,257.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,-1861.0,62,29.0,0.45,-2658.0,-2004.0,-417.0,-3919.0,0.2,-3919.0,-3919.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,1,no news,Long+short,846.0,21,19.0,1.73,-1161.0,-1105.0,-486.0,-1240.0,0.57,-2678.0,-2069.0,829.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,1,no news,Long only,-1585.0,21,14.3,0.18,-1928.0,-1857.0,-622.0,-3677.0,0.05,-3677.0,-3677.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,2,no news,Long+short,-322.0,42,16.7,0.79,-1497.0,-962.0,-312.0,-2410.0,0.28,-2529.0,-2296.0,-114.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,2,no news,Long only,-863.0,42,16.7,0.46,-1549.0,-1162.0,-388.0,-2958.0,0.13,-2958.0,-2958.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,3,no news,Long+short,-523.0,63,14.3,0.63,-1315.0,-971.0,-259.0,-2605.0,0.2,-2605.0,-2141.0,-464.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.25 x daily ATR,3,no news,Long only,-1128.0,62,16.1,0.4,-1692.0,-1326.0,-266.0,-3189.0,0.13,-3189.0,-3189.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,1,no news,Long+short,-784.0,21,9.5,0.67,-2378.0,-1856.0,-528.0,-2870.0,0.33,-3650.0,-2814.0,-56.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,1,no news,Long only,-2334.0,21,14.3,0.26,-3145.0,-2603.0,-622.0,-4422.0,0.12,-4422.0,-4422.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,2,no news,Long+short,-923.0,42,21.4,0.69,-2660.0,-1979.0,-584.0,-3006.0,0.35,-3772.0,-2971.0,-35.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,2,no news,Long only,-1389.0,42,23.8,0.52,-2458.0,-1687.0,-584.0,-3482.0,0.23,-3482.0,-3482.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,3,no news,Long+short,-701.0,63,23.8,0.71,-1857.0,-1437.0,-417.0,-2781.0,0.32,-3205.0,-2490.0,-290.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.5R,3,no news,Long only,-1450.0,62,22.6,0.49,-2247.0,-1647.0,-417.0,-3509.0,0.21,-3509.0,-3509.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,1,no news,Long+short,665.0,21,38.1,1.27,-2172.0,-1844.0,-528.0,-1417.0,0.63,-3164.0,-2580.0,1163.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,1,no news,Long only,-2134.0,21,28.6,0.34,-3213.0,-2558.0,-622.0,-4224.0,0.13,-4278.0,-4224.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,2,no news,Long+short,-233.0,42,35.7,0.92,-2120.0,-1613.0,-584.0,-2314.0,0.48,-3141.0,-2887.0,573.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,2,no news,Long only,-1322.0,42,31.0,0.55,-2391.0,-1665.0,-584.0,-3416.0,0.24,-3416.0,-3416.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,3,no news,Long+short,-187.0,63,34.9,0.93,-1444.0,-1150.0,-417.0,-2264.0,0.43,-2744.0,-2487.0,224.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 0.75R,3,no news,Long only,-1448.0,62,29.0,0.52,-2245.0,-1592.0,-417.0,-3507.0,0.22,-3507.0,-3507.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,1,no news,Long+short,487.0,21,42.9,1.18,-2358.0,-2186.0,-528.0,-1594.0,0.6,-3404.0,-2757.0,1163.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,1,no news,Long only,-2529.0,21,33.3,0.33,-3720.0,-2954.0,-622.0,-4617.0,0.13,-4671.0,-4617.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,2,no news,Long+short,-458.0,42,38.1,0.86,-2344.0,-1966.0,-584.0,-2538.0,0.46,-3452.0,-3083.0,546.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,2,no news,Long only,-2130.0,42,33.3,0.45,-3199.0,-2473.0,-584.0,-4219.0,0.21,-4219.0,-4219.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,3,no news,Long+short,-400.0,63,41.3,0.86,-1657.0,-1449.0,-417.0,-2476.0,0.41,-2982.0,-2715.0,239.0
+2nd 5-min candle closes beyond the 1st (no volume check),BE at 1.5R,3,no news,Long only,-1979.0,62,32.3,0.45,-2776.0,-2122.0,-417.0,-4036.0,0.2,-4036.0,-4036.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,1,no news,Long+short,535.0,21,42.9,1.19,-2358.0,-2186.0,-528.0,-1545.0,0.62,-3404.0,-2757.0,1212.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,1,no news,Long only,-2529.0,21,33.3,0.33,-3720.0,-2954.0,-622.0,-4617.0,0.13,-4671.0,-4617.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,2,no news,Long+short,-434.0,42,38.1,0.87,-2320.0,-1942.0,-584.0,-2513.0,0.46,-3427.0,-3083.0,570.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,2,no news,Long only,-2130.0,42,33.3,0.45,-3199.0,-2473.0,-584.0,-4219.0,0.21,-4219.0,-4219.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,3,no news,Long+short,-385.0,63,41.3,0.86,-1642.0,-1434.0,-417.0,-2461.0,0.41,-2967.0,-2715.0,254.0
+2nd 5-min candle closes beyond the 1st (no volume check),No breakeven,3,no news,Long only,-1979.0,62,32.3,0.45,-2776.0,-2122.0,-417.0,-4036.0,0.2,-4036.0,-4036.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",1,no news,Long+short,386.0,21,42.9,1.14,-2505.0,-2186.0,-528.0,-1694.0,0.59,-3496.0,-2912.0,1218.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",1,no news,Long only,-2685.0,21,33.3,0.29,-3764.0,-3109.0,-622.0,-4772.0,0.12,-4826.0,-4772.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",2,no news,Long+short,-716.0,42,40.5,0.78,-2362.0,-1906.0,-584.0,-2796.0,0.41,-3391.0,-3161.0,365.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",2,no news,Long only,-1762.0,42,40.5,0.51,-2832.0,-2105.0,-584.0,-3854.0,0.22,-3854.0,-3854.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",3,no news,Long+short,-455.0,63,46.0,0.83,-1552.0,-1254.0,-417.0,-2532.0,0.38,-2852.0,-2616.0,84.0
+2nd 5-min candle closes beyond the 1st (no volume check),"BE at 1R, lock +0.25R",3,no news,Long only,-1763.0,62,38.7,0.48,-2561.0,-1906.0,-417.0,-3821.0,0.21,-3821.0,-3821.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,486.0,21,52.4,1.35,-766.0,-1085.0,-486.0,-1608.0,0.35,-2354.0,-1453.0,-155.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-777.0,21,52.4,0.64,-1705.0,-1391.0,-622.0,-2874.0,0.14,-3084.0,-2874.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,-426.0,42,52.4,0.78,-1090.0,-828.0,-242.0,-2517.0,0.19,-2517.0,-2014.0,-503.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,-429.0,42,57.1,0.78,-920.0,-702.0,-388.0,-2527.0,0.15,-2527.0,-2527.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,-153.0,63,58.7,0.91,-596.0,-653.0,-213.0,-2237.0,0.18,-2237.0,-1765.0,-472.0
+2nd 5-min candle closes beyond the 1st (no volume check),"ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,-786.0,62,56.5,0.63,-1134.0,-956.0,-218.0,-2849.0,0.11,-2849.0,-2849.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,378.0,21,38.1,1.13,-2561.0,-2234.0,-528.0,-1701.0,0.59,-3551.0,-2956.0,1254.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-2777.0,21,28.6,0.28,-3786.0,-3113.0,-622.0,-4863.0,0.1,-4929.0,-4863.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,-138.0,42,35.7,0.96,-2440.0,-1979.0,-584.0,-2215.0,0.53,-3480.0,-3276.0,1061.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,2,no news,Long only,-1588.0,42,38.1,0.56,-2743.0,-1836.0,-584.0,-3680.0,0.25,-3680.0,-3680.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,114.0,63,42.9,1.04,-1507.0,-1072.0,-417.0,-1961.0,0.51,-2645.0,-2460.0,498.0
+2nd 5-min candle closes beyond the 1st (no volume check),ADR trail only: trail 25% ADR once at BE,3,no news,Long only,-1719.0,62,37.1,0.5,-2536.0,-1794.0,-417.0,-3777.0,0.21,-3777.0,-3777.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-927.0,21,33.3,0.49,-1789.0,-1133.0,-486.0,-3017.0,0.15,-3017.0,-2618.0,-399.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,1,no news,Long only,-1307.0,21,38.1,0.36,-1943.0,-1364.0,-486.0,-3400.0,0.07,-3400.0,-3400.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-539.0,42,40.5,0.66,-1253.0,-686.0,-320.0,-2629.0,0.16,-2629.0,-2117.0,-512.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,2,no news,Long only,-383.0,42,50.0,0.73,-910.0,-533.0,-320.0,-2481.0,0.11,-2481.0,-2481.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,3,no news,Long+short,-377.0,63,42.9,0.72,-856.0,-414.0,-248.0,-2461.0,0.13,-2461.0,-1794.0,-668.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 100% ADR,3,no news,Long only,-699.0,62,46.8,0.55,-1050.0,-804.0,-283.0,-2762.0,0.07,-2762.0,-2762.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-450.0,21,33.3,0.76,-1760.0,-1111.0,-486.0,-2540.0,0.25,-2620.0,-2392.0,-148.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,1,no news,Long only,-1622.0,21,28.6,0.3,-2286.0,-1777.0,-486.0,-3714.0,0.06,-3768.0,-3714.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,2,no news,Long+short,-469.0,42,35.7,0.73,-1313.0,-590.0,-320.0,-2558.0,0.21,-2558.0,-2130.0,-428.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,2,no news,Long only,-468.0,42,45.2,0.73,-1096.0,-681.0,-341.0,-2566.0,0.17,-2566.0,-2566.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,3,no news,Long+short,-316.0,63,39.7,0.8,-957.0,-528.0,-248.0,-2400.0,0.2,-2400.0,-1896.0,-504.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out when the day's range reaches 130% ADR,3,no news,Long only,-1042.0,62,38.7,0.49,-1461.0,-1042.0,-264.0,-3104.0,0.11,-3104.0,-3104.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,289.0,21,38.1,1.1,-2561.0,-2234.0,-528.0,-1790.0,0.57,-3551.0,-2967.0,1177.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,-528.0,42,35.7,0.84,-2428.0,-1933.0,-584.0,-2608.0,0.45,-3442.0,-3187.0,580.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",2,no news,Long only,-1939.0,42,31.0,0.46,-3014.0,-2282.0,-584.0,-4029.0,0.21,-4029.0,-4029.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,-342.0,63,38.1,0.87,-1608.0,-1332.0,-417.0,-2418.0,0.41,-2911.0,-2690.0,273.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA (1-min close)",3,no news,Long only,-1837.0,62,29.0,0.46,-2665.0,-1980.0,-417.0,-3894.0,0.21,-3894.0,-3894.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,283.0,21,38.1,1.1,-2561.0,-2234.0,-528.0,-1796.0,0.57,-3551.0,-2967.0,1171.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,-536.0,42,35.7,0.84,-2428.0,-1938.0,-584.0,-2615.0,0.45,-3446.0,-3192.0,577.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",2,no news,Long only,-1943.0,42,31.0,0.46,-3014.0,-2286.0,-584.0,-4033.0,0.21,-4033.0,-4033.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,-346.0,63,38.1,0.87,-1607.0,-1337.0,-417.0,-2422.0,0.41,-2911.0,-2687.0,265.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 20 EMA (1-min close)",3,no news,Long only,-1833.0,62,29.0,0.46,-2658.0,-1976.0,-417.0,-3891.0,0.21,-3891.0,-3891.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,340.0,21,38.1,1.12,-2561.0,-2234.0,-528.0,-1740.0,0.58,-3551.0,-2967.0,1227.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,-510.0,42,35.7,0.85,-2430.0,-1938.0,-584.0,-2589.0,0.45,-3448.0,-3194.0,605.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,-1945.0,42,31.0,0.46,-3015.0,-2288.0,-584.0,-4035.0,0.21,-4035.0,-4035.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,-327.0,63,38.1,0.88,-1606.0,-1327.0,-417.0,-2402.0,0.42,-2884.0,-2689.0,287.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,-1838.0,62,29.0,0.46,-2660.0,-1980.0,-417.0,-3895.0,0.21,-3895.0,-3895.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,407.0,21,38.1,1.14,-2561.0,-2234.0,-528.0,-1672.0,0.6,-3551.0,-2967.0,1295.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-2738.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4824.0,0.12,-4878.0,-4824.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-485.0,42,35.7,0.85,-2396.0,-1923.0,-584.0,-2564.0,0.46,-3433.0,-3203.0,639.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,-1978.0,42,31.0,0.45,-3031.0,-2298.0,-584.0,-4068.0,0.2,-4068.0,-4068.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,-305.0,63,38.1,0.89,-1579.0,-1277.0,-417.0,-2380.0,0.42,-2835.0,-2714.0,334.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,-1910.0,62,29.0,0.44,-2688.0,-2038.0,-417.0,-3968.0,0.19,-3968.0,-3968.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,156.0,21,38.1,1.06,-2591.0,-2234.0,-528.0,-1924.0,0.54,-3555.0,-2942.0,1017.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-2727.0,21,28.6,0.29,-3786.0,-3093.0,-622.0,-4813.0,0.11,-4893.0,-4813.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-494.0,42,35.7,0.85,-2425.0,-1974.0,-584.0,-2574.0,0.45,-3462.0,-3090.0,516.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,-1735.0,42,35.7,0.52,-2795.0,-1928.0,-584.0,-3827.0,0.23,-3827.0,-3827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,-255.0,63,41.3,0.91,-1542.0,-1210.0,-417.0,-2333.0,0.43,-2759.0,-2500.0,167.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-1771.0,62,35.5,0.48,-2511.0,-1805.0,-417.0,-3829.0,0.2,-3829.0,-3829.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-41.0,21,38.1,0.99,-2561.0,-2234.0,-528.0,-2122.0,0.49,-3551.0,-2938.0,816.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-2726.0,21,28.6,0.29,-3786.0,-3091.0,-622.0,-4812.0,0.11,-4895.0,-4812.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-419.0,42,38.1,0.87,-2293.0,-1848.0,-584.0,-2498.0,0.47,-3327.0,-3085.0,587.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,-1692.0,42,35.7,0.53,-2777.0,-1875.0,-584.0,-3783.0,0.24,-3783.0,-3783.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,-196.0,63,42.9,0.93,-1445.0,-1128.0,-417.0,-2273.0,0.44,-2759.0,-2488.0,215.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,-1774.0,62,35.5,0.48,-2512.0,-1801.0,-417.0,-3832.0,0.2,-3832.0,-3832.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,169.0,21,38.1,1.06,-2515.0,-2190.0,-528.0,-1912.0,0.54,-3507.0,-2894.0,982.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-2700.0,21,28.6,0.29,-3755.0,-3100.0,-622.0,-4786.0,0.12,-4870.0,-4786.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,-468.0,42,38.1,0.86,-2493.0,-2062.0,-584.0,-2547.0,0.46,-3533.0,-3196.0,649.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,-1799.0,42,38.1,0.5,-2800.0,-2105.0,-584.0,-3890.0,0.21,-3890.0,-3890.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,-236.0,63,44.4,0.91,-1587.0,-1332.0,-417.0,-2313.0,0.43,-2857.0,-2567.0,255.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,-1770.0,62,37.1,0.48,-2509.0,-1879.0,-417.0,-3828.0,0.2,-3828.0,-3828.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,296.0,21,38.1,1.11,-2545.0,-2201.0,-528.0,-1785.0,0.57,-3518.0,-2912.0,1128.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-2723.0,21,28.6,0.28,-3771.0,-3116.0,-622.0,-4809.0,0.11,-4885.0,-4809.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,-455.0,42,38.1,0.86,-2532.0,-2100.0,-584.0,-2533.0,0.46,-3574.0,-3214.0,680.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,-1858.0,42,38.1,0.48,-2847.0,-2169.0,-584.0,-3949.0,0.21,-3949.0,-3949.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,-256.0,63,44.4,0.91,-1639.0,-1392.0,-417.0,-2332.0,0.42,-2919.0,-2598.0,266.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,-1811.0,62,37.1,0.47,-2534.0,-1925.0,-417.0,-3869.0,0.2,-3869.0,-3869.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,545.0,21,38.1,1.19,-2561.0,-2234.0,-528.0,-1534.0,0.63,-3551.0,-2967.0,1433.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,-423.0,42,35.7,0.87,-2424.0,-1965.0,-584.0,-2501.0,0.47,-3464.0,-3209.0,708.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,-1961.0,42,31.0,0.45,-3004.0,-2304.0,-584.0,-4051.0,0.21,-4051.0,-4051.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,-277.0,63,38.1,0.9,-1609.0,-1356.0,-417.0,-2353.0,0.43,-2889.0,-2696.0,343.0
+2nd 5-min candle closes beyond the 1st (no volume check),"50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,-1935.0,62,29.0,0.43,-2665.0,-2077.0,-417.0,-3992.0,0.19,-3992.0,-3992.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,97.0,21,38.1,1.03,-2515.0,-2190.0,-528.0,-1985.0,0.52,-3507.0,-2894.0,909.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-2700.0,21,28.6,0.29,-3755.0,-3100.0,-622.0,-4786.0,0.12,-4870.0,-4786.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-486.0,42,38.1,0.85,-2485.0,-2036.0,-584.0,-2565.0,0.45,-3515.0,-3178.0,613.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,-1781.0,42,38.1,0.5,-2809.0,-2087.0,-584.0,-3872.0,0.22,-3872.0,-3872.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,-238.0,63,44.4,0.91,-1570.0,-1304.0,-417.0,-2315.0,0.43,-2848.0,-2556.0,241.0
+2nd 5-min candle closes beyond the 1st (no volume check),"33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,-1726.0,62,37.1,0.49,-2515.0,-1835.0,-417.0,-3784.0,0.21,-3784.0,-3784.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,1,no news,Long+short,-1672.0,21,19.0,0.19,-2060.0,-1828.0,-447.0,-3767.0,0.02,-3821.0,-2489.0,-1278.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,1,no news,Long only,-1503.0,21,23.8,0.24,-1990.0,-1658.0,-447.0,-3595.0,0.03,-3649.0,-3595.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,2,no news,Long+short,-1237.0,42,21.4,0.38,-1903.0,-1296.0,-321.0,-3327.0,0.11,-3327.0,-2510.0,-817.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,2,no news,Long only,-673.0,42,31.0,0.62,-1372.0,-742.0,-233.0,-2770.0,0.16,-2770.0,-2770.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,3,no news,Long+short,-930.0,63,22.2,0.47,-1515.0,-930.0,-248.0,-3016.0,0.13,-3016.0,-1998.0,-1018.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + out on a close back through VWAP,3,no news,Long only,-644.0,62,27.4,0.6,-1230.0,-659.0,-143.0,-2707.0,0.15,-2707.0,-2707.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",1,no news,Long+short,436.0,21,38.1,1.15,-2561.0,-2234.0,-528.0,-1643.0,0.61,-3551.0,-2967.0,1324.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",2,no news,Long+short,-461.0,42,35.7,0.86,-2423.0,-1944.0,-584.0,-2540.0,0.46,-3447.0,-3193.0,653.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",2,no news,Long only,-1944.0,42,31.0,0.46,-3009.0,-2287.0,-584.0,-4035.0,0.21,-4035.0,-4035.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",3,no news,Long+short,-301.0,63,38.1,0.89,-1609.0,-1344.0,-417.0,-2376.0,0.42,-2877.0,-2689.0,312.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner trails VWAP",3,no news,Long only,-1865.0,62,29.0,0.45,-2656.0,-2008.0,-417.0,-3922.0,0.2,-3922.0,-3922.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,1,no news,Long+short,275.0,21,38.1,1.1,-2561.0,-2234.0,-528.0,-1804.0,0.57,-3551.0,-2967.0,1163.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,2,no news,Long+short,-537.0,42,35.7,0.84,-2423.0,-1939.0,-584.0,-2616.0,0.45,-3443.0,-3189.0,573.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,2,no news,Long only,-1940.0,42,31.0,0.46,-3009.0,-2283.0,-584.0,-4030.0,0.21,-4030.0,-4030.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,3,no news,Long+short,-356.0,63,38.1,0.87,-1613.0,-1335.0,-417.0,-2432.0,0.41,-2912.0,-2688.0,257.0
+2nd 5-min candle closes beyond the 1st (no volume check),Base + entry only on the right side of VWAP,3,no news,Long only,-1861.0,62,29.0,0.45,-2658.0,-2004.0,-417.0,-3919.0,0.2,-3919.0,-3919.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,308.0,21,38.1,1.11,-2561.0,-2234.0,-528.0,-1771.0,0.58,-3551.0,-2967.0,1196.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-2741.0,21,28.6,0.29,-3820.0,-3165.0,-622.0,-4827.0,0.12,-4881.0,-4827.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,-527.0,42,35.7,0.84,-2429.0,-1940.0,-584.0,-2606.0,0.45,-3450.0,-3196.0,589.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",2,no news,Long only,-1947.0,42,31.0,0.46,-3015.0,-2290.0,-584.0,-4037.0,0.21,-4037.0,-4037.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,-337.0,63,38.1,0.88,-1605.0,-1340.0,-417.0,-2413.0,0.41,-2906.0,-2689.0,277.0
+2nd 5-min candle closes beyond the 1st (no volume check),"Base, runner chandelier 3x 1-min ATR",3,no news,Long only,-1836.0,62,29.0,0.46,-2659.0,-1979.0,-417.0,-3894.0,0.21,-3894.0,-3894.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,42.0,21,38.1,1.01,-2561.0,-2234.0,-528.0,-2039.0,0.51,-3551.0,-2915.0,875.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-2725.0,21,28.6,0.29,-3786.0,-3102.0,-622.0,-4812.0,0.11,-4918.0,-4812.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,-580.0,42,38.1,0.83,-2400.0,-1924.0,-584.0,-2660.0,0.43,-3440.0,-3204.0,545.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,-1745.0,42,35.7,0.51,-2871.0,-1978.0,-584.0,-3837.0,0.23,-3837.0,-3837.0,0.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,-304.0,63,42.9,0.89,-1531.0,-1183.0,-417.0,-2381.0,0.41,-2825.0,-2541.0,160.0
+2nd 5-min candle closes beyond the 1st (no volume check),No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,-1834.0,62,35.5,0.46,-2584.0,-1886.0,-417.0,-3892.0,0.19,-3892.0,-3892.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long+short,-1891.0,15,26.7,0.26,-2568.0,-1891.0,-528.0,-3381.0,0.11,-3381.0,-2741.0,-640.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",1,no news,Long only,-1078.0,12,25.0,0.47,-2022.0,-1107.0,-528.0,-2273.0,0.22,-2273.0,-2273.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long+short,-530.0,26,38.5,0.66,-1304.0,-632.0,-333.0,-1823.0,0.24,-1823.0,-1237.0,-586.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",2,no news,Long only,-308.0,18,33.3,0.72,-1003.0,-431.0,-333.0,-1206.0,0.28,-1206.0,-1206.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long+short,-195.0,33,39.4,0.82,-744.0,-285.0,-222.0,-1288.0,0.27,-1288.0,-868.0,-420.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base (current): BE 1R, 50% 1.5R, 25% 2R, runner trail 1R",3,no news,Long only,-169.0,21,33.3,0.77,-633.0,-288.0,-222.0,-868.0,0.27,-868.0,-868.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,1,no news,Long+short,-1118.0,15,20.0,0.24,-1467.0,-1118.0,-389.0,-2615.0,0.06,-2615.0,-1645.0,-970.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,1,no news,Long only,-172.0,12,16.7,0.81,-921.0,-614.0,-389.0,-1371.0,0.29,-1371.0,-1371.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,2,no news,Long+short,-326.0,26,26.9,0.65,-900.0,-360.0,-322.0,-1621.0,0.17,-1621.0,-924.0,-697.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,2,no news,Long only,6.0,18,22.2,1.01,-534.0,-225.0,-153.0,-894.0,0.28,-894.0,-894.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,3,no news,Long+short,-28.0,33,30.3,0.96,-486.0,-187.0,-161.0,-1123.0,0.21,-1123.0,-660.0,-463.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.25 x daily ATR,3,no news,Long only,40.0,21,23.8,1.11,-359.0,-150.0,-102.0,-660.0,0.26,-660.0,-660.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,1,no news,Long+short,-1727.0,15,20.0,0.17,-2075.0,-1727.0,-528.0,-3221.0,0.05,-3221.0,-2250.0,-970.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,1,no news,Long only,-780.0,12,16.7,0.49,-1529.0,-920.0,-528.0,-1976.0,0.22,-1976.0,-1976.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,2,no news,Long+short,-841.0,26,19.2,0.35,-1303.0,-841.0,-333.0,-2134.0,0.11,-2134.0,-1311.0,-824.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,2,no news,Long only,-382.0,18,16.7,0.55,-839.0,-529.0,-333.0,-1280.0,0.19,-1280.0,-1280.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,3,no news,Long+short,-447.0,33,21.2,0.51,-882.0,-447.0,-222.0,-1541.0,0.15,-1541.0,-963.0,-579.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.5R,3,no news,Long only,-264.0,21,14.3,0.54,-569.0,-353.0,-222.0,-963.0,0.18,-963.0,-963.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,1,no news,Long+short,-1398.0,15,26.7,0.33,-2075.0,-1398.0,-528.0,-2890.0,0.12,-2890.0,-2250.0,-640.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,1,no news,Long only,-585.0,12,25.0,0.62,-1529.0,-725.0,-528.0,-1782.0,0.27,-1782.0,-1782.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,2,no news,Long+short,-283.0,26,38.5,0.78,-1057.0,-385.0,-333.0,-1578.0,0.27,-1578.0,-992.0,-586.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,2,no news,Long only,-61.0,18,33.3,0.93,-756.0,-431.0,-333.0,-961.0,0.33,-961.0,-961.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,3,no news,Long+short,-30.0,33,39.4,0.97,-579.0,-267.0,-222.0,-1125.0,0.3,-1125.0,-705.0,-420.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 0.75R,3,no news,Long only,-5.0,21,33.3,0.99,-468.0,-288.0,-222.0,-705.0,0.31,-705.0,-705.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,1,no news,Long+short,-2168.0,15,33.3,0.25,-2901.0,-2168.0,-528.0,-3657.0,0.1,-3657.0,-3016.0,-640.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,1,no news,Long only,-1355.0,12,33.3,0.43,-2296.0,-1439.0,-528.0,-2548.0,0.2,-2548.0,-2548.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,2,no news,Long+short,-571.0,26,46.2,0.67,-1372.0,-571.0,-333.0,-1863.0,0.26,-1863.0,-1277.0,-586.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,2,no news,Long only,-348.0,18,44.4,0.73,-1085.0,-446.0,-333.0,-1246.0,0.3,-1246.0,-1246.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,3,no news,Long+short,-207.0,33,48.5,0.83,-756.0,-264.0,-222.0,-1301.0,0.29,-1301.0,-865.0,-435.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",BE at 1.5R,3,no news,Long only,-166.0,21,47.6,0.81,-657.0,-288.0,-222.0,-865.0,0.3,-865.0,-865.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,1,no news,Long+short,-2068.0,15,33.3,0.29,-2901.0,-2068.0,-528.0,-3556.0,0.12,-3556.0,-3016.0,-540.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,1,no news,Long only,-1355.0,12,33.3,0.43,-2296.0,-1439.0,-528.0,-2548.0,0.2,-2548.0,-2548.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,2,no news,Long+short,-521.0,26,46.2,0.7,-1323.0,-521.0,-333.0,-1813.0,0.27,-1813.0,-1277.0,-536.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,2,no news,Long only,-348.0,18,44.4,0.73,-1085.0,-446.0,-333.0,-1246.0,0.3,-1246.0,-1246.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,3,no news,Long+short,-174.0,33,48.5,0.86,-723.0,-264.0,-222.0,-1267.0,0.3,-1267.0,-865.0,-402.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No breakeven,3,no news,Long only,-166.0,21,47.6,0.81,-657.0,-288.0,-222.0,-865.0,0.3,-865.0,-865.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",1,no news,Long+short,-1755.0,15,40.0,0.32,-2539.0,-1755.0,-528.0,-3245.0,0.11,-3245.0,-2658.0,-586.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",1,no news,Long only,-995.0,12,41.7,0.51,-2022.0,-1053.0,-528.0,-2190.0,0.23,-2190.0,-2190.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",2,no news,Long+short,-415.0,26,53.8,0.73,-1189.0,-565.0,-333.0,-1708.0,0.25,-1708.0,-1148.0,-560.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",2,no news,Long only,-218.0,18,55.6,0.8,-914.0,-431.0,-333.0,-1117.0,0.3,-1117.0,-1117.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",3,no news,Long+short,-123.0,33,60.6,0.88,-672.0,-266.0,-222.0,-1217.0,0.28,-1217.0,-821.0,-396.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","BE at 1R, lock +0.25R",3,no news,Long only,-121.0,21,61.9,0.83,-585.0,-288.0,-222.0,-821.0,0.28,-821.0,-821.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long+short,-412.0,15,60.0,0.72,-1212.0,-827.0,-389.0,-1910.0,0.14,-2016.0,-1228.0,-682.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",1,no news,Long only,-13.0,12,66.7,0.99,-736.0,-467.0,-389.0,-1213.0,0.15,-1240.0,-1213.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long+short,87.0,26,69.2,1.09,-320.0,-335.0,-322.0,-1209.0,0.18,-1209.0,-679.0,-529.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",2,no news,Long only,206.0,18,72.2,1.39,-179.0,-160.0,-160.0,-696.0,0.2,-696.0,-696.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long+short,218.0,33,72.7,1.35,-69.0,-217.0,-192.0,-877.0,0.19,-877.0,-496.0,-381.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","ADR targets: 50% at 25% ADR, 25% at 50% ADR, runner trail 15% ADR",3,no news,Long only,205.0,21,76.2,1.58,-51.0,-107.0,-107.0,-496.0,0.19,-496.0,-496.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,1,no news,Long+short,-1723.0,15,40.0,0.33,-2507.0,-1861.0,-528.0,-3214.0,0.09,-3214.0,-2577.0,-638.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,1,no news,Long only,-1278.0,12,41.7,0.37,-2022.0,-1278.0,-528.0,-2472.0,0.11,-2472.0,-2472.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,2,no news,Long+short,-352.0,26,53.8,0.77,-994.0,-743.0,-333.0,-1644.0,0.25,-1790.0,-1215.0,-429.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,2,no news,Long only,-324.0,18,55.6,0.7,-858.0,-493.0,-333.0,-1223.0,0.2,-1223.0,-1223.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,3,no news,Long+short,-59.0,33,60.6,0.94,-519.0,-410.0,-222.0,-1152.0,0.28,-1272.0,-841.0,-311.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",ADR trail only: trail 25% ADR once at BE,3,no news,Long only,-142.0,21,61.9,0.8,-498.0,-328.0,-222.0,-841.0,0.21,-842.0,-841.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,1,no news,Long+short,-1043.0,15,33.3,0.28,-1444.0,-1081.0,-389.0,-2537.0,0.03,-2537.0,-1892.0,-645.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,1,no news,Long only,-835.0,12,50.0,0.26,-1128.0,-886.0,-389.0,-2031.0,0.0,-2031.0,-2031.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,2,no news,Long+short,-373.0,26,53.8,0.59,-741.0,-469.0,-322.0,-1666.0,0.07,-1666.0,-1197.0,-468.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,2,no news,Long only,-329.0,18,61.1,0.48,-568.0,-372.0,-218.0,-1227.0,0.03,-1227.0,-1227.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,3,no news,Long+short,-237.0,33,51.5,0.63,-483.0,-311.0,-201.0,-1331.0,0.06,-1331.0,-896.0,-434.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 100% ADR,3,no news,Long only,-197.0,21,61.9,0.55,-363.0,-248.0,-146.0,-896.0,0.03,-896.0,-896.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,1,no news,Long+short,-706.0,15,40.0,0.62,-1792.0,-1010.0,-389.0,-2199.0,0.21,-2199.0,-1817.0,-383.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,1,no news,Long only,-666.0,12,41.7,0.5,-1333.0,-699.0,-389.0,-1863.0,0.13,-1863.0,-1863.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,2,no news,Long+short,-164.0,26,53.8,0.86,-759.0,-509.0,-322.0,-1458.0,0.23,-1460.0,-996.0,-462.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,2,no news,Long only,-93.0,18,55.6,0.87,-569.0,-326.0,-218.0,-993.0,0.19,-993.0,-993.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,3,no news,Long+short,25.0,33,57.6,1.03,-372.0,-355.0,-179.0,-1070.0,0.22,-1070.0,-690.0,-380.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out when the day's range reaches 130% ADR,3,no news,Long only,10.0,21,61.9,1.02,-308.0,-217.0,-146.0,-690.0,0.18,-690.0,-690.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",1,no news,Long+short,-1846.0,15,26.7,0.28,-2568.0,-1846.0,-528.0,-3336.0,0.12,-3336.0,-2737.0,-599.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",1,no news,Long only,-1120.0,12,25.0,0.45,-2022.0,-1120.0,-528.0,-2315.0,0.21,-2315.0,-2315.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",2,no news,Long+short,-518.0,26,38.5,0.66,-1291.0,-625.0,-333.0,-1811.0,0.24,-1811.0,-1250.0,-561.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",2,no news,Long only,-322.0,18,33.3,0.7,-1003.0,-421.0,-333.0,-1220.0,0.27,-1220.0,-1220.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",3,no news,Long+short,-189.0,33,39.4,0.82,-730.0,-287.0,-222.0,-1283.0,0.27,-1283.0,-879.0,-403.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA (1-min close)",3,no news,Long only,-180.0,21,33.3,0.75,-635.0,-280.0,-222.0,-879.0,0.26,-879.0,-879.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",1,no news,Long+short,-1865.0,15,26.7,0.27,-2568.0,-1865.0,-528.0,-3355.0,0.11,-3355.0,-2742.0,-613.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",1,no news,Long only,-1129.0,12,25.0,0.44,-2022.0,-1129.0,-528.0,-2324.0,0.2,-2324.0,-2324.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",2,no news,Long+short,-534.0,26,38.5,0.65,-1295.0,-638.0,-333.0,-1827.0,0.24,-1827.0,-1257.0,-570.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",2,no news,Long only,-329.0,18,33.3,0.7,-1004.0,-421.0,-333.0,-1227.0,0.27,-1227.0,-1227.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",3,no news,Long+short,-200.0,33,39.4,0.81,-734.0,-295.0,-222.0,-1293.0,0.27,-1293.0,-884.0,-410.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 20 EMA (1-min close)",3,no news,Long only,-185.0,21,33.3,0.75,-635.0,-281.0,-222.0,-884.0,0.26,-884.0,-884.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",1,no news,Long+short,-1891.0,15,26.7,0.26,-2568.0,-1891.0,-528.0,-3381.0,0.11,-3381.0,-2745.0,-635.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",1,no news,Long only,-1114.0,12,25.0,0.45,-2022.0,-1114.0,-528.0,-2309.0,0.21,-2309.0,-2309.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",2,no news,Long+short,-541.0,26,38.5,0.65,-1299.0,-643.0,-333.0,-1834.0,0.23,-1834.0,-1251.0,-583.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",2,no news,Long only,-324.0,18,33.3,0.7,-1005.0,-424.0,-333.0,-1222.0,0.27,-1222.0,-1222.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",3,no news,Long+short,-206.0,33,39.4,0.81,-739.0,-297.0,-222.0,-1299.0,0.26,-1299.0,-881.0,-418.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails 9 EMA on 5-min bars",3,no news,Long only,-182.0,21,33.3,0.75,-636.0,-283.0,-222.0,-881.0,0.26,-881.0,-881.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long+short,-2018.0,15,26.7,0.22,-2568.0,-2018.0,-528.0,-3507.0,0.07,-3507.0,-2825.0,-682.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",1,no news,Long only,-1210.0,12,25.0,0.4,-2022.0,-1210.0,-528.0,-2404.0,0.18,-2404.0,-2404.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long+short,-616.0,26,38.5,0.6,-1304.0,-712.0,-333.0,-1909.0,0.2,-1909.0,-1296.0,-613.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",2,no news,Long only,-373.0,18,33.3,0.66,-1008.0,-431.0,-333.0,-1271.0,0.24,-1271.0,-1271.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long+short,-265.0,33,39.4,0.75,-756.0,-351.0,-222.0,-1358.0,0.23,-1358.0,-920.0,-438.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% at 1.5R, rest trails 9 EMA 5-min",3,no news,Long only,-221.0,21,33.3,0.69,-645.0,-287.0,-222.0,-920.0,0.23,-920.0,-920.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long+short,-2025.0,15,26.7,0.21,-2568.0,-2025.0,-528.0,-3514.0,0.06,-3514.0,-2853.0,-661.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,1,no news,Long only,-1292.0,12,33.3,0.36,-2022.0,-1292.0,-528.0,-2486.0,0.15,-2486.0,-2486.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long+short,-539.0,26,46.2,0.65,-1182.0,-680.0,-333.0,-1832.0,0.2,-1832.0,-1276.0,-555.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,2,no news,Long only,-347.0,18,50.0,0.68,-939.0,-488.0,-333.0,-1245.0,0.22,-1245.0,-1245.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long+short,-197.0,33,51.5,0.81,-662.0,-353.0,-222.0,-1290.0,0.23,-1290.0,-890.0,-400.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 9 EMA 5-min once at BE,3,no news,Long only,-191.0,21,57.1,0.73,-586.0,-325.0,-222.0,-890.0,0.2,-890.0,-890.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long+short,-1827.0,15,26.7,0.29,-2568.0,-1836.0,-528.0,-3316.0,0.1,-3316.0,-2750.0,-566.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,1,no news,Long only,-1416.0,12,33.3,0.3,-2022.0,-1416.0,-528.0,-2609.0,0.08,-2609.0,-2609.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long+short,-494.0,26,46.2,0.68,-1065.0,-650.0,-333.0,-1787.0,0.2,-1787.0,-1288.0,-498.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,2,no news,Long only,-399.0,18,50.0,0.63,-904.0,-479.0,-333.0,-1297.0,0.16,-1297.0,-1297.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long+short,-189.0,33,54.5,0.82,-600.0,-370.0,-222.0,-1282.0,0.22,-1282.0,-926.0,-356.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: all trails 20 EMA 1-min once at BE,3,no news,Long only,-227.0,21,57.1,0.68,-564.0,-320.0,-222.0,-926.0,0.15,-926.0,-926.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long+short,-1794.0,15,40.0,0.3,-2541.0,-1794.0,-528.0,-3284.0,0.1,-3284.0,-2647.0,-637.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",1,no news,Long only,-986.0,12,41.7,0.51,-2022.0,-1035.0,-528.0,-2181.0,0.22,-2181.0,-2181.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long+short,-405.0,26,53.8,0.74,-1132.0,-577.0,-333.0,-1698.0,0.25,-1698.0,-1143.0,-556.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",2,no news,Long only,-217.0,18,55.6,0.8,-888.0,-441.0,-333.0,-1116.0,0.28,-1116.0,-1116.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long+short,-78.0,33,60.6,0.93,-602.0,-267.0,-222.0,-1172.0,0.28,-1172.0,-781.0,-391.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Thirds at 1R, 2R, 3R, stop steps up",3,no news,Long only,-81.0,21,61.9,0.89,-529.0,-294.0,-222.0,-781.0,0.28,-781.0,-781.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long+short,-1858.0,15,40.0,0.28,-2548.0,-1858.0,-528.0,-3348.0,0.09,-3348.0,-2667.0,-681.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",1,no news,Long only,-1014.0,12,41.7,0.5,-2022.0,-1053.0,-528.0,-2209.0,0.22,-2209.0,-2209.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long+short,-428.0,26,53.8,0.72,-1169.0,-605.0,-333.0,-1721.0,0.25,-1721.0,-1162.0,-559.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",2,no news,Long only,-233.0,18,55.6,0.78,-914.0,-446.0,-333.0,-1132.0,0.29,-1132.0,-1132.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long+short,-104.0,33,60.6,0.9,-625.0,-275.0,-222.0,-1198.0,0.28,-1198.0,-802.0,-396.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Quarters at 1R, 2R, 3R, 4R, stop steps up",3,no news,Long only,-102.0,21,61.9,0.86,-557.0,-297.0,-222.0,-802.0,0.28,-802.0,-802.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long+short,-1900.0,15,26.7,0.26,-2568.0,-1900.0,-528.0,-3390.0,0.1,-3390.0,-2749.0,-641.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",1,no news,Long only,-1084.0,12,25.0,0.47,-2022.0,-1107.0,-528.0,-2278.0,0.22,-2278.0,-2278.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long+short,-475.0,26,38.5,0.69,-1275.0,-622.0,-333.0,-1767.0,0.26,-1767.0,-1227.0,-541.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",2,no news,Long only,-298.0,18,33.3,0.73,-1004.0,-446.0,-333.0,-1197.0,0.29,-1197.0,-1197.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long+short,-161.0,33,39.4,0.85,-718.0,-290.0,-222.0,-1255.0,0.29,-1255.0,-865.0,-390.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","50% 1.5R, 25% 3R, runner trail 1.5R",3,no news,Long only,-166.0,21,33.3,0.77,-636.0,-297.0,-222.0,-865.0,0.27,-865.0,-865.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long+short,-1800.0,15,40.0,0.3,-2541.0,-1800.0,-528.0,-3290.0,0.09,-3290.0,-2653.0,-637.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",1,no news,Long only,-1058.0,12,41.7,0.48,-2022.0,-1058.0,-528.0,-2253.0,0.2,-2253.0,-2253.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long+short,-469.0,26,53.8,0.69,-1158.0,-618.0,-333.0,-1762.0,0.22,-1762.0,-1183.0,-579.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",2,no news,Long only,-261.0,18,55.6,0.76,-891.0,-432.0,-333.0,-1160.0,0.26,-1160.0,-1160.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long+short,-123.0,33,60.6,0.88,-615.0,-281.0,-222.0,-1217.0,0.25,-1217.0,-810.0,-406.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","33% 1R, 33% 2R, runner trail 9 EMA 5-min, steps",3,no news,Long only,-111.0,21,61.9,0.85,-531.0,-288.0,-222.0,-810.0,0.25,-810.0,-810.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,1,no news,Long+short,-506.0,15,26.7,0.44,-898.0,-681.0,-193.0,-2004.0,0.04,-2004.0,-1191.0,-813.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,1,no news,Long only,479.0,12,41.7,1.91,-526.0,-193.0,-193.0,-723.0,0.43,-723.0,-723.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,2,no news,Long+short,-39.0,26,30.8,0.94,-584.0,-253.0,-161.0,-1336.0,0.18,-1336.0,-630.0,-705.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,2,no news,Long only,198.0,18,33.3,1.61,-304.0,-129.0,-129.0,-703.0,0.28,-703.0,-703.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,3,no news,Long+short,-104.0,33,30.3,0.82,-470.0,-183.0,-122.0,-1200.0,0.14,-1200.0,-542.0,-659.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + out on a close back through VWAP,3,no news,Long only,159.0,21,38.1,1.63,-198.0,-86.0,-86.0,-542.0,0.26,-542.0,-542.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",1,no news,Long+short,-1865.0,15,26.7,0.27,-2568.0,-1865.0,-528.0,-3355.0,0.11,-3355.0,-2741.0,-614.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",1,no news,Long only,-1149.0,12,25.0,0.43,-2022.0,-1149.0,-528.0,-2343.0,0.2,-2343.0,-2343.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",2,no news,Long+short,-511.0,26,38.5,0.67,-1266.0,-647.0,-333.0,-1803.0,0.25,-1803.0,-1265.0,-538.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",2,no news,Long only,-336.0,18,33.3,0.69,-1003.0,-431.0,-333.0,-1234.0,0.27,-1234.0,-1234.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",3,no news,Long+short,-183.0,33,39.4,0.83,-716.0,-301.0,-222.0,-1276.0,0.28,-1276.0,-887.0,-388.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner trails VWAP",3,no news,Long only,-188.0,21,33.3,0.74,-633.0,-288.0,-222.0,-887.0,0.25,-887.0,-887.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,1,no news,Long+short,-1891.0,15,26.7,0.26,-2568.0,-1891.0,-528.0,-3381.0,0.11,-3381.0,-2741.0,-640.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,1,no news,Long only,-1078.0,12,25.0,0.47,-2022.0,-1107.0,-528.0,-2273.0,0.22,-2273.0,-2273.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,2,no news,Long+short,-530.0,26,38.5,0.66,-1304.0,-632.0,-333.0,-1823.0,0.24,-1823.0,-1237.0,-586.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,2,no news,Long only,-308.0,18,33.3,0.72,-1003.0,-431.0,-333.0,-1206.0,0.28,-1206.0,-1206.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,3,no news,Long+short,-195.0,33,39.4,0.82,-744.0,-285.0,-222.0,-1288.0,0.27,-1288.0,-868.0,-420.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",Base + entry only on the right side of VWAP,3,no news,Long only,-169.0,21,33.3,0.77,-633.0,-288.0,-222.0,-868.0,0.27,-868.0,-868.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",1,no news,Long+short,-1849.0,15,26.7,0.28,-2568.0,-1849.0,-528.0,-3339.0,0.12,-3339.0,-2739.0,-600.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",1,no news,Long only,-1134.0,12,25.0,0.44,-2022.0,-1134.0,-528.0,-2328.0,0.2,-2328.0,-2328.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",2,no news,Long+short,-527.0,26,38.5,0.66,-1293.0,-633.0,-333.0,-1820.0,0.24,-1820.0,-1258.0,-562.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",2,no news,Long only,-330.0,18,33.3,0.7,-1004.0,-423.0,-333.0,-1228.0,0.27,-1228.0,-1228.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",3,no news,Long+short,-193.0,33,39.4,0.82,-731.0,-289.0,-222.0,-1286.0,0.27,-1286.0,-882.0,-404.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle","Base, runner chandelier 3x 1-min ATR",3,no news,Long only,-183.0,21,33.3,0.75,-632.0,-282.0,-222.0,-882.0,0.26,-882.0,-882.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long+short,-1928.0,15,26.7,0.25,-2568.0,-1940.0,-528.0,-3417.0,0.08,-3417.0,-2836.0,-581.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,1,no news,Long only,-1504.0,12,33.3,0.26,-2022.0,-1504.0,-528.0,-2697.0,0.06,-2697.0,-2697.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long+short,-561.0,26,46.2,0.63,-1118.0,-723.0,-333.0,-1853.0,0.18,-1853.0,-1321.0,-532.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,2,no news,Long only,-434.0,18,50.0,0.6,-911.0,-483.0,-333.0,-1332.0,0.15,-1332.0,-1332.0,0.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long+short,-226.0,33,54.5,0.79,-634.0,-378.0,-222.0,-1318.0,0.2,-1318.0,-943.0,-376.0
+"2nd 5-min candle closes beyond the 1st, volume >= 1st candle",No targets: chandelier 3x 1-min ATR once at BE,3,no news,Long only,-244.0,21,57.1,0.66,-562.0,-322.0,-222.0,-943.0,0.14,-943.0,-943.0,0.0
