@@ -224,6 +224,8 @@ def trades(cands, x, adr, vwap_filter=False, datr_tab=None):
             continue
         if ENTRY["or"] == 5 and (cand["rvol5"] < o.MIN_RVOL or cand["price5"] < o.MIN_PRICE):
             continue                             # stocks in play judged on what is known at 09:35
+        if ENTRY["or"] != 5 and cand["rvol"] < o.MIN_RVOL:
+            continue                             # 15/30-min range: first 15 minutes (known at 09:45)
         if ENTRY_MODE == "breakout":
             ents = {k_: tuple(v_) + (None,) for k_, v_ in v.find_entries(cand, ENTRY).items()}
         else:
