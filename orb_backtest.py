@@ -294,7 +294,7 @@ def add_news_flags(trades, days):
 
 # ---------------------------------------------------------------------------- portfolio
 def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=0.5, daily_limit_pct=0.0,
-              keep=None, commission_pct=0.0, max_per_day=0):
+              keep=None, commission_pct=0.0, max_per_day=0, weights=None, min_rvol_after_first=0.0):
     """Applies an optional filter (keep), slots (max open positions), sizing and an optional daily loss limit.
     Long+short takes, per stock and day, the first break that passes the filters; long only takes the long break."""
     pool = [t for t in trades if (not news_required or t["news"]) and (keep is None or keep(t))]
@@ -320,6 +320,8 @@ def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=
                 continue
             if max_per_day and len(closed) >= max_per_day:
                 break
+            if min_rvol_after_first and closed and t["rvol"] < min_rvol_after_first:
+                continue                     # after the first trade of the day, only strong stocks
             # daily loss limit: only trades already CLOSED before this entry count (no look-ahead)
             realized = sum(p for e, p in closed if e <= t["entry_m"])
             if daily_limit_pct and realized <= -CAPITAL * daily_limit_pct / 100:
@@ -328,6 +330,8 @@ def portfolio(trades, slots, long_only, news_required, sizing="EQUAL", risk_pct=
                 shares = min(CAPITAL * risk_pct / 100 / t["risk"], 2 * slot_value / t["entry"])
             elif sizing == "RISK_CAP":           # risk a fixed % of capital, position never above the slot value
                 shares = min(CAPITAL * risk_pct / 100 / t["risk"], slot_value / t["entry"])
+            elif weights:                        # share of the capital by the order of the trade in the day
+                shares = CAPITAL * weights[min(len(closed), len(weights) - 1)] / t["entry"]
             else:
                 shares = slot_value / t["entry"]
             if t["side"] == "short":
